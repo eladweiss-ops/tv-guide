@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="he" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>לוח שידורים אישי</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
+<style>
+  /* Layout: one column built for a thumb. Sticky header (title, channel chooser, two tabs, search). "Now" = one card per channel. "Grid" = channel dropdown, five day buttons, one list. Nothing scrolls sideways. */
+  :root {
+    --bg: #f7f5fb;
+    --surface: #ffffff;
+    --ink: #16142b;
+    --muted: #54506b;
+    --line: #ddd9ea;
+    --accent: #1b2a8f;
+    --accent-ink: #ffffff;
+    --soft: #ebe7f6;
+    --live: #c8381f;
+    --c-ent: #ff6a2b; --c-news: #1b2a8f; --c-life: #6fcbb8; --c-oth: #c9c7d1;
+    --font-body: "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --font-display: "Secular One", "Heebo", system-ui, Arial, sans-serif;
+  }
+  :root[data-theme="dark"] {
+    --bg: #15131f; --surface: #201d2e; --ink: #f1effa; --muted: #b3aecb; --line: #38334d;
+    --accent: #9aa6ff; --accent-ink: #10102a; --soft: #2a2640; --live: #ff8466;
+    --c-ent: #ff7f45; --c-news: #8a96ff; --c-life: #5cbfa9; --c-oth: #6b6780;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 112.5%; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); font-size: 1rem; line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  }
+  [hidden] { display: none !important; }
+  .page { max-width: 680px; margin: 0 auto; }
+  button, select, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    padding: 12px 0 10px; display: flex; flex-direction: column; gap: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; margin: 0; }
+  .ghost {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 14px; font-weight: 500; min-height: 44px;
+  }
+  .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--soft); border-radius: 12px; padding: 4px; gap: 4px; }
+  .tabs button { border: 0; background: transparent; padding: 10px; border-radius: 9px; font-weight: 700; color: var(--muted); min-height: 46px; }
+  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+  input[type="search"] {
+    width: 100%; border: 1px solid var(--line); background: var(--surface);
+    border-radius: 12px; padding: 11px 14px; min-height: 48px;
+  }
+
+  main { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; }
+  .note { background: var(--soft); border-radius: 12px; padding: 12px 14px; color: var(--ink); }
+  .note b { font-weight: 700; }
+  .note code { font-family: ui-monospace, Consolas, monospace; direction: ltr; unicode-bidi: embed; background: var(--surface); padding: 1px 6px; border-radius: 6px; }
+  .none { color: var(--muted); margin: 0; }
+  .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 700; min-height: 48px; }
+
+  /* now */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-width: 0; }
+  .chn { font-size: 0.95rem; font-weight: 700; color: var(--accent); }
+  .cur { font-size: 1.45rem; line-height: 1.25; margin: 0; font-weight: 700; text-wrap: balance; overflow-wrap: anywhere; }
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; }
+  .prog { height: 6px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--live); }
+  .next { margin: 2px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+  .next b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; margin-inline-end: 8px; }
+  .more { display: none; border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 4px; }
+  .more p { margin: 0; }
+  .open > .more { display: block; }
+
+  /* grid */
+  .sel { display: flex; flex-direction: column; gap: 4px; }
+  .lbl { font-size: 0.9rem; font-weight: 700; color: var(--muted); }
+  select {
+    width: 100%; min-height: 50px; border: 1px solid var(--line); background: var(--surface);
+    border-radius: 12px; padding: 10px 14px; font-weight: 500;
+  }
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.2rem, 1fr)); gap: 6px; }
+  .day {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+    border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 6px 2px; min-height: 56px; line-height: 1.25;
+  }
+  .day span { font-size: 0.85rem; color: var(--muted); }
+  .day b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+  .day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  .day[aria-pressed="true"] span, .day[aria-pressed="true"] b { color: var(--accent-ink); }
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 3.6rem minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .row:first-child { border-top: 0; }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+  .ttl { font-weight: 500; font-size: 1.0625rem; overflow-wrap: anywhere; min-width: 0; }
+  .row .more { grid-column: 2; margin: 4px 0 0; }
+  .row.now { background: var(--soft); }
+  .row.now .time { color: var(--live); font-weight: 700; }
+  .row.past .ttl, .row.past .time { opacity: .6; }
+  .tag { display: inline-block; margin-inline-start: 8px; font-size: 0.8rem; color: var(--live); font-weight: 700; }
+  .sub { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
+
+  /* sheet */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 20; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--surface);
+    border-radius: 18px 18px 0 0; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain;
+    padding-top: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .sheet-in { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .sheet h2 { margin: 0; font-size: 1.2rem; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opts { border-top: 1px solid var(--line); }
+  .opt { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 52px; }
+  .opt input { width: 24px; height: 24px; accent-color: var(--accent); flex: none; }
+  /* netflix */
+  .nf { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 14px; padding: 14px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .nf:first-child { border-top: 0; }
+  .poster { width: 100%; aspect-ratio: 2 / 3; border-radius: 8px; background: var(--soft); overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.8rem; text-align: center; }
+  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .nfb { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .nfb .ttl { font-size: 1.1rem; font-weight: 700; }
+  .ov { margin: 0; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .nf.open .ov { display: block; -webkit-line-clamp: unset; color: var(--ink); }
+  .credit { font-size: 0.8rem; color: var(--muted); margin: 6px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; min-height: 38px; font-size: 0.92rem; font-weight: 500; }
+  .sheet .chips { gap: 6px; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .gh { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 6px; font-weight: 700; color: var(--accent); }
+  .gh .ghost { min-height: 38px; padding: 4px 12px; font-size: 0.9rem; font-weight: 500; color: var(--ink); }
+  .opt .sub { margin-inline-start: auto; }
+  #done { position: sticky; bottom: 0; box-shadow: 0 -10px 12px -6px var(--surface); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; min-height: 48px; font-weight: 500; }
+  .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+  /* dial */
+  .dialwrap { display: flex; justify-content: center; }
+  #dial { width: 100%; max-width: 360px; height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
+  #dial .k-ent { fill: var(--c-ent); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
+  #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
+  #dial text { fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
+  #dial .face { fill: var(--surface); }
+  #dial .hand { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+  #dial .knob { fill: var(--ink); }
+  #dial .nowdot { fill: var(--live); stroke: var(--surface); stroke-width: 2; }
+  .hint { text-align: center; color: var(--muted); font-size: 0.9rem; margin: -6px 0 0; }
+  .dcard { cursor: default; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.9rem; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 7px; margin-inline-end: 6px; vertical-align: -2px; }
+
+  @media (prefers-reduced-motion: no-preference) { .prog i { transition: width .4s; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="head">
+      <h1>לוח שידורים</h1>
+      <button class="ghost" id="chBtn" type="button">ערוצים <span id="chCount"></span></button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabDial" data-tab="dial" aria-selected="true">היום</button>
+      <button type="button" role="tab" id="tabNow" data-tab="now" aria-selected="false">עכשיו</button>
+      <button type="button" role="tab" id="tabGrid" data-tab="grid" aria-selected="false">לוח</button>
+      <button type="button" role="tab" id="tabNf" data-tab="nf" aria-selected="false" hidden>נטפליקס</button>
+    </div>
+    <input type="search" id="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית">
+  </header>
+  <main id="main"></main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" hidden aria-label="הגדרות">
+  <div class="sheet-in">
+    <h2>אילו ערוצים להציג</h2>
+    <input type="search" id="chFind" placeholder="חיפוש ערוץ" aria-label="חיפוש ערוץ">
+    <div class="chips" id="cchips" role="group" aria-label="סינון לפי סוג"></div>
+    <div class="bar">
+      <button type="button" class="ghost" data-act="all">בחר את המוצגים</button>
+      <button type="button" class="ghost" data-act="none">נקה את המוצגים</button>
+    </div>
+    <div class="opts" id="opts"></div>
+    <h2>תצוגה</h2>
+    <div class="seg">
+      <button type="button" data-theme-set="light" aria-pressed="true">בהיר</button>
+      <button type="button" data-theme-set="dark" aria-pressed="false">כהה</button>
+    </div>
+    <button class="btn" id="done" type="button">סיום</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+  var p2 = function (n) { return String(n).padStart(2, "0"); };
+  var hhmm = function (d) { return p2(d.getHours()) + ":" + p2(d.getMinutes()); };
+  var dstr = function (d) { return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); };
+  function parse(s) { var m = s.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]); }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false;
+
+  // קבוצות לפי ספק, וז'אנרים לפי מילות מפתח בשם הערוץ. שתיהן משוערות, ואפשר לתקן ברשימות כאן.
+  var GROUPS = [["broad", "ברודקאסט (ערוצי חינם)"], ["hot", "HOT"], ["yes", "yes"], ["both", "ערוצים משותפים ל-yes ול-HOT"], ["other", "ערוצים נוספים"]];
+  var GENRES = [["news", "חדשות"], ["sport", "ספורט"], ["kids", "ילדים"], ["movies", "סרטים וסדרות"], ["ent", "בידור"], ["docu", "דוקו וידע"], ["music", "מוזיקה"]];
+  var GNAME = {}; GENRES.forEach(function (g) { GNAME[g[0]] = g[1]; });
+  var BROAD = /קשת|רשת|כאן|עכשיו|^(9|14|24)\b|ערוץ (9|14|24)\b|כנסת|i24|הלא|מכאן|הכלכלה/i;
+  var GEN_RX = [
+    ["sport", /ספורט|sport|\bone\b|eurosport|5\s?(gold|max|stars|live)|ווינר|nba|nfl|ליגת|ליגה|ל\. |fight|golf|motor|mutv|פורמולה/i],
+    ["news", /חדשות|news|cnn|bbc|i24|פוקס|fox|ג'זירה|jazeera|bloomberg|euronews|כנסת|הכלכלה|france|\bdw\b|rt\b/i],
+    ["kids", /ילדים|ניקלודיאון|nick|נאנו|nano|דיסני|disney|cartoon|קרטון|baby|הופ|\bhop\b|ג'וניור|junior|boomerang|בומרנג|kids|טלג'ם|zoomoo|טיני|tiny|פו\b/i],
+    ["music", /מוזיק|מוסיק|mtv|music|שירים|radio|רדיו|vh1|stingray|גלגל/i],
+    ["docu", /דוקו|docu|nat ?geo|נשיונל|discovery|דיסקברי|history|היסטור|animal|אנימל|science|מדע|טבע|תרבות|travel|טיול|food|אוכל|תעודה|crime|investigation|life ?style|פנאי/i],
+    ["movies", /סרטים|movies|cinema|סינמה|film|פילם|action|אקשן|drama|דרמה|comedy|קומדי|stars|thriller|טרילר|סדרות|series|סטארס|מוביז/i],
+    ["ent", /בידור|\be!|!e\b|e!|ויוה|viva|fun\b|פאן|ריאליטי|reality|lifetime|סמולטוק|hot3|הוט 3/i]
+  ];
+  function grpOf(c) {
+    var n = c.name;
+    if (BROAD.test(n)) return "broad";
+    if (/(^|\s)hot(\s|$)|^הוט/i.test(n)) return "hot";
+    if (/(^|\s)yes(\s|$)|^יס/i.test(n)) return "yes";
+    if (c.prov === "hot") return "hot";
+    if (c.prov === "yes") return "yes";
+    if (c.prov === "both") return "both";
+    return "other";
+  }
+  function genOf(c) { for (var i = 0; i < GEN_RX.length; i++) if (GEN_RX[i][1].test(c.name)) return GEN_RX[i][0]; return ""; }
+  var GRANK = {}; GROUPS.forEach(function (g, i) { GRANK[g[0]] = i; });
+  // שמות שוואלה נותנת לערוצים, והשם שמוצג במקומם. אפשר להוסיף שורות.
+  var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14" };
+  function classify() {
+    G.channels.forEach(function (c) { if (ALIAS[c.name]) c.name = ALIAS[c.name]; c._g = grpOf(c); c._n = genOf(c); });
+    G.channels.sort(function (a, b) { return GRANK[a._g] - GRANK[b._g] || a.name.localeCompare(b.name, "he"); });
+  }
+
+  // נתוני דוגמה (קשת בלבד): מוצגים רק כשהדף לא מצליח לקרוא את guide.json.
+  function sample() {
+    var R = {
+      "2026-10-20": [["00:30","אולפן שישי - הכתבות"],["01:30","המטבח המנצח VIP"],["02:35","קליפ טיים"],["03:10","מאסטר שף"],["04:15","המרכיב העיקרי: במטבח של אבי ביטון"],["06:00","מבזק חדשות"],["07:10","חדשות הבוקר"],["09:35","חדשות הבוקר"],["11:00","חדשות האוכל"],["14:00","12 בצוהריים"],["15:00","מהדורת היום"],["16:55","חמש עם"],["17:55","שש עם..."],["19:00","שבע עם"],["19:50","המהדורה המרכזית"],["21:30","ארץ נהדרת"],["22:45","אברי ושרקי"],["23:30","תשדירי תעמולה לבחירות לכנסת ה-26"]]
+    };
+    var programs = [];
+    Object.keys(R).forEach(function (d) { R[d].forEach(function (r) { programs.push({ ch: "3819", start: d + "T" + r[0], title: r[1] }); }); });
+    return { updated: null, channels: [{ id: "3819", name: "קשת" }], programs: programs };
+  }
+
+  function load() {
+    return fetch("guide.json", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) { if (!j.programs || !j.programs.length) throw 0; return { g: j, s: false }; })
+      .catch(function () { return { g: sample(), s: true }; });
+  }
+
+  function index() {
+    by = new Map();
+    G.channels.forEach(function (c) { by.set(c.id, []); });
+    G.programs.forEach(function (p) { var a = by.get(p.ch); if (a) a.push({ title: p.title, desc: p.desc || "", s: parse(p.start) }); });
+    by.forEach(function (a) {
+      a.sort(function (x, y) { return x.s - y.s; });
+      a.forEach(function (p, i) { p.e = a[i + 1] ? a[i + 1].s : new Date(p.s.getTime() + 3600000); });
+    });
+  }
+
+  var MANY = 8;
+  function needsPick() { return G.channels.length > MANY && !sel.size; }
+  function baseChans() {
+    var l = G.channels.filter(function (c) { return sel.has(c.id); });
+    return l.length ? l : (G.channels.length > MANY ? [] : G.channels);
+  }
+  function chans() {
+    var l = baseChans();
+    if (gen !== "all") {
+      var f = l.filter(function (c) { return c._n === gen; });
+      if (f.length) l = f; else gen = "all";
+    }
+    return l;
+  }
+  function chipsHtml() {
+    var cnt = {}, kinds = 0;
+    baseChans().forEach(function (c) { if (c._n) { if (!cnt[c._n]) kinds++; cnt[c._n] = (cnt[c._n] || 0) + 1; } });
+    if (kinds < 2) return "";
+    return '<div class="chips" role="group" aria-label="סינון לפי סוג"><button type="button" class="chip" data-chip="all" aria-pressed="' + (gen === "all") + '">הכל</button>' +
+      GENRES.filter(function (g) { return cnt[g[0]]; }).map(function (g) {
+        return '<button type="button" class="chip" data-chip="' + g[0] + '" aria-pressed="' + (gen === g[0]) + '">' + g[1] + " (" + cnt[g[0]] + ")</button>";
+      }).join("") + "</div>";
+  }
+  function allDays() {
+    var s = new Set(); by.forEach(function (a) { a.forEach(function (p) { s.add(dstr(p.s)); }); });
+    return Array.from(s).sort();
+  }
+  function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
+  function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
+  var descHtml = function (p) { return p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>'; };
+
+  function vPick() {
+    return '<div class="note"><b>בחר את הערוצים שלך.</b> נמצאו ' + G.channels.length + ' ערוצים, וכדאי להציג רק את אלה שיש לך.</div><button type="button" class="btn" data-open="1">בחירת ערוצים</button>';
+  }
+
+  function vNow() {
+    var now = new Date(), h = "";
+    chans().forEach(function (c) {
+      var a = by.get(c.id) || [];
+      var i = a.findIndex(function (p) { return p.s <= now && now < p.e; });
+      if (i < 0) { h += '<article class="card"><div class="chn">' + esc(c.name) + '</div><p class="none">אין נתוני שידור לשעה הזו.</p></article>'; return; }
+      var p = a[i], n = a[i + 1], pct = Math.round((now - p.s) / (p.e - p.s) * 100);
+      h += '<article class="card" data-toggle tabindex="0"><div class="chn">' + esc(c.name) + "</div>" +
+        '<h2 class="cur">' + esc(p.title) + "</h2>" +
+        '<div class="meta"><span>' + hhmm(p.s) + "–" + hhmm(p.e) + "</span><span>נותרו " + Math.max(1, Math.round((p.e - now) / 60000)) + " דק׳</span></div>" +
+        '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        (n ? '<p class="next"><b>' + hhmm(n.s) + "</b>" + esc(n.title) + "</p>" : "") +
+        '<div class="more">' + descHtml(p) + "</div></article>";
+    });
+    return h;
+  }
+
+  function pickers(now) {
+    var days = allDays(), list = chans();
+    if (!day || days.indexOf(day) < 0) day = days.indexOf(dstr(now)) >= 0 ? dstr(now) : days[0];
+    if (!chId || !list.some(function (c) { return c.id === chId; })) chId = list[0].id;
+    var h = '<label class="sel"><span class="lbl">ערוץ</span><select id="chSel">' + list.map(function (c) {
+      return '<option value="' + esc(c.id) + '"' + (c.id === chId ? " selected" : "") + ">" + esc(c.name) + "</option>";
+    }).join("") + "</select></label>";
+    h += '<div class="days" role="group" aria-label="יום">' + days.map(function (d) {
+      var dt = dObj(d);
+      return '<button type="button" class="day" data-day="' + d + '" aria-pressed="' + (d === day) + '"><span>' + (d === dstr(now) ? "היום" : DAYS[dt.getDay()]) + "</span><b>" + dt.getDate() + "." + (dt.getMonth() + 1) + "</b></button>";
+    }).join("") + "</div>";
+    return h;
+  }
+
+  function vGrid() {
+    var now = new Date(), h = pickers(now);
+    var rows = (by.get(chId) || []).filter(function (p) { return dstr(p.s) === day; });
+    h += '<div class="list">' + (rows.length ? rows.map(function (p) {
+      var cls = p.s <= now && now < p.e ? " now" : (p.e <= now ? " past" : "");
+      return '<div class="row' + cls + '" data-toggle tabindex="0"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) +
+        (cls === " now" ? '<span class="tag">משודר עכשיו</span>' : "") + '</span><div class="more">' + descHtml(p) + "</div></div>";
+    }).join("") : '<div class="row"><span></span><span class="none">אין נתונים ליום הזה.</span></div>') + "</div>";
+    return h;
+  }
+
+  function nfDate(d, full) {
+    if (!d) return "";
+    var p = d.split("-");
+    return full ? +p[2] + "." + +p[1] + "." + p[0] : p[0];
+  }
+  function vNf() {
+    var list = (nfView === "new" ? NF["new"] : NF.popular) || [], t = q.trim().toLowerCase();
+    if (t) list = list.filter(function (x) { return x.title.toLowerCase().indexOf(t) >= 0 || (x.orig || "").toLowerCase().indexOf(t) >= 0; });
+    var h = '<div class="chips" role="group" aria-label="סוג רשימה"><button type="button" class="chip" data-nf="pop" aria-pressed="' + (nfView !== "new") + '">פופולרי עכשיו</button>' +
+      '<button type="button" class="chip" data-nf="new" aria-pressed="' + (nfView === "new") + '">חדש ב-60 הימים האחרונים</button></div>';
+    h += list.length ? '<div class="list">' + list.map(function (x) {
+      var meta = [x.type === "tv" ? "סדרה" : "סרט", nfDate(x.date, nfView === "new"), x.rating ? "★ " + x.rating : ""].filter(Boolean).join(" · ");
+      return '<div class="nf" data-toggle tabindex="0"><div class="poster">' +
+        (x.poster ? '<img loading="lazy" alt="" src="https://image.tmdb.org/t/p/w185' + esc(x.poster) + '">' : "ללא תמונה") + '</div><div class="nfb"><div class="ttl">' + esc(x.title) + '</div><div class="sub">' + esc(meta) + "</div>" +
+        '<p class="ov">' + (x.overview ? esc(x.overview) : "אין תקציר בעברית.") + "</p></div></div>";
+    }).join("") + "</div>" : '<p class="none">לא נמצאו תוצאות.</p>';
+    h += '<p class="credit">הנתונים מ-TMDB, וזמינות בנטפליקס מ-JustWatch. השירות משתמש ב-API של TMDB אך אינו מאושר או מוסמך על ידם.</p>';
+    return h;
+  }
+
+
+  // ---- שעון היום ----
+  var CX = 180, CY = 180, RO = 150, RI = 92, KIND = { news: "חדשות", ent: "בידור", life: "אורח חיים", oth: "אחר" };
+  function pgOf(t) {
+    if (/חדשות|מהדורה|מבזק|פוליטי/.test(t)) return "news";
+    if (/בוקר|מטבח|שף|אוכל|בישול|בריאות|טיול|(^|\s)עם(\s|\.|$)/.test(t)) return "life";
+    if (/תשדיר|קליפ|שידור חוזר|פרסומות|מוזיקה/.test(t)) return "oth";
+    return "ent";
+  }
+  function pt(r, m) { var a = m / 1440 * 2 * Math.PI - Math.PI / 2; return [CX + r * Math.cos(a), CY + r * Math.sin(a)]; }
+  function f1(n) { return Math.round(n * 10) / 10; }
+  function arcPath(a, b) {
+    a += 1.6; b -= 1.6; if (b - a < 1) return "";
+    var p1 = pt(RO, a), p2 = pt(RO, b), p3 = pt(RI, b), p4 = pt(RI, a), lg = (b - a) > 720 ? 1 : 0;
+    return "M" + f1(p1[0]) + " " + f1(p1[1]) + "A" + RO + " " + RO + " 0 " + lg + " 1 " + f1(p2[0]) + " " + f1(p2[1]) + "L" + f1(p3[0]) + " " + f1(p3[1]) + "A" + RI + " " + RI + " 0 " + lg + " 0 " + f1(p4[0]) + " " + f1(p4[1]) + "Z";
+  }
+  function dialT() {
+    if (scrub != null) return scrub;
+    var now = new Date(), d0 = dObj(day).getTime();
+    return day === dstr(now) ? Math.floor((now - d0) / 60000) : 20 * 60;
+  }
+  function vDial() {
+    var now = new Date(), h = pickers(now), d0 = dObj(day).getTime(), d1 = d0 + 86400000;
+    var segs = (by.get(chId) || []).filter(function (p) { return p.e > d0 && p.s < d1; }).map(function (p) {
+      return { p: p, a: Math.max(0, (p.s - d0) / 60000), b: Math.min(1440, (p.e - d0) / 60000) };
+    });
+    D = { segs: segs, d0: d0 };
+    if (!segs.length) return h + '<p class="none">אין נתונים ליום הזה.</p>';
+    var T = dialT(), svg = '<svg id="dial" viewBox="-20 -20 400 400" tabindex="0" role="slider" aria-label="שעה ביום" aria-valuemin="0" aria-valuemax="1439" aria-valuenow="' + T + '"><circle class="face" cx="180" cy="180" r="121"></circle>';
+    segs.forEach(function (s, i) { var d = arcPath(s.a, s.b); if (d) svg += '<path data-i="' + i + '" class="k-' + pgOf(s.p.title) + '" d="' + d + '"></path>'; });
+    for (var k = 0; k < 24; k += 3) { var a1 = pt(RO + 4, k * 60), a2 = pt(RO + 12, k * 60); svg += '<line x1="' + f1(a1[0]) + '" y1="' + f1(a1[1]) + '" x2="' + f1(a2[0]) + '" y2="' + f1(a2[1]) + '" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>'; }
+    [[0, 180, 2], [6, 360, 185], [12, 180, 372], [18, 0, 185]].forEach(function (l) { svg += '<text x="' + l[1] + '" y="' + l[2] + '" font-size="15" font-weight="700">' + p2(l[0]) + "</text>"; });
+    if (day === dstr(now)) { var nm = pt(RO + 14, (now - d0) / 60000); svg += '<circle class="nowdot" cx="' + f1(nm[0]) + '" cy="' + f1(nm[1]) + '" r="6"></circle>'; }
+    svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="7"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><text id="dTitle" x="180" y="220" font-size="16" font-weight="500"></text></svg>';
+    h += '<div class="dialwrap">' + svg + '</div><p class="hint">גוררים את הטבעת כדי לטייל ביום</p>';
+    h += '<button type="button" class="ghost" id="dNow" data-dnow hidden>חזרה לעכשיו</button>';
+    h += '<article class="card dcard" id="dCard" aria-live="polite"></article>';
+    h += '<div class="legend">' + Object.keys(KIND).map(function (k2) { return '<span><i style="background:var(--c-' + k2 + ')"></i>' + KIND[k2] + "</span>"; }).join("") + "</div>";
+    return h;
+  }
+  function updateDial(T) {
+    if (!D || !$("#dial")) return;
+    T = ((Math.round(T) % 1440) + 1440) % 1440;
+    var now = new Date(), isToday = day === dstr(now), hd = $("#dHand"), kn = $("#dKnob"), a = pt(RI - 18, T), b = pt(RO + 14, T);
+    hd.setAttribute("x1", f1(a[0])); hd.setAttribute("y1", f1(a[1])); hd.setAttribute("x2", f1(b[0])); hd.setAttribute("y2", f1(b[1]));
+    kn.setAttribute("cx", f1(b[0])); kn.setAttribute("cy", f1(b[1]));
+    $("#dial").setAttribute("aria-valuenow", T);
+    var idx = -1; D.segs.forEach(function (s, i) { if (T >= s.a && T < s.b) idx = i; });
+    document.querySelectorAll("#dial path").forEach(function (p) { p.classList.toggle("on", +p.getAttribute("data-i") === idx); });
+    var s = idx >= 0 ? D.segs[idx] : null, nx = idx >= 0 ? D.segs[idx + 1] : null;
+    $("#dTime").textContent = p2(Math.floor(T / 60)) + ":" + p2(T % 60);
+    $("#dTitle").textContent = s ? (s.p.title.length > 15 ? s.p.title.slice(0, 14) + "…" : s.p.title) : "";
+    var cn = (G.channels.filter(function (c) { return c.id === chId; })[0] || {}).name || "";
+    var live = s && isToday && s.p.s <= now && now < s.p.e;
+    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span>' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p) +
+      (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + esc(nx.p.title) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
+    $("#dNow").hidden = !(isToday && scrub != null);
+  }
+  function dialMin(e) {
+    var r = $("#dial").getBoundingClientRect(), a = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2)));
+    if (a < 0) a += 2 * Math.PI;
+    return Math.round(a / (2 * Math.PI) * 288) * 5 % 1440;
+  }
+  function dialSet(m) { scrub = ((m % 1440) + 1440) % 1440; updateDial(scrub); }
+
+  function vSearch() {
+    var now = new Date(), term = q.trim().toLowerCase(), hits = [];
+    (chans().length ? chans() : G.channels).forEach(function (c) {
+      (by.get(c.id) || []).forEach(function (p) {
+        if (p.e > now && p.title.toLowerCase().indexOf(term) >= 0) hits.push({ c: c, p: p });
+      });
+    });
+    hits.sort(function (a, b) { return a.p.s - b.p.s; });
+    if (!hits.length) return '<p class="none">לא נמצאו תוכניות עתידיות בשם הזה.</p>';
+    return '<div class="list">' + hits.slice(0, 80).map(function (x) {
+      return '<div class="row" data-toggle tabindex="0"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) +
+        '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + '</span></span><div class="more">' + descHtml(x.p) + "</div></div>";
+    }).join("") + "</div>";
+  }
+
+  function render() {
+    var note = isSample ? '<div class="note"><b>מוצגים נתוני דוגמה.</b> הדף לא מצא את <code>guide.json</code>. פתח אותו דרך שרת (<code>npx serve</code>) ולא ישירות מהקובץ.</div>' : "";
+    var nf = tab === "nf" && NF;
+    var picking = !nf && needsPick(), searching = !nf && !!q.trim();
+    var chips = (!picking && !searching && !nf && tab !== "dial") ? chipsHtml() : "";
+    var body = nf ? vNf() : (searching ? vSearch() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
+    $("#main").innerHTML = (nf ? "" : note) + chips + body;
+    $("#tabNf").setAttribute("aria-selected", String(!!nf));
+    $("#chCount").textContent = sel.size ? "(" + sel.size + ")" : "";
+    $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));
+    $("#tabNow").setAttribute("aria-selected", String(tab === "now"));
+    $("#tabGrid").setAttribute("aria-selected", String(tab === "grid"));
+    $("#tabNf").hidden = !NF;
+    if (scrollNext && tab === "grid" && !q.trim()) {
+      var el = document.querySelector(".row.now"); if (el) el.scrollIntoView({ block: "center" });
+    }
+    scrollNext = false;
+    if (D && tab === "dial" && !nf && !picking && !searching && $("#dial")) updateDial(dialT());
+  }
+
+  function setTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    store("tvg.theme", t);
+    document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
+  }
+  function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); } }
+  function visible() {
+    var f = find.trim().toLowerCase();
+    return G.channels.filter(function (c) {
+      if (f && c.name.toLowerCase().indexOf(f) < 0) return false;
+      if (cf === "sel") return sel.has(c.id);
+      if (cf !== "all") return c._n === cf;
+      return true;
+    });
+  }
+  function buildSheet() {
+    var cnt = {};
+    G.channels.forEach(function (c) { if (c._n) cnt[c._n] = (cnt[c._n] || 0) + 1; });
+    var chips = [["all", "הכל (" + G.channels.length + ")"], ["sel", "נבחרו (" + sel.size + ")"]].concat(GENRES.filter(function (g) { return cnt[g[0]]; }).map(function (g) { return [g[0], g[1] + " (" + cnt[g[0]] + ")"]; }));
+    $("#cchips").innerHTML = chips.map(function (c) { return '<button type="button" class="chip" data-cchip="' + c[0] + '" aria-pressed="' + (cf === c[0]) + '">' + c[1] + "</button>"; }).join("");
+    var vis = visible(), h = "";
+    GROUPS.forEach(function (g) {
+      var list = vis.filter(function (c) { return c._g === g[0]; });
+      if (!list.length) return;
+      var all = list.every(function (c) { return sel.has(c.id); });
+      h += '<div class="gh"><span>' + g[1] + " (" + list.length + ')</span><button type="button" class="ghost" data-grp="' + g[0] + '">' + (all ? "בטל קבוצה" : "בחר קבוצה") + "</button></div>";
+      h += list.map(function (c) {
+        return '<label class="opt"><input type="checkbox" data-opt="' + esc(c.id) + '"' + (sel.has(c.id) ? " checked" : "") + "><span>" + esc(c.name) + "</span>" + (c._n ? '<span class="sub">' + GNAME[c._n] + "</span>" : "") + "</label>";
+      }).join("");
+    });
+    $("#opts").innerHTML = h || '<p class="none" style="padding:12px 0">לא נמצא ערוץ שמתאים.</p>';
+  }
+  function saveSel() { store("tvg.sel", JSON.stringify(Array.from(sel))); }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    var tb = t.closest("[data-tab]"); if (tb) { tab = tb.getAttribute("data-tab"); store("tvg.tab", tab); scrollNext = tab === "grid"; render(); return; }
+    var pd = t.closest("[data-day]"); if (pd) { day = pd.getAttribute("data-day"); scrub = null; scrollNext = true; render(); return; }
+    var th = t.closest("[data-theme-set]"); if (th) { setTheme(th.getAttribute("data-theme-set")); return; }
+    var nv = t.closest("[data-nf]"); if (nv) { nfView = nv.getAttribute("data-nf"); render(); return; }
+    var cc = t.closest("[data-chip]"); if (cc) { gen = cc.getAttribute("data-chip"); render(); return; }
+    var sc = t.closest("[data-cchip]"); if (sc) { cf = sc.getAttribute("data-cchip"); buildSheet(); return; }
+    var gp = t.closest("[data-grp]");
+    if (gp) {
+      var key = gp.getAttribute("data-grp"), list = visible().filter(function (c) { return c._g === key; });
+      var allOn = list.every(function (c) { return sel.has(c.id); });
+      list.forEach(function (c) { if (allOn) sel.delete(c.id); else sel.add(c.id); });
+      saveSel(); buildSheet(); return;
+    }
+    var ac = t.closest("[data-act]");
+    if (ac) {
+      visible().forEach(function (c) { if (ac.getAttribute("data-act") === "all") sel.add(c.id); else sel.delete(c.id); });
+      saveSel(); buildSheet(); return;
+    }
+    if (t.closest("[data-dnow]")) { scrub = null; updateDial(dialT()); return; }
+    var tg = t.closest("[data-toggle]"); if (tg) { tg.classList.toggle("open"); return; }
+    if (t.closest("#chBtn") || t.closest("[data-open]")) { openSheet(true); return; }
+    if (t.closest("#done") || t.closest("#scrim")) { openSheet(false); render(); return; }
+  });
+  document.addEventListener("pointerdown", function (e) {
+    var d = e.target.closest && e.target.closest("#dial"); if (!d) return;
+    dragging = true; try { d.setPointerCapture(e.pointerId); } catch (x) {}
+    dialSet(dialMin(e)); e.preventDefault();
+  });
+  document.addEventListener("pointermove", function (e) { if (dragging && $("#dial")) dialSet(dialMin(e)); });
+  function endDrag() { dragging = false; }
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+  document.addEventListener("keydown", function (e) {
+    if (e.target.id === "dial") {
+      var st = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
+      if (st) { e.preventDefault(); dialSet(dialT() + st); } else if (e.key === "Home") { e.preventDefault(); scrub = null; updateDial(dialT()); }
+      return;
+    }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("[data-toggle]")) { e.preventDefault(); e.target.classList.toggle("open"); }
+  });
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.id === "chSel") { chId = t.value; scrub = null; scrollNext = true; render(); return; }
+    var id = t.getAttribute && t.getAttribute("data-opt");
+    if (!id) return;
+    if (t.checked) sel.add(id); else sel.delete(id);
+    saveSel();
+    var sc = document.querySelector('[data-cchip="sel"]'); if (sc) sc.textContent = "נבחרו (" + sel.size + ")";
+  });
+  $("#q").addEventListener("input", function (e) { q = e.target.value; render(); });
+  $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
+
+  // רענון "עכשיו" כל דקה, וגם כשחוזרים לדף
+  function refresh() { if (!G || document.hidden || q.trim() || !$("#sheet").hidden) return; if (tab === "now") render(); else if (tab === "dial" && scrub == null && !dragging) updateDial(dialT()); }
+  setInterval(refresh, 60000);
+  document.addEventListener("visibilitychange", refresh);
+
+  setTheme(store("tvg.theme") === "dark" ? "dark" : "light");
+  load().then(function (r) {
+    G = r.g; isSample = r.s; classify(); index();
+    try { var saved = JSON.parse(store("tvg.sel") || "null"); if (Array.isArray(saved)) saved.forEach(function (id) { if (by.has(id)) sel.add(id); }); } catch (e) {}
+    var st0 = store("tvg.tab"); tab = (st0 === "grid" || st0 === "now") ? st0 : "dial";
+    scrollNext = tab === "grid";
+    render();
+    if (needsPick() && store("tvg.tab") !== "nf") openSheet(true);
+    // לשונית נטפליקס מופיעה רק אם הקובץ netflix.json קיים
+    fetch("netflix.json", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        if (!j || !(j.popular || []).length && !(j["new"] || []).length) return;
+        NF = j;
+        if (store("tvg.tab") === "nf") { tab = "nf"; if (!$("#sheet").hidden) openSheet(false); }
+        render();
+      }).catch(function () {});
+  });
+})();
+</script>
+</body>
+</html>

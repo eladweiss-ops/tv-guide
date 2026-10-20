@@ -89,6 +89,10 @@
   .more p { margin: 0; }
   .rem { margin-top: 10px; min-height: 44px; padding: 8px 14px; font-size: .9rem; }
   .rem[disabled] { opacity: .75; }
+  .dcard { position: relative; }
+  /* בלשונית "היום" יש מעל השעון גם בחירת ערוץ וימים, אז הכותרת לא צמודה: אחרת היא חותכת את השעון כשגוללים אל הכרטיס. */
+  body.tab-dial header.top { position: static; }
+  .rem.sm { position: absolute; top: 10px; left: 10px; margin: 0; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; font-size: 1.15rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
   .open > .more { display: block; }
 
   /* grid */
@@ -157,7 +161,7 @@
 
   /* dial */
   .dialwrap { display: flex; justify-content: center; }
-  #dial { width: 100%; max-width: 360px; height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
+  #dial { width: 100%; max-width: min(360px, 36vh); height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
   #dial .k-ent { fill: var(--c-ent); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
   #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
   #dial text { fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
@@ -313,13 +317,13 @@
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
-  var descHtml = function (p, cid) { return (p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>') + remBtn(p, cid); };
+  var descHtml = function (p, cid, small) { return (p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>') + remBtn(p, cid, small); };
 
   // תזכורת: קובץ יומן (.ics) עם התראה 10 דקות לפני תחילת התוכנית. אתר סטטי לא יכול לשלוח פוש כשהוא סגור, אבל יומן הטלפון יכול.
   var LEAD_MIN = 10;
-  function remBtn(p, cid) {
+  function remBtn(p, cid, small) {
     if (!cid || p.s <= new Date()) return "";
-    return '<button type="button" class="btn rem" data-rem="' + esc(cid) + "|" + p.s.getTime() + '">⏰ תזכיר לי (התראה ביומן)</button>';
+    return '<button type="button" class="btn rem' + (small ? " sm" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="תזכיר לי (התראה ביומן)" title="תזכיר לי (התראה ביומן)">⏰' : ">⏰ תזכיר לי (התראה ביומן)") + "</button>";
   }
   function icsEsc(s) { return String(s || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;"); }
   function icsT(d) { return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
@@ -337,7 +341,7 @@
     var url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
     var a = document.createElement("a"); a.href = url; a.download = "reminder.ics"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-    btn.textContent = "נוצר ✓ פתח/י את הקובץ כדי להוסיף ליומן"; btn.disabled = true;
+    btn.textContent = btn.classList.contains("sm") ? "✓" : "נוצר ✓ פתח/י את הקובץ כדי להוסיף ליומן"; btn.disabled = true;
   }
 
   function vPick() {
@@ -460,7 +464,7 @@
     $("#dTitle").textContent = s ? (s.p.title.length > 15 ? s.p.title.slice(0, 14) + "…" : s.p.title) : "";
     var cn = (G.channels.filter(function (c) { return c.id === chId; })[0] || {}).name || "";
     var live = s && isToday && s.p.s <= now && now < s.p.e;
-    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span>' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, chId) +
+    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span>' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, chId, true) +
       (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + esc(nx.p.title) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
     $("#dNow").hidden = !(isToday && scrub != null);
   }
@@ -493,6 +497,7 @@
     var chips = (!picking && !searching && !nf && tab !== "dial") ? chipsHtml() : "";
     var body = nf ? vNf() : (searching ? vSearch() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
     $("#main").innerHTML = (nf ? "" : note) + chips + body;
+    document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = sel.size ? "(" + sel.size + ")" : "";
     $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));

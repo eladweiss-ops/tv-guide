@@ -164,7 +164,7 @@
   #dial { width: 100%; max-width: min(360px, 36vh); height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
   #dial .k-ent { fill: var(--c-ent); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
   #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
-  #dial text { fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
+  #dial text { direction: rtl; unicode-bidi: plaintext; fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
   #dial .face { fill: var(--surface); }
   #dial .hand { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
   #dial .knob { fill: var(--ink); }
@@ -276,6 +276,10 @@
   .rbt.star[aria-pressed="true"] { color: #ff9f0a; background: rgba(255,159,10,.16); }
   .go.sg { grid-template-columns: 1fr; }
   .xchip { display: inline-flex; align-items: center; gap: 8px; }
+  #qwrap { position: relative; }
+  #qwrap input { padding-inline-end: 52px; }
+  #qwrap input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+  #qx { position: absolute; inset-inline-end: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(118,118,128,.28); color: var(--ink); font-size: 1rem; line-height: 1; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -285,7 +289,7 @@
       <h1 id="ttl">היום</h1>
 <div class="hb"><button class="glass round" id="fvBtn" type="button" aria-label="המועדפים שלי"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><polygon points="12 3 14.8 9 21 9.7 16.4 14 17.7 20.5 12 17.2 6.3 20.5 7.6 14 3 9.7 9.2 9"></polygon></svg><span id="fvCount" class="cnt"></span></button>      <button class="glass round" id="chBtn" type="button" aria-label="בחירת ערוצים"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="13" y2="17"></line></svg><span id="chCount" class="cnt"></span></button></div>
     </div>
-    <div id="qwrap" hidden><input type="search" id="q" placeholder="חיפוש תוכנית בכל הלוח" aria-label="חיפוש תוכנית"></div>
+    <div id="qwrap" hidden><input type="search" id="q" placeholder="חיפוש תוכנית בכל הלוח" aria-label="חיפוש תוכנית"><button type="button" id="qx" hidden aria-label="ניקוי החיפוש">✕</button></div>
   </header>
   <main id="main"></main>
 </div>
@@ -853,7 +857,7 @@
   function openFavs() { delArm = false; $("#favBody").innerHTML = favHtml(); $("#favs").hidden = false; $("#scrim2").hidden = false; }
   function closeFavs() { $("#favs").hidden = true; if ($("#rem").hidden) $("#scrim2").hidden = true; }
   function startSearch(text, exact) {
-    closeFavs(); $("#qwrap").hidden = false; $("#q").value = text || ""; q = text || ""; qExact = exact ? text : null;
+    closeFavs(); $("#qwrap").hidden = false; $("#qx").hidden = !text; $("#q").value = text || ""; q = text || ""; qExact = exact ? text : null;
     render(); if (!exact) $("#q").focus(); window.scrollTo({ top: 0 });
   }
 
@@ -891,7 +895,7 @@
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }
-  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; qExact = null; render(); } }
+  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; render(); } }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
   function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
@@ -956,7 +960,7 @@
     if (t.closest("[data-favadd]")) { startSearch("", false); return; }
     if (t.closest("[data-favclear]")) { if (!delArm) { delArm = true; } else { FAV.clear(); saveFav(); updFav(); delArm = false; if (tab === "dial" && !q.trim()) render(); } $("#favBody").innerHTML = favHtml(); return; }
     if (t.closest("[data-favclose]")) { closeFavs(); return; }
-    var sgb = t.closest("[data-sug]"); if (sgb) { var st2 = sgb.getAttribute("data-sug"); $("#q").value = st2; q = st2; qExact = st2; render(); window.scrollTo({ top: 0 }); return; }
+    var sgb = t.closest("[data-sug]"); if (sgb) { var st2 = sgb.getAttribute("data-sug"); $("#q").value = st2; q = st2; qExact = st2; $("#qx").hidden = false; render(); window.scrollTo({ top: 0 }); return; }
     var sc2 = t.closest("[data-scope]"); if (sc2) { scope = sc2.getAttribute("data-scope"); render(); return; }
     if (t.closest("[data-clearx]")) { qExact = null; render(); return; }
     var jp = t.closest("[data-jump]");
@@ -1024,7 +1028,8 @@
     saveSel();
     var sc = document.querySelector('[data-cchip="sel"]'); if (sc) sc.textContent = "נבחרו (" + sel.size + ")";
   });
-  $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; render(); });
+  $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; $("#qx").hidden = !q; render(); });
+  $("#qx").addEventListener("click", function () { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; render(); $("#q").focus(); });
   $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
 
   // רענון "עכשיו" כל דקה, וגם כשחוזרים לדף

@@ -102,13 +102,13 @@
     width: 100%; min-height: 50px; border: 1px solid var(--line); background: var(--surface);
     border-radius: 12px; padding: 10px 14px; font-weight: 500;
   }
-  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.2rem, 1fr)); gap: 6px; }
+  .days { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
   .day {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
     border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 6px 2px; min-height: 56px; line-height: 1.25;
   }
   .day span { font-size: 0.85rem; color: var(--muted); }
-  .day b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+  .day b { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
   .day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
   .day[aria-pressed="true"] span, .day[aria-pressed="true"] b { color: var(--accent-ink); }
   .list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
@@ -174,6 +174,18 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.9rem; color: var(--muted); }
   .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 7px; margin-inline-end: 6px; vertical-align: -2px; }
 
+  .pill { position: fixed; top: 38%; left: 50%; transform: translateX(-50%); z-index: 30; background: var(--ink); color: var(--bg); padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 1.05rem; box-shadow: 0 6px 24px rgba(0,0,0,.28); pointer-events: none; white-space: nowrap; }
+  @keyframes fromR { from { opacity: 0; transform: translateX(44px); } to { opacity: 1; transform: none; } }
+  @keyframes fromL { from { opacity: 0; transform: translateX(-44px); } to { opacity: 1; transform: none; } }
+  .sech { margin: 8px 0 0; font-size: 1.05rem; font-weight: 700; }
+  .srow { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 6px 4px 6px; }
+  .srow .go { flex: 1; min-width: 0; display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 10px; align-items: center; text-align: start; background: transparent; border: 0; padding: 8px 8px; min-height: 56px; }
+  .srow .time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--live); }
+  .srow .ttl { font-weight: 700; overflow-wrap: anywhere; }
+  .rbt { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--soft); font-size: 1.15rem; }
+  .fav { margin-top: 10px; min-height: 44px; }
+  #dial .fs { fill: #fff; stroke: var(--ink); stroke-width: 3; paint-order: stroke; font-size: 15px; pointer-events: none; }
+  @media (prefers-reduced-motion: no-preference) { .from-r { animation: fromR .26s ease-out; } .from-l { animation: fromL .26s ease-out; } }
   @media (prefers-reduced-motion: no-preference) { .prog i { transition: width .4s; } }
 </style>
 </head>
@@ -212,9 +224,14 @@
       <button type="button" data-theme-set="light" aria-pressed="true">בהיר</button>
       <button type="button" data-theme-set="dark" aria-pressed="false">כהה</button>
     </div>
+    <div id="instBox" hidden><h2>התקנה כאפליקציה</h2><p class="none" id="instTxt"></p><button type="button" class="ghost" id="instBtn" data-install hidden>הוסף למסך הבית</button></div>
     <button class="btn" id="done" type="button">סיום</button>
   </div>
-</div>
+</section>
+
+<div class="pill" id="pill" hidden role="status"></div>
+<div class="scrim" id="scrim2" hidden></div>
+<section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
 
 <script>
 (function () {
@@ -227,7 +244,7 @@
   function parse(s) { var m = s.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 
-  var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false;
+  var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false, lastIdx = -2;
 
   // קבוצות לפי ספק, וז'אנרים לפי מילות מפתח בשם הערוץ. שתיהן משוערות, ואפשר לתקן ברשימות כאן.
   var GROUPS = [["broad", "ברודקאסט (ערוצי חינם)"], ["hot", "HOT"], ["yes", "yes"], ["both", "ערוצים משותפים ל-yes ול-HOT"], ["other", "ערוצים נוספים"]];
@@ -365,31 +382,81 @@
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
-  var descHtml = function (p, cid, small) { return (p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>') + remBtn(p, cid, small); };
+  var descHtml = function (p, cid, small) { return (p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>') + remBtn(p, cid, small) + (cid ? favBtn(p) : ""); };
 
-  // תזכורת: קובץ יומן (.ics) עם התראה 10 דקות לפני תחילת התוכנית. אתר סטטי לא יכול לשלוח פוש כשהוא סגור, אבל יומן הטלפון יכול.
-  var LEAD_MIN = 10;
+  // תזכורת: קובץ יומן (.ics) עם התראה לפני תחילת התוכנית. אתר סטטי לא יכול לשלוח פוש כשהוא סגור, אבל יומן הטלפון יכול.
+  var lead = +(store("tvg.lead") || 10), rem = null, tapPending = false, tapAt = null, pillT = null;
+  var FAV = new Set(); try { JSON.parse(store("tvg.fav") || "[]").forEach(function (t) { FAV.add(t); }); } catch (e) {}
+  function saveFav() { store("tvg.fav", JSON.stringify(Array.from(FAV))); }
   function remBtn(p, cid, small) {
     if (!cid || p.s <= new Date()) return "";
     return '<button type="button" class="btn rem' + (small ? " sm" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="תזכיר לי (התראה ביומן)" title="תזכיר לי (התראה ביומן)">⏰' : ">⏰ תזכיר לי (התראה ביומן)") + "</button>";
   }
-  function icsEsc(s) { return String(s || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;"); }
+  function favBtn(p) {
+    var on = FAV.has(p.title);
+    return '<button type="button" class="ghost fav" data-fav="' + esc(p.title) + '" aria-pressed="' + on + '">' + (on ? "★ במועדפים" : "☆ הוסף למועדפים") + "</button>";
+  }
+  function icsEsc(s) { return String(s || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;"); }
   function icsT(d) { return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
-  function remind(btn) {
-    var v = btn.getAttribute("data-rem"), k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
+  function findProg(v) {
+    var k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
     var p = (by.get(id) || []).filter(function (x) { return x.s.getTime() === ts; })[0];
-    if (!p) return;
-    var ch = (G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || "";
-    var ttl = p.title + (ch ? " (" + ch + ")" : "");
-    var ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
-      "UID:" + id + "-" + ts + "@tv-guide", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
+    return p ? { id: id, p: p } : null;
+  }
+  function chName(id) { return (G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || ""; }
+  function icsText(r) {
+    var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : "");
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
+      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
       "SUMMARY:" + icsEsc(ttl), "DESCRIPTION:" + icsEsc((p.desc || "").slice(0, 300)),
-      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + LEAD_MIN + "M", "END:VALARM",
+      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + lead + "M", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"].join("\r\n");
-    var url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+  }
+  function pill(t, ms) { var el = $("#pill"); el.textContent = t; el.hidden = false; clearTimeout(pillT); if (ms) pillT = setTimeout(function () { el.hidden = true; }, ms); }
+  function openRem(r) {
+    rem = r;
+    $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(chName(r.id)) + "</span><span>" + dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
+      '<div class="lbl">התראה לפני השידור</div><div class="chips" role="group">' + [5, 10, 30].map(function (m) { return '<button type="button" class="chip" data-lead="' + m + '" aria-pressed="' + (lead === m) + '">' + m + " דקות</button>"; }).join("") + "</div>" +
+      '<button type="button" class="btn" data-ics>הוספה ליומן עם תזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
+      '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>';
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+  }
+  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; }
+  function downloadIcs() {
+    if (!rem) return;
+    var url = URL.createObjectURL(new Blob([icsText(rem)], { type: "text/calendar;charset=utf-8" }));
     var a = document.createElement("a"); a.href = url; a.download = "reminder.ics"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-    btn.textContent = btn.classList.contains("sm") ? "✓" : "נוצר ✓ פתח/י את הקובץ כדי להוסיף ליומן"; btn.disabled = true;
+    closeRem(); pill("נוסף ליומן", 1600);
+  }
+  function tapDial() {
+    var T = scrub == null ? dialT() : scrub, now = new Date(), sg = null;
+    if (D) D.segs.forEach(function (x) { if (T >= x.a && T < x.b) sg = x; });
+    if (!sg) return;
+    if (sg.p.s > now) openRem({ id: chId, p: sg.p }); else pill(sg.p.e > now ? "התוכנית משודרת עכשיו" : "התוכנית כבר שודרה", 1400);
+  }
+  function inMin(d, now) { var m = Math.max(1, Math.round((d - now) / 60000)); return m < 60 ? m + " דק׳" : Math.floor(m / 60) + " שע׳" + (m % 60 ? " " + (m % 60) + " דק׳" : ""); }
+  function airRow(c, p, sub) {
+    var v = c.id + "|" + p.s.getTime();
+    return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" +
+      '<button type="button" class="rbt" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">⏰</button></div>';
+  }
+  function soonHtml(now) {
+    var soon = [], favs = [];
+    chans().forEach(function (c) {
+      var a = by.get(c.id) || [], first = true;
+      a.forEach(function (p) {
+        if (p.s <= now) return;
+        if (first) { soon.push({ c: c, p: p }); first = false; }
+        if (FAV.has(p.title) && favs.length < 200) favs.push({ c: c, p: p });
+      });
+    });
+    soon.sort(function (x, y) { return x.p.s - y.p.s; });
+    favs.sort(function (x, y) { return x.p.s - y.p.s; });
+    var h = "";
+    if (soon.length) h += '<h2 class="sech">מתחיל בקרוב</h2>' + soon.slice(0, 3).map(function (x) { return airRow(x.c, x.p, x.c.name + " · בעוד " + inMin(x.p.s, now)); }).join("");
+    if (favs.length) h += '<h2 class="sech">★ המועדפים שלי, בקרוב</h2>' + favs.slice(0, 6).map(function (x) { return airRow(x.c, x.p, x.c.name + " · " + dayLabel(dstr(x.p.s))); }).join("");
+    return h;
   }
 
   function vPick() {
@@ -485,18 +552,20 @@
       return { p: p, a: Math.max(0, (p.s - d0) / 60000), b: Math.min(1440, (p.e - d0) / 60000) };
     });
     D = { segs: segs, d0: d0 };
-    if (!segs.length) return h + '<p class="none">אין נתונים ליום הזה.</p>';
+    if (!segs.length) return h + '<p class="none">אין נתונים ליום הזה.</p>' + soonHtml(now);
     var T = dialT(), svg = '<svg id="dial" viewBox="-20 -20 400 400" tabindex="0" role="slider" aria-label="שעה ביום" aria-valuemin="0" aria-valuemax="1439" aria-valuenow="' + T + '"><circle class="face" cx="180" cy="180" r="121"></circle>';
     segs.forEach(function (s, i) { var d = arcPath(s.a, s.b); if (d) svg += '<path data-i="' + i + '" class="k-' + pgOf(s.p.title) + '" d="' + d + '"></path>'; });
+    segs.forEach(function (sg) { if (FAV.has(sg.p.title) && sg.b - sg.a >= 20) { var m = pt(121, (sg.a + sg.b) / 2); svg += '<text class="fs" x="' + f1(m[0]) + '" y="' + f1(m[1] + 5) + '" text-anchor="middle">★</text>'; } });
     for (var k = 0; k < 24; k += 3) { var a1 = pt(RO + 4, k * 60), a2 = pt(RO + 12, k * 60); svg += '<line x1="' + f1(a1[0]) + '" y1="' + f1(a1[1]) + '" x2="' + f1(a2[0]) + '" y2="' + f1(a2[1]) + '" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>'; }
     [[0, 180, 2], [6, 360, 185], [12, 180, 372], [18, 0, 185]].forEach(function (l) { svg += '<text x="' + l[1] + '" y="' + l[2] + '" font-size="15" font-weight="700">' + p2(l[0]) + "</text>"; });
     if (day === dstr(now)) { var nm = pt(RO + 14, (now - d0) / 60000); svg += '<circle class="nowdot" cx="' + f1(nm[0]) + '" cy="' + f1(nm[1]) + '" r="6"></circle>'; }
     svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="7"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><text id="dTitle" x="180" y="220" font-size="16" font-weight="500"></text></svg>';
-    h += '<div class="dialwrap">' + svg + '</div><p class="hint">גוררים את הטבעת כדי לטייל ביום</p>';
+    h += '<div class="dialwrap">' + svg + '</div><p class="hint">גוררים את הטבעת כדי לטייל ביום. לחיצה על קטע עתידי מוסיפה תזכורת. החלקה הצידה מחליפה יום.</p>';
     h += '<button type="button" class="ghost" id="dNow" data-dnow hidden>חזרה לעכשיו</button>';
     h += '<article class="card dcard" id="dCard" aria-live="polite"></article>';
     h += '<div class="legend">' + Object.keys(KIND).map(function (k2) { return '<span><i style="background:var(--c-' + k2 + ')"></i>' + KIND[k2] + "</span>"; }).join("") + "</div>";
-    return h;
+    lastIdx = -2;
+    return h + soonHtml(now);
   }
   function updateDial(T) {
     if (!D || !$("#dial")) return;
@@ -506,6 +575,7 @@
     kn.setAttribute("cx", f1(b[0])); kn.setAttribute("cy", f1(b[1]));
     $("#dial").setAttribute("aria-valuenow", T);
     var idx = -1; D.segs.forEach(function (s, i) { if (T >= s.a && T < s.b) idx = i; });
+    if (idx !== lastIdx) { if (dragging && lastIdx !== -2 && navigator.vibrate) { try { navigator.vibrate(8); } catch (x) {} } lastIdx = idx; }
     document.querySelectorAll("#dial path").forEach(function (p) { p.classList.toggle("on", +p.getAttribute("data-i") === idx); });
     var s = idx >= 0 ? D.segs[idx] : null, nx = idx >= 0 ? D.segs[idx + 1] : null;
     $("#dTime").textContent = p2(Math.floor(T / 60)) + ":" + p2(T % 60);
@@ -522,6 +592,50 @@
     return Math.round(a / (2 * Math.PI) * 288) * 5 % 1440;
   }
   function dialSet(m) { scrub = ((m % 1440) + 1440) % 1440; updateDial(scrub); }
+
+  // ---- החלקה בין ימים ----
+  var sw = null;
+  function stepDay(dir) {
+    var days = allDays(), i = days.indexOf(day), n = i + dir;
+    if (n < 0 || n >= days.length) { pill("אין עוד ימים", 1000); return; }
+    day = days[n]; scrub = null; scrollNext = tab === "grid"; render();
+    var w = $(".dialwrap") || $(".list"); if (w) w.classList.add(dir > 0 ? "from-r" : "from-l");
+    pill(dayLabel(day), 1100);
+  }
+  document.addEventListener("touchstart", function (e) {
+    if ((tab !== "dial" && tab !== "grid") || q.trim() || e.touches.length !== 1 || e.target.closest("#dial,.sheet,select")) { sw = null; return; }
+    var t = e.touches[0]; sw = { x: t.clientX, y: t.clientY, dx: 0, lock: null };
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!sw) return;
+    var t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if (!sw.lock && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) sw.lock = Math.abs(dx) > Math.abs(dy) * 1.3 ? "h" : "v";
+    if (sw.lock !== "h") return;
+    sw.dx = dx;
+    var days = allDays(), n = days.indexOf(day) + (dx < 0 ? 1 : -1);
+    $("#main").style.transform = "translateX(" + Math.round(dx * 0.35) + "px)";
+    if (Math.abs(dx) > 40) pill(n >= 0 && n < days.length ? (dx < 0 ? "היום הבא: " : "היום הקודם: ") + dayLabel(days[n]) : "אין עוד ימים");
+  }, { passive: true });
+  function swEnd() {
+    if (!sw) return;
+    $("#main").style.transform = "";
+    var dx = sw.dx, lock = sw.lock; sw = null;
+    if (lock === "h") { $("#pill").hidden = true; if (Math.abs(dx) > 70) stepDay(dx < 0 ? 1 : -1); }
+  }
+  document.addEventListener("touchend", swEnd);
+  document.addEventListener("touchcancel", swEnd);
+
+  // ---- התקנה כאפליקציה ----
+  var dip = null;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); dip = e; setInst(); });
+  function setInst() {
+    var box = $("#instBox"); if (!box) return;
+    var sa = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+    if (sa) { box.hidden = true; return; }
+    box.hidden = false; $("#instBtn").hidden = !dip;
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    $("#instTxt").textContent = dip ? "אפשר להתקין את הלוח כאפליקציה, והוא ייפתח במסך מלא." : ios ? "בספארי: לוחצים על כפתור השיתוף ואז על ״הוסף למסך הבית״." : "בתפריט הדפדפן: ״הוסף למסך הבית״ או ״התקן אפליקציה״.";
+  }
 
   function vSearch() {
     var now = new Date(), term = q.trim().toLowerCase(), hits = [];
@@ -564,7 +678,7 @@
     store("tvg.theme", t);
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
-  function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); } }
+  function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
   // ערוצי ברודקאסט וערוצים משותפים מופיעים בכל סינון
   function provOk(c, p) { return p === "all" || c._g === "broad" || c.prov === "both" || !c.prov || c.prov === p; }
@@ -602,7 +716,24 @@
 
   document.addEventListener("click", function (e) {
     var t = e.target;
-    var rm = t.closest("[data-rem]"); if (rm) { remind(rm); return; }
+    if (t.closest("#dial")) { if (tapPending) { tapPending = false; tapDial(); } return; }
+    var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
+    var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
+    if (t.closest("[data-ics]")) { downloadIcs(); return; }
+    if (t.closest("[data-remclose]") || t.closest("#scrim2")) { closeRem(); return; }
+    var fv = t.closest("[data-fav]");
+    if (fv) {
+      var ft = fv.getAttribute("data-fav"); if (FAV.has(ft)) FAV.delete(ft); else FAV.add(ft); saveFav();
+      if (tab === "dial") render(); else { var on = FAV.has(ft); fv.setAttribute("aria-pressed", String(on)); fv.textContent = on ? "★ במועדפים" : "☆ הוסף למועדפים"; }
+      pill(FAV.has(ft) ? "נוסף למועדפים" : "הוסר מהמועדפים", 1100); return;
+    }
+    var jp = t.closest("[data-jump]");
+    if (jp) {
+      var jr = findProg(jp.getAttribute("data-jump"));
+      if (jr) { chId = jr.id; day = dstr(jr.p.s); scrub = Math.round((jr.p.s - dObj(day)) / 60000); tab = "dial"; store("tvg.tab", "dial"); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      return;
+    }
+    if (t.closest("[data-install]")) { if (dip) { dip.prompt(); dip = null; setInst(); } return; }
     var tb = t.closest("[data-tab]"); if (tb) { tab = tb.getAttribute("data-tab"); store("tvg.tab", tab); scrollNext = tab === "grid"; render(); return; }
     var pd = t.closest("[data-day]"); if (pd) { day = pd.getAttribute("data-day"); scrub = null; scrollNext = true; render(); return; }
     var th = t.closest("[data-theme-set]"); if (th) { setTheme(th.getAttribute("data-theme-set")); return; }
@@ -629,12 +760,15 @@
   });
   document.addEventListener("pointerdown", function (e) {
     var d = e.target.closest && e.target.closest("#dial"); if (!d) return;
-    dragging = true; try { d.setPointerCapture(e.pointerId); } catch (x) {}
+    dragging = true; tapAt = { x: e.clientX, y: e.clientY }; tapPending = false; try { d.setPointerCapture(e.pointerId); } catch (x) {}
     dialSet(dialMin(e)); e.preventDefault();
   });
   document.addEventListener("pointermove", function (e) { if (dragging && $("#dial")) dialSet(dialMin(e)); });
-  function endDrag() { dragging = false; }
-  document.addEventListener("pointerup", endDrag);
+  function endDrag() { dragging = false; tapAt = null; }
+  document.addEventListener("pointerup", function (e) {
+    var tap = dragging && tapAt && Math.abs(e.clientX - tapAt.x) < 8 && Math.abs(e.clientY - tapAt.y) < 8;
+    endDrag(); tapPending = !!tap;
+  });
   document.addEventListener("pointercancel", endDrag);
   document.addEventListener("keydown", function (e) {
     if (e.target.id === "dial") {
@@ -657,11 +791,12 @@
   $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
 
   // רענון "עכשיו" כל דקה, וגם כשחוזרים לדף
-  function refresh() { if (!G || document.hidden || q.trim() || !$("#sheet").hidden) return; if (tab === "now") render(); else if (tab === "dial" && scrub == null && !dragging) updateDial(dialT()); }
+  function refresh() { if (!G || document.hidden || q.trim() || !$("#sheet").hidden || !$("#rem").hidden) return; if (tab === "now") render(); else if (tab === "dial" && scrub == null && !dragging) updateDial(dialT()); }
   setInterval(refresh, 60000);
   document.addEventListener("visibilitychange", refresh);
 
   setTheme(store("tvg.theme") === "dark" ? "dark" : "light");
+  setInst();
   load().then(function (r) {
     G = r.g; isSample = r.s; classify(); index();
     try { var saved = JSON.parse(store("tvg.sel") || "null"); if (Array.isArray(saved)) saved.forEach(function (id) { id = IDMAP[id] || id; if (by.has(id)) sel.add(id); }); if (sel.size !== saved.length) saveSel(); } catch (e) {}

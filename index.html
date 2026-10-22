@@ -270,6 +270,12 @@
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     :root { --glass: var(--surface); --sheet: var(--surface); --barbg: var(--bg); }
   }
+
+  .hb { display: flex; gap: 10px; }
+  .rbt.star { font-size: 1.3rem; color: var(--muted); }
+  .rbt.star[aria-pressed="true"] { color: #ff9f0a; background: rgba(255,159,10,.16); }
+  .go.sg { grid-template-columns: 1fr; }
+  .xchip { display: inline-flex; align-items: center; gap: 8px; }
 </style>
 </head>
 <body>
@@ -277,9 +283,9 @@
   <header class="top">
     <div class="head">
       <h1 id="ttl">היום</h1>
-      <button class="glass round" id="chBtn" type="button" aria-label="בחירת ערוצים"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="13" y2="17"></line></svg><span id="chCount" class="cnt"></span></button>
+<div class="hb"><button class="glass round" id="fvBtn" type="button" aria-label="המועדפים שלי"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><polygon points="12 3 14.8 9 21 9.7 16.4 14 17.7 20.5 12 17.2 6.3 20.5 7.6 14 3 9.7 9.2 9"></polygon></svg><span id="fvCount" class="cnt"></span></button>      <button class="glass round" id="chBtn" type="button" aria-label="בחירת ערוצים"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="13" y2="17"></line></svg><span id="chCount" class="cnt"></span></button></div>
     </div>
-    <div id="qwrap" hidden><input type="search" id="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"></div>
+    <div id="qwrap" hidden><input type="search" id="q" placeholder="חיפוש תוכנית בכל הלוח" aria-label="חיפוש תוכנית"></div>
   </header>
   <main id="main"></main>
 </div>
@@ -319,6 +325,7 @@
 
 <div class="pill" id="pill" hidden role="status"></div>
 <div class="scrim" id="scrim2" hidden></div>
+<section class="sheet" id="favs" hidden aria-label="מועדפים"><div class="sheet-in" id="favBody"></div></section>
 <section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
 
 <script>
@@ -332,7 +339,7 @@
   function parse(s) { var m = s.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 
-  var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false, lastIdx = -2, SCR = {};
+  var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false, lastIdx = -2, SCR = {}, qExact = null, scope = "all", TI = null, TIt = 0, delArm = false;
 
   // קבוצות לפי ספק, וז'אנרים לפי מילות מפתח בשם הערוץ. שתיהן משוערות, ואפשר לתקן ברשימות כאן.
   var GROUPS = [["broad", "ברודקאסט (ערוצי חינם)"], ["hot", "HOT"], ["yes", "yes"], ["both", "ערוצים משותפים ל-yes ול-HOT"], ["other", "ערוצים נוספים"]];
@@ -769,19 +776,85 @@
     $("#instTxt").textContent = dip ? "אפשר להתקין את הלוח כאפליקציה, והוא ייפתח במסך מלא." : ios ? "בספארי: לוחצים על כפתור השיתוף ואז על ״הוסף למסך הבית״." : "בתפריט הדפדפן: ״הוסף למסך הבית״ או ״התקן אפליקציה״.";
   }
 
-  function vSearch() {
-    var now = new Date(), term = q.trim().toLowerCase(), hits = [];
-    (chans().length ? chans() : G.channels).forEach(function (c) {
+  // ---- חיפוש בכל הלוח, השלמות אוטומטיות וניהול מועדפים ----
+  function titleIndex() {
+    var now = new Date();
+    if (TI && now - TIt < 600000) return TI;
+    var m = new Map();
+    G.channels.forEach(function (c) {
       (by.get(c.id) || []).forEach(function (p) {
-        if (p.e > now && p.title.toLowerCase().indexOf(term) >= 0) hits.push({ c: c, p: p });
+        if (p.e <= now) return;
+        var e = m.get(p.title); if (!e) { e = { t: p.title, tl: p.title.toLowerCase(), chs: {} }; m.set(p.title, e); }
+        e.chs[c.id] = (e.chs[c.id] || 0) + 1;
+      });
+    });
+    TI = Array.from(m.values()); TIt = now; return TI;
+  }
+  function tokOk(tl, toks) { for (var i = 0; i < toks.length; i++) if (tl.indexOf(toks[i]) < 0) return false; return true; }
+  function suggestions(term) {
+    var toks = term.toLowerCase().split(/\s+/).filter(Boolean); if (!toks.length) return [];
+    var mine = scope === "mine" ? new Set(chans().map(function (c) { return c.id; })) : null, out = [];
+    titleIndex().forEach(function (e) {
+      if (!tokOk(e.tl, toks)) return;
+      var n = 0, k = 0; Object.keys(e.chs).forEach(function (id) { if (!mine || mine.has(id)) { n += e.chs[id]; k++; } });
+      if (n) out.push({ t: e.t, n: n, k: k, pre: e.tl.indexOf(toks[0]) === 0 ? 0 : 1 });
+    });
+    out.sort(function (a, b) { return a.pre - b.pre || b.n - a.n || a.t.length - b.t.length; });
+    return out.slice(0, 6);
+  }
+  function starBtn(title) {
+    var on = FAV.has(title);
+    return '<button type="button" class="rbt star" data-fav="' + esc(title) + '" aria-pressed="' + on + '" aria-label="מועדף: ' + esc(title) + '">' + (on ? "★" : "☆") + "</button>";
+  }
+  function vSearch() {
+    var now = new Date(), term = q.trim().toLowerCase(), toks = term.split(/\s+/).filter(Boolean), hits = [];
+    var list = scope === "mine" ? chans() : G.channels;
+    list.forEach(function (c) {
+      (by.get(c.id) || []).forEach(function (p) {
+        if (p.e <= now) return;
+        if (qExact ? p.title === qExact : tokOk(p.title.toLowerCase(), toks)) hits.push({ c: c, p: p });
       });
     });
     hits.sort(function (a, b) { return a.p.s - b.p.s; });
-    if (!hits.length) return '<p class="none">לא נמצאו תוכניות עתידיות בשם הזה.</p>';
-    return '<div class="list">' + hits.slice(0, 80).map(function (x) {
-      return '<div class="row" data-toggle tabindex="0"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) +
-        '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + '</span></span><div class="more">' + descHtml(x.p, x.c.id) + "</div></div>";
-    }).join("") + "</div>";
+    var h = '<div class="chips" role="group" aria-label="היקף חיפוש"><button type="button" class="chip" data-scope="all" aria-pressed="' + (scope === "all") + '">כל הלוח</button><button type="button" class="chip" data-scope="mine" aria-pressed="' + (scope === "mine") + '">הערוצים שלי</button>' +
+      (qExact ? '<button type="button" class="chip xchip" data-clearx="1" aria-label="ביטול הבחירה">' + esc(qExact) + " ✕</button>" : "") + "</div>";
+    if (!qExact) {
+      var sg = suggestions(term);
+      if (sg.length) h += '<h2 class="sech">הצעות</h2>' + sg.map(function (x) {
+        return '<div class="srow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
+      }).join("");
+    }
+    if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
+    h += '<h2 class="sech">שידורים קרובים (' + hits.length + (hits.length > 80 ? ", מוצגים 80 הראשונים" : "") + ")</h2>";
+    h += hits.slice(0, 80).map(function (x) {
+      var v = x.c.id + "|" + x.p.s.getTime();
+      return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
+        '<button type="button" class="rbt" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">⏰</button></div>';
+    }).join("");
+    return h;
+  }
+  function updFav() { $("#fvCount").textContent = FAV.size ? String(FAV.size) : ""; }
+  function favHtml() {
+    var now = new Date(), next = {};
+    if (FAV.size) G.channels.forEach(function (c) {
+      (by.get(c.id) || []).forEach(function (p) { if (p.s > now && FAV.has(p.title) && (!next[p.title] || p.s < next[p.title].p.s)) next[p.title] = { c: c, p: p }; });
+    });
+    var titles = Array.from(FAV).sort(function (a, b) { return a.localeCompare(b, "he"); });
+    var h = "<h2>המועדפים שלי</h2>";
+    h += titles.length ? titles.map(function (t) {
+      var n = next[t], sub = n ? "הבא: " + dayLabel(dstr(n.p.s)) + " " + hhmm(n.p.s) + " · " + n.c.name : "אין שידור בימים הקרובים";
+      return '<div class="srow"><button type="button" class="go sg" data-favsearch="' + esc(t) + '"><span class="ttl">' + esc(t) + '<br><span class="sub">' + esc(sub) + '</span></span></button><button type="button" class="rbt" data-favdel="' + esc(t) + '" aria-label="הסר מהמועדפים: ' + esc(t) + '">✕</button></div>';
+    }).join("") : '<p class="none">עדיין אין מועדפים. מחפשים תוכנית וסומנים בכוכב, או לוחצים על "הוסף למועדפים" בכרטיס של תוכנית.</p>';
+    h += '<button type="button" class="btn" data-favadd>הוספת תוכנית</button>';
+    if (titles.length > 1) h += '<button type="button" class="ghost" data-favclear>' + (delArm ? "בטוח? לחיצה נוספת תסיר את כולם" : "הסר הכל") + "</button>";
+    h += '<button type="button" class="ghost" data-favclose>סגירה</button>';
+    return h;
+  }
+  function openFavs() { delArm = false; $("#favBody").innerHTML = favHtml(); $("#favs").hidden = false; $("#scrim2").hidden = false; }
+  function closeFavs() { $("#favs").hidden = true; if ($("#rem").hidden) $("#scrim2").hidden = true; }
+  function startSearch(text, exact) {
+    closeFavs(); $("#qwrap").hidden = false; $("#q").value = text || ""; q = text || ""; qExact = exact ? text : null;
+    render(); if (!exact) $("#q").focus(); window.scrollTo({ top: 0 });
   }
 
   function render() {
@@ -794,6 +867,7 @@
     document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = sel.size ? String(sel.size) : "";
+    updFav();
     $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס" }[nf ? "nf" : tab] || "לוח שידורים");
     if (searching) $("#qwrap").hidden = false;
     $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));
@@ -817,7 +891,7 @@
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }
-  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; render(); } }
+  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; qExact = null; render(); } }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
   function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
@@ -863,17 +937,32 @@
     var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
     var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
-    if (t.closest("[data-remclose]") || t.closest("#scrim2")) { closeRem(); return; }
+    if (t.closest("[data-remclose]") || t.closest("#scrim2")) { closeRem(); closeFavs(); return; }
     var fv = t.closest("[data-fav]");
     if (fv) {
-      var ft = fv.getAttribute("data-fav"); if (FAV.has(ft)) FAV.delete(ft); else FAV.add(ft); saveFav();
-      if (tab === "dial") render(); else { var on = FAV.has(ft); fv.setAttribute("aria-pressed", String(on)); fv.textContent = on ? "★ במועדפים" : "☆ הוסף למועדפים"; }
-      pill(FAV.has(ft) ? "נוסף למועדפים" : "הוסר מהמועדפים", 1100); return;
+      var ft = fv.getAttribute("data-fav"); if (FAV.has(ft)) FAV.delete(ft); else FAV.add(ft); saveFav(); updFav();
+      var on = FAV.has(ft);
+      document.querySelectorAll("[data-fav]").forEach(function (el) {
+        if (el.getAttribute("data-fav") !== ft) return;
+        el.setAttribute("aria-pressed", String(on));
+        if (el.classList.contains("star")) el.textContent = on ? "★" : "☆"; else if (el.classList.contains("fav")) el.textContent = on ? "★ במועדפים" : "☆ הוסף למועדפים";
+      });
+      if (tab === "dial" && !q.trim()) render();
+      pill(on ? "נוסף למועדפים" : "הוסר מהמועדפים", 1100); return;
     }
+    if (t.closest("#fvBtn")) { openFavs(); return; }
+    var fd = t.closest("[data-favdel]"); if (fd) { FAV.delete(fd.getAttribute("data-favdel")); saveFav(); updFav(); delArm = false; $("#favBody").innerHTML = favHtml(); if (tab === "dial" && !q.trim()) render(); return; }
+    var fs = t.closest("[data-favsearch]"); if (fs) { startSearch(fs.getAttribute("data-favsearch"), true); return; }
+    if (t.closest("[data-favadd]")) { startSearch("", false); return; }
+    if (t.closest("[data-favclear]")) { if (!delArm) { delArm = true; } else { FAV.clear(); saveFav(); updFav(); delArm = false; if (tab === "dial" && !q.trim()) render(); } $("#favBody").innerHTML = favHtml(); return; }
+    if (t.closest("[data-favclose]")) { closeFavs(); return; }
+    var sgb = t.closest("[data-sug]"); if (sgb) { var st2 = sgb.getAttribute("data-sug"); $("#q").value = st2; q = st2; qExact = st2; render(); window.scrollTo({ top: 0 }); return; }
+    var sc2 = t.closest("[data-scope]"); if (sc2) { scope = sc2.getAttribute("data-scope"); render(); return; }
+    if (t.closest("[data-clearx]")) { qExact = null; render(); return; }
     var jp = t.closest("[data-jump]");
     if (jp) {
       var jr = findProg(jp.getAttribute("data-jump"));
-      if (jr) { chId = jr.id; day = dstr(jr.p.s); scrub = Math.round((jr.p.s - dObj(day)) / 60000); tab = "dial"; store("tvg.tab", "dial"); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (jr) { if (!chans().some(function (c) { return c.id === jr.id; })) { sel.add(jr.id); saveSel(); pill("הערוץ נוסף לערוצים שלך", 1600); } setSearch(false); chId = jr.id; day = dstr(jr.p.s); scrub = Math.round((jr.p.s - dObj(day)) / 60000); tab = "dial"; store("tvg.tab", "dial"); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
       return;
     }
     if (t.closest("[data-install]")) { if (dip) { dip.prompt(); dip = null; setInst(); } return; }
@@ -935,7 +1024,7 @@
     saveSel();
     var sc = document.querySelector('[data-cchip="sel"]'); if (sc) sc.textContent = "נבחרו (" + sel.size + ")";
   });
-  $("#q").addEventListener("input", function (e) { q = e.target.value; render(); });
+  $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; render(); });
   $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
 
   // רענון "עכשיו" כל דקה, וגם כשחוזרים לדף

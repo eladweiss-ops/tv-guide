@@ -7,10 +7,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#1b2a8f">
+<meta name="theme-color" content="#f2f2f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="לוח שידורים">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap">
 <style>
   /* Layout: one column built for a thumb. Sticky header (title, channel chooser, two tabs, search). "Now" = one card per channel. "Grid" = channel dropdown, five day buttons, one list. Nothing scrolls sideways. */
   :root {
@@ -195,24 +195,103 @@
   #dial .fs { fill: #fff; stroke: var(--ink); stroke-width: 3; paint-order: stroke; font-size: 15px; pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) { .from-r { animation: fromR .26s ease-out; } .from-l { animation: fromL .26s ease-out; } }
   @media (prefers-reduced-motion: no-preference) { .prog i { transition: width .4s; } }
+
+  /* ===== iOS 27 / Liquid Glass ===== */
+  :root {
+    --bg: #f2f2f7; --surface: #ffffff; --ink: #1c1c1e; --muted: #6c6c70; --line: #e5e5ea;
+    --accent: #0a5fd6; --accent-ink: #ffffff; --soft: rgba(118,118,128,.12); --live: #c0392b;
+    --c-ent: #ff9500; --c-news: #5856d6; --c-life: #30b0c7; --c-oth: #c7c7cc;
+    --glass: rgba(255,255,255,.62); --glass-line: rgba(255,255,255,.8); --glass-edge: rgba(0,0,0,.14);
+    --sel: rgba(118,118,128,.16); --sheet: rgba(250,250,252,.86); --barbg: rgba(242,242,247,.82);
+    --font-body: -apple-system, "SF Pro Text", "SF Hebrew", "Heebo", system-ui, "Segoe UI", Arial, sans-serif;
+    --font-display: -apple-system, "SF Pro Display", "Heebo", system-ui, Arial, sans-serif;
+  }
+  :root[data-theme="dark"] {
+    --bg: #000000; --surface: #1c1c1e; --ink: #ffffff; --muted: #a1a1a6; --line: #38383a;
+    --accent: #4da3ff; --accent-ink: #00142e; --soft: rgba(118,118,128,.24); --live: #ff6b5e;
+    --c-ent: #ff9f0a; --c-news: #7d7aff; --c-life: #40c8e0; --c-oth: #636366;
+    --glass: rgba(72,72,78,.55); --glass-line: rgba(255,255,255,.2); --glass-edge: rgba(255,255,255,.1);
+    --sel: rgba(0,0,0,.34); --sheet: rgba(52,52,58,.84); --barbg: rgba(0,0,0,.72);
+  }
+  body { padding-top: calc(env(safe-area-inset-top, 0px) + 4px); padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px)); letter-spacing: -0.1px; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.1rem; letter-spacing: -0.4px; line-height: 1.1; }
+  .glass { background: var(--glass); border: 1px solid var(--glass-line); box-shadow: 0 0 0 .5px var(--glass-edge), 0 6px 20px rgba(0,0,0,.07); -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%); }
+  .round { position: relative; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; color: var(--ink); flex: none; }
+  .round.big { width: 64px; height: 64px; }
+  .cnt { position: absolute; top: -4px; left: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center; }
+  .cnt:empty { display: none; }
+
+  header.top { background: var(--barbg); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid transparent; padding: 10px 0 10px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; transition: border-color .2s; }
+  body.scrolled header.top { border-bottom-color: var(--line); }
+  body.tab-dial header.top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  #qwrap input { border: 0; background: var(--soft); border-radius: 24px; min-height: 48px; padding: 10px 18px; }
+
+  .dock { position: fixed; z-index: 10; left: 0; right: 0; margin: 0 auto; width: min(calc(100% - 32px), 648px); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; align-items: stretch; }
+  .dock .tabs { flex: 1; min-width: 0; height: 64px; border-radius: 32px; padding: 4px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; background: var(--glass); }
+  .dock .tabs button { border: 0; background: transparent; border-radius: 28px; padding: 0; min-height: 0; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .62rem; font-weight: 600; }
+  .dock .tabs button[aria-selected="true"] { background: var(--sel); color: var(--accent); font-weight: 700; box-shadow: none; }
+
+  .card { border: 0; border-radius: 26px; padding: 18px; }
+  .list { border: 0; border-radius: 24px; }
+  .srow { border: 0; border-radius: 22px; }
+  .row.now { background: var(--soft); }
+  .chn { color: var(--c-news); }
+  .btn { border-radius: 999px; min-height: 50px; padding: 12px 22px; box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+  .ghost { border: 0; background: var(--soft); border-radius: 999px; padding: 8px 18px; }
+  .step { border-radius: 16px; }
+  .chip { border: 0; background: var(--soft); min-height: 40px; padding: 4px 16px; }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  select { border: 0; border-radius: 24px; min-height: 50px; padding: 10px 18px; background: var(--surface); }
+  .days { background: var(--soft); border-radius: 26px; padding: 3px; gap: 0; }
+  .day { border: 0; background: transparent; border-radius: 23px; min-height: 52px; }
+  .day span, .day b { color: var(--muted); }
+  .day[aria-pressed="true"] { background: var(--surface); box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.12); border: 0; }
+  .day[aria-pressed="true"] span, .day[aria-pressed="true"] b { color: var(--ink); font-weight: 700; }
+  .seg button { border: 0; background: var(--soft); border-radius: 999px; }
+  .seg { grid-template-columns: repeat(3, 1fr); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .rbt { border: 0; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .prog { background: var(--soft); }
+  .prog i { background: var(--c-ent); }
+  .legend i { border-radius: 50%; }
+  #dial .knob { fill: var(--surface); stroke: var(--ink); stroke-width: 4; }
+  #dial path.on { stroke-width: 3; }
+
+  .scrim { background: rgba(0,0,0,.28); }
+  .sheet { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); border-radius: 40px; max-height: 86vh; padding: 22px 22px 22px; background: var(--sheet); border: 1px solid var(--glass-line); box-shadow: 0 0 0 .5px var(--glass-edge), 0 20px 50px rgba(0,0,0,.22); -webkit-backdrop-filter: blur(32px) saturate(190%); backdrop-filter: blur(32px) saturate(190%); }
+  .sheet h2 { font-size: 1.35rem; font-weight: 800; }
+  #done { box-shadow: none; }
+  .opts, .opt { border-color: var(--line); }
+
+  @media (prefers-reduced-transparency: reduce) {
+    :root { --glass: var(--surface); --sheet: var(--surface); --barbg: var(--bg); }
+    .glass, header.top, .sheet { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root { --glass: var(--surface); --sheet: var(--surface); --barbg: var(--bg); }
+  }
 </style>
 </head>
 <body>
 <div class="page">
   <header class="top">
     <div class="head">
-      <h1>לוח שידורים</h1>
-      <button class="ghost" id="chBtn" type="button">ערוצים <span id="chCount"></span></button>
+      <h1 id="ttl">היום</h1>
+      <button class="glass round" id="chBtn" type="button" aria-label="בחירת ערוצים"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="13" y2="17"></line></svg><span id="chCount" class="cnt"></span></button>
     </div>
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" id="tabDial" data-tab="dial" aria-selected="true">היום</button>
-      <button type="button" role="tab" id="tabNow" data-tab="now" aria-selected="false">עכשיו</button>
-      <button type="button" role="tab" id="tabGrid" data-tab="grid" aria-selected="false">לוח</button>
-      <button type="button" role="tab" id="tabNf" data-tab="nf" aria-selected="false" hidden>נטפליקס</button>
-    </div>
-    <input type="search" id="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית">
+    <div id="qwrap" hidden><input type="search" id="q" placeholder="חיפוש תוכנית" aria-label="חיפוש תוכנית"></div>
   </header>
   <main id="main"></main>
+</div>
+
+<div class="dock">
+  <nav class="tabs glass" role="tablist" aria-label="מסכים">
+    <button type="button" role="tab" id="tabDial" data-tab="dial" aria-selected="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg><span>היום</span></button>
+    <button type="button" role="tab" id="tabNow" data-tab="now" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"></circle><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9"></path><path d="M16.5 7.5a6.4 6.4 0 0 1 0 9"></path></svg><span>עכשיו</span></button>
+    <button type="button" role="tab" id="tabGrid" data-tab="grid" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4.5" cy="7" r="0.8"></circle><circle cx="4.5" cy="12" r="0.8"></circle><circle cx="4.5" cy="17" r="0.8"></circle></svg><span>לוח</span></button>
+    <button type="button" role="tab" id="tabNf" data-tab="nf" aria-selected="false" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"></rect><polygon points="10.5 9.5 15 12 10.5 14.5"></polygon></svg><span>נטפליקס</span></button>
+  </nav>
+  <button type="button" class="glass round big" id="sBtn" aria-label="חיפוש תוכנית"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.2" y2="16.2"></line></svg></button>
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -231,6 +310,7 @@
     <div class="seg">
       <button type="button" data-theme-set="light" aria-pressed="true">בהיר</button>
       <button type="button" data-theme-set="dark" aria-pressed="false">כהה</button>
+      <button type="button" data-theme-set="auto" aria-pressed="false">לפי המכשיר</button>
     </div>
     <div id="instBox" hidden><h2>התקנה כאפליקציה</h2><p class="none" id="instTxt"></p><button type="button" class="ghost" id="instBtn" data-install hidden>הוסף למסך הבית</button></div>
     <button class="btn" id="done" type="button">סיום</button>
@@ -386,7 +466,8 @@
   }
   function allDays() {
     var s = new Set(); by.forEach(function (a) { a.forEach(function (p) { s.add(dstr(p.s)); }); });
-    return Array.from(s).sort();
+    var all = Array.from(s).sort(), td = dstr(new Date()), fut = all.filter(function (d) { return d >= td; });
+    return (fut.length ? fut : all).slice(0, 5);
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
@@ -603,7 +684,7 @@
     for (var k = 0; k < 24; k += 3) { var a1 = pt(RO + 4, k * 60), a2 = pt(RO + 12, k * 60); svg += '<line x1="' + f1(a1[0]) + '" y1="' + f1(a1[1]) + '" x2="' + f1(a2[0]) + '" y2="' + f1(a2[1]) + '" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>'; }
     [[0, 180, 2], [6, 360, 185], [12, 180, 372], [18, 0, 185]].forEach(function (l) { svg += '<text x="' + l[1] + '" y="' + l[2] + '" font-size="15" font-weight="700">' + p2(l[0]) + "</text>"; });
     if (day === dstr(now)) { var nm = pt(RO + 14, (now - d0) / 60000); svg += '<circle class="nowdot" cx="' + f1(nm[0]) + '" cy="' + f1(nm[1]) + '" r="6"></circle>'; }
-    svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="7"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><text id="dTitle" x="180" y="220" font-size="16" font-weight="500"></text></svg>';
+    svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="9"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><text id="dTitle" x="180" y="220" font-size="16" font-weight="500"></text></svg>';
     h += '<div class="dialwrap">' + svg + '</div><p class="hint">גוררים את הטבעת כדי לטייל ביום. לחיצה על קטע עתידי מוסיפה תזכורת. החלקה הצידה מחליפה יום.</p>';
     h += '<button type="button" class="ghost" id="dNow" data-dnow hidden>חזרה לעכשיו</button>';
     h += '<article class="card dcard" id="dCard" aria-live="polite"></article>';
@@ -712,7 +793,9 @@
     $("#main").innerHTML = (nf ? "" : note) + chips + body;
     document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
-    $("#chCount").textContent = sel.size ? "(" + sel.size + ")" : "";
+    $("#chCount").textContent = sel.size ? String(sel.size) : "";
+    $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס" }[nf ? "nf" : tab] || "לוח שידורים");
+    if (searching) $("#qwrap").hidden = false;
     $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));
     $("#tabNow").setAttribute("aria-selected", String(tab === "now"));
     $("#tabGrid").setAttribute("aria-selected", String(tab === "grid"));
@@ -724,11 +807,18 @@
     if (D && tab === "dial" && !nf && !picking && !searching && $("#dial")) updateDial(dialT());
   }
 
+  var themeSel = "light";
   function setTheme(t) {
-    document.documentElement.setAttribute("data-theme", t);
-    store("tvg.theme", t);
+    if (t !== "dark" && t !== "auto") t = "light";
+    themeSel = t; store("tvg.theme", t);
+    var eff = t === "auto" ? (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t;
+    document.documentElement.setAttribute("data-theme", eff);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", eff === "dark" ? "#000000" : "#f2f2f7");
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
+  if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }
+  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; render(); } }
+  window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
   function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
   // ערוצי ברודקאסט וערוצים משותפים מופיעים בכל סינון
@@ -769,6 +859,7 @@
     var t = e.target;
     if (t.closest("#dial")) { if (tapPending) { tapPending = false; tapDial(); } return; }
     var st = t.closest("[data-step]"); if (st) { var sp = st.getAttribute("data-step").split("|"); stepCard(sp[1], +sp[0]); return; }
+    if (t.closest("#sBtn")) { setSearch($("#qwrap").hidden); return; }
     var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
     var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
@@ -852,7 +943,7 @@
   setInterval(refresh, 60000);
   document.addEventListener("visibilitychange", refresh);
 
-  setTheme(store("tvg.theme") === "dark" ? "dark" : "light");
+  setTheme(store("tvg.theme") || "light");
   setInst();
   load().then(function (r) {
     G = r.g; isSample = r.s; classify(); index();

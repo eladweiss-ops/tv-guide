@@ -354,7 +354,7 @@
   var G = null, by = new Map(), sel = new Set(), tab = "dial", day = null, chId = null, q = "", find = "", isSample = false, scrollNext = false, gen = "all", cf = "all", NF = null, nfView = "pop", scrub = null, D = null, dragging = false, lastIdx = -2, SCR = {}, qExact = null, scope = "all", TI = null, TIt = 0, delArm = false;
 
   // קבוצות לפי ספק, וז'אנרים לפי מילות מפתח בשם הערוץ. שתיהן משוערות, ואפשר לתקן ברשימות כאן.
-  var GROUPS = [["broad", "ברודקאסט (ערוצי חינם)"], ["hot", "HOT"], ["yes", "yes"], ["both", "ערוצים משותפים ל-yes ול-HOT"], ["other", "ערוצים נוספים"]];
+  var GROUPS = [["broad", "ברודקאסט (ערוצי חינם)"], ["sport", "ערוצי ספורט"], ["hot", "HOT"], ["yes", "yes"], ["both", "ערוצים משותפים ל-yes ול-HOT"], ["other", "ערוצים נוספים"]];
   var GENRES = [["news", "חדשות"], ["sport", "ספורט"], ["kids", "ילדים"], ["movies", "סרטים וסדרות"], ["ent", "בידור"], ["docu", "דוקו וידע"], ["music", "מוזיקה"]];
   var GNAME = {}; GENRES.forEach(function (g) { GNAME[g[0]] = g[1]; });
   var BROAD = /קשת|רשת|כאן|עכשיו|^(9|14|24)\b|ערוץ (9|14|24)\b|כנסת|i24|הלא|מכאן|הכלכלה/i;
@@ -370,6 +370,7 @@
   function grpOf(c) {
     var n = c.name;
     if (BROAD.test(n)) return "broad";
+    if (genOf(c) === "sport") return "sport";
     if (/(^|\s)hot(\s|$)|^הוט/i.test(n)) return "hot";
     if (/(^|\s)yes(\s|$)|^יס/i.test(n)) return "yes";
     if (c.prov === "hot") return "hot";
@@ -422,7 +423,14 @@
     G.channels = out;
     G.channels.forEach(function (c) { c._g = grpOf(c); c._n = genOf(c); });
     var heb = function (n) { return /[\u0590-\u05FF]/.test(n) ? 0 : 1; };
-    G.channels.sort(function (a, b) { return GRANK[a._g] - GRANK[b._g] || heb(a.name) - heb(b.name) || a.name.localeCompare(b.name, "he"); });
+    // ערוצי ספורט לפי המספר: ספורט 1, 2, 3, 4, 5, 5+, ... ואחריהם השאר
+    var sk = function (c) {
+      if (c._g !== "sport") return 0;
+      var n = c.name, m = n.match(/(?:^|\s)(?:ספורט|sport)\s*(\d)/i) || n.match(/^(5)\s*(?=gold|max)/i);
+      if (!m) return /^ערוץ הספורט$/.test(n) ? 50 : 100;
+      return +m[1] * 10 + (/\+|פלוס/.test(n) ? 1 : /stars/i.test(n) ? 2 : /gold|גולד/i.test(n) ? 3 : /max/i.test(n) ? 4 : /live/i.test(n) ? 5 : 0);
+    };
+    G.channels.sort(function (a, b) { return GRANK[a._g] - GRANK[b._g] || sk(a) - sk(b) || heb(a.name) - heb(b.name) || a.name.localeCompare(b.name, "he"); });
   }
 
   // נתוני דוגמה (קשת בלבד): מוצגים רק כשהדף לא מצליח לקרוא את guide.json.
@@ -449,9 +457,10 @@
     [true, false].forEach(function (leadPass) {
       G.programs.forEach(function (p) {
         var lid = IDMAP[p.ch] || p.ch;
-        if ((lid === p.ch) !== leadPass || !by.has(lid) || seen[lid][p.start]) return;
-        seen[lid][p.start] = 1;
-        by.get(lid).push({ title: unent(p.title), desc: p.desc || "", s: parse(p.start) });
+        if ((lid === p.ch) !== leadPass || !by.has(lid)) return;
+        if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; return; }
+        var o = { title: unent(p.title), desc: p.desc || "", s: parse(p.start) };
+        seen[lid][p.start] = o; by.get(lid).push(o);
       });
     });
     by.forEach(function (a) {
@@ -1049,7 +1058,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-24.3", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-24.4", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

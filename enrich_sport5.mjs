@@ -50,11 +50,11 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
   const groups = new Map();
   for (const p of guide.programs) {
     const c = chOf.get(String(p.ch)); if (!c) continue;
-    const g = c + "|" + p.start.slice(0, 10); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p);
+    const g = p.ch + "|" + c + "|" + p.start.slice(0, 10); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p);
   }
   let n = 0;
   for (const [g, progs] of groups) {
-    const items = sched.get(g); if (!items || !items.length) continue;
+    const items = sched.get(g.slice(g.indexOf("|") + 1)); if (!items || !items.length) continue; // כל ערוץ (SD/HD) מותאם בנפרד
     const pick = new Map();
     for (const it of items) {
       let bp = null, bd = 21;

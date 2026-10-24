@@ -43,21 +43,30 @@ export function typeOf(name) {
 }
 
 const mins = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
-const key = (x) => String(x).replace(/[^\p{L}\p{N}]/gu, "");
-
-export function enrich(guide, sched) { // sched: Map "type|day" -> [{time,text,rich}]
-  const chT = new Map(guide.channels.map((c) => [String(c.id), typeOf(c.name)]).filter((x) => x[1]));
-  let n = 0;
+export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> items [{time, ...}]
+  const chOf = new Map(guide.channels.map((c) => [String(c.id), typeOf(c.name)]).filter((x) => x[1]));
+  const key = (x) => String(x).replace(/^ישיר!?\s*/, "").replace(/[^\p{L}\p{N}]/gu, "");
+  // התאמה אחד-לאחד: כל משבצת באתר הולכת לתוכנית הכי קרובה אליה בזמן (עד 20 דקות)
+  const groups = new Map();
   for (const p of guide.programs) {
-    const ty = chT.get(String(p.ch)); if (!ty || p.desc) continue;
-    const items = sched.get(ty + "|" + p.start.slice(0, 10)); if (!items) continue;
-    const t = mins(p.start.slice(11, 16));
-    let best = null, bd = 21;
-    for (const it of items) { const d = Math.abs(mins(it.time) - t); if (d < bd) { bd = d; best = it; } }
-    if (!best) continue;
-    const text = best.rich || best.text;
-    if (key(text).startsWith(key(p.title))) continue;
-    p.desc = text; n++;
+    const c = chOf.get(String(p.ch)); if (!c) continue;
+    const g = c + "|" + p.start.slice(0, 10); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p);
+  }
+  let n = 0;
+  for (const [g, progs] of groups) {
+    const items = sched.get(g); if (!items || !items.length) continue;
+    const pick = new Map();
+    for (const it of items) {
+      let bp = null, bd = 21;
+      for (const p of progs) { const d = Math.abs(mins(it.time) - mins(p.start.slice(11, 16))); if (d < bd) { bd = d; bp = p; } }
+      if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
+    }
+    for (const [p, { it: best }] of pick) {
+      if (p.desc) continue;
+      const text = best.rich || best.text;
+      if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;
+      p.desc = text; n++;
+    }
   }
   return n;
 }

@@ -28,6 +28,9 @@ jobs:
       - name: Add Sport 5 match details
         continue-on-error: true
         run: node enrich_sport5.mjs
+      - name: Add Kan 11 summaries
+        continue-on-error: true
+        run: node enrich_kan.mjs
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:
@@ -44,5 +47,6 @@ jobs:
             echo "No changes"
           else
             git commit -m "Update guide"
+            git pull --rebase -X theirs origin main || true
             git push
           fi

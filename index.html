@@ -372,7 +372,7 @@
   function genOf(c) { for (var i = 0; i < GEN_RX.length; i++) if (GEN_RX[i][1].test(c.name)) return GEN_RX[i][0]; return ""; }
   var GRANK = {}; GROUPS.forEach(function (g, i) { GRANK[g[0]] = i; });
   // שמות שוואלה נותנת לערוצים, והשם שמוצג במקומם. אפשר להוסיף שורות.
-  var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14" };
+  var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14", "SPORT 3": "ספורט 3", "SPORT 3 HD": "ספורט 3", "SPORT 4": "ספורט 4", "SPORT 4 HD": "ספורט 4", "SPORT 1": "ספורט 1", "SPORT 2": "ספורט 2" };
   // פענוח ישויות HTML בשמות (וואלה שולחת למשל &#x27; במקום גרש)
   function unent(t) {
     return String(t == null ? "" : t).replace(/&#x([0-9a-f]+);/gi, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
@@ -901,11 +901,16 @@
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
   // ערוצי ברודקאסט וערוצים משותפים מופיעים בכל סינון
   function provOk(c, p) { return p === "all" || c._g === "broad" || c.prov === "both" || !c.prov || c.prov === p; }
+  // חיפוש ערוץ: "sport" ו"ספורט" שקולים
+  function hay(c) { return c.name.toLowerCase().replace(/sport/g, "ספורט"); }
+  // אותו ערוץ אצל הספק השני: אם כבר נבחר, לא מציגים אותו שוב
+  function twinSel(c) { var k = normKey(c.name); return G.channels.some(function (o) { return o.id !== c.id && sel.has(o.id) && normKey(o.name) === k; }); }
   function visible() {
     var f = find.trim().toLowerCase();
     return G.channels.filter(function (c) {
       if (!provOk(c, PROV)) return false;
-      if (f && c.name.toLowerCase().indexOf(f) < 0) return false;
+      if (f && hay(c).indexOf(f.replace(/sport/g, "ספורט")) < 0) return false;
+      if (!sel.has(c.id) && twinSel(c)) return false;
       if (cf === "sel") return sel.has(c.id);
       if (cf !== "all") return c._n === cf;
       return true;
@@ -1024,8 +1029,8 @@
     if (t.id === "chSel") { chId = t.value; scrub = null; scrollNext = true; render(); return; }
     var id = t.getAttribute && t.getAttribute("data-opt");
     if (!id) return;
-    if (t.checked) sel.add(id); else sel.delete(id);
-    saveSel();
+    if (t.checked) { sel.add(id); var c0 = G.channels.filter(function (c) { return c.id === id; })[0]; if (c0) G.channels.forEach(function (o) { if (o.id !== id && normKey(o.name) === normKey(c0.name)) sel.delete(o.id); }); } else sel.delete(id);
+    saveSel(); if (t.checked) buildSheet();
     var sc = document.querySelector('[data-cchip="sel"]'); if (sc) sc.textContent = "נבחרו (" + sel.size + ")";
   });
   $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; $("#qx").hidden = !q; render(); });

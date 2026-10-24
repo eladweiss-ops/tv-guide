@@ -19,6 +19,9 @@ jobs:
           node-version: 22
       - name: Fetch guide from Walla
         run: node scrape.mjs --all --range 3690 3850
+      - name: Add Reshet 13 summaries
+        continue-on-error: true
+        run: node enrich13.mjs
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:

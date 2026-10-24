@@ -281,6 +281,7 @@
   #qwrap input { padding-inline-end: 52px; }
   #qwrap input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
   #qx { position: absolute; inset-inline-end: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(118,118,128,.28); color: var(--ink); font-size: 1rem; line-height: 1; cursor: pointer; }
+  #bkCode { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 14px; padding: 10px 12px; font: 13px/1.4 ui-monospace, monospace; resize: vertical; }
 </style>
 </head>
 <body>
@@ -323,6 +324,12 @@
       <button type="button" data-theme-set="dark" aria-pressed="false">כהה</button>
       <button type="button" data-theme-set="auto" aria-pressed="false">לפי המכשיר</button>
     </div>
+    <h2>גיבוי ושחזור</h2>
+    <p class="none">הבחירות נשמרות רק במכשיר הזה. לפני מחיקת האפליקציה, העתיקו קוד גיבוי (למשל לפתקים), ואחרי ההתקנה הדביקו אותו כאן.</p>
+    <div class="bar"><button type="button" class="ghost" id="bkCopy">העתקת קוד גיבוי</button></div>
+    <textarea id="bkCode" rows="3" placeholder="הדבקת קוד גיבוי לשחזור" aria-label="קוד גיבוי" dir="ltr"></textarea>
+    <div class="bar"><button type="button" class="ghost" id="bkRestore">שחזור מהקוד</button></div>
+    <p class="none" id="bkVer"></p>
     <div id="instBox" hidden><h2>התקנה כאפליקציה</h2><p class="none" id="instTxt"></p><button type="button" class="ghost" id="instBtn" data-install hidden>הוסף למסך הבית</button></div>
     <button class="btn" id="done" type="button">סיום</button>
   </div>
@@ -1037,6 +1044,45 @@
   $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; $("#qx").hidden = !q; render(); });
   $("#qx").addEventListener("click", function () { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; render(); $("#q").focus(); });
   $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
+
+  // ---- עדכון אוטומטי של האפליקציה ----
+  // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
+  var BUILD = "2026-10-24.2", bootAt = Date.now(), lastChk = 0;
+  function checkUpdate() {
+    if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
+    fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
+      var m = t.match(/var BUILD = "([^"]+)"/); if (!m || m[1] === BUILD) return;
+      var tried = null; try { tried = sessionStorage.getItem("tvg.try"); sessionStorage.setItem("tvg.try", m[1]); } catch (e) {}
+      if (tried === m[1]) return; // כבר ניסינו לטעון את הגרסה הזו, לא נכנסים ללולאה
+      location.replace("./?v=" + encodeURIComponent(m[1]));
+    }).catch(function () {});
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) return;
+    if (Date.now() - bootAt > 3 * 3600000) { location.reload(); return; } // נתונים טריים אחרי הפסקה ארוכה
+    checkUpdate();
+  });
+  setTimeout(checkUpdate, 1500);
+
+  // ---- גיבוי ושחזור הבחירות ----
+  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab"];
+  function bkCode() { var o = {}; BK.forEach(function (k) { var v = store(k); if (v != null) o[k] = v; }); return "TVG1:" + btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
+  $("#bkCopy").addEventListener("click", function () {
+    var c = bkCode(); $("#bkCode").value = c;
+    var ok = function () { pill("קוד הגיבוי הועתק", 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(c).then(ok, function () { $("#bkCode").select(); pill("סמנו והעתיקו את הקוד", 1800); });
+    else { $("#bkCode").select(); pill("סמנו והעתיקו את הקוד", 1800); }
+  });
+  $("#bkRestore").addEventListener("click", function () {
+    var c = $("#bkCode").value.trim().replace(/\s+/g, "");
+    try {
+      if (c.indexOf("TVG1:") !== 0) throw 0;
+      var o = JSON.parse(decodeURIComponent(escape(atob(c.slice(5)))));
+      BK.forEach(function (k) { if (typeof o[k] === "string") store(k, o[k]); });
+      pill("שוחזר, טוען מחדש…"); setTimeout(function () { location.reload(); }, 600);
+    } catch (e) { pill("הקוד לא תקין", 1600); }
+  });
+  $("#bkVer").textContent = "גרסה " + BUILD;
 
   // רענון "עכשיו" כל דקה, וגם כשחוזרים לדף
   function refresh() { if (!G || document.hidden || q.trim() || !$("#sheet").hidden || !$("#rem").hidden) return; if (tab === "now") render(); else if (tab === "dial" && scrub == null && !dragging) updateDial(dialT()); }

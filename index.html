@@ -165,6 +165,7 @@
   #dial .k-ent { fill: var(--c-ent); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
   #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
   #dial text { direction: rtl; unicode-bidi: plaintext; fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
+  #dTitle { text-align: center; font: 500 16px/30px var(--font-body); color: var(--ink); white-space: nowrap; overflow: hidden; unicode-bidi: plaintext; pointer-events: none; }
   #dial .face { fill: var(--surface); }
   #dial .hand { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
   #dial .knob { fill: var(--ink); }
@@ -575,7 +576,7 @@
     if (i < 0) return '<article class="card" data-cid="' + esc(c.id) + '"><div class="chn">' + esc(c.name) + '</div><p class="none">אין נתוני שידור לשעה הזו.</p></article>';
     var p = a[k], n = a[k + 1], live = k === i, pct = Math.round((now - p.s) / (p.e - p.s) * 100);
     var label = live ? "" : '<span class="badge">' + (k - i === 1 ? "הבא בתור" : "בעוד " + (k - i) + " תוכניות") + "</span>";
-    var meta = '<span>' + hhmm(p.s) + "–" + hhmm(p.e) + "</span><span>" + (live ? "נותרו " + Math.max(1, Math.round((p.e - now) / 60000)) + " דק׳" : "מתחיל בעוד " + inMin(p.s, now) + (dstr(p.s) !== dstr(now) ? " · " + dayLabel(dstr(p.s)) : "")) + "</span>";
+    var meta = '<span dir="ltr">' + hhmm(p.s) + "–" + hhmm(p.e) + "</span><span>" + (live ? "נותרו " + Math.max(1, Math.round((p.e - now) / 60000)) + " דק׳" : "מתחיל בעוד " + inMin(p.s, now) + (dstr(p.s) !== dstr(now) ? " · " + dayLabel(dstr(p.s)) : "")) + "</span>";
     var nav = (k > i ? '<button type="button" class="ghost step" data-step="-1|' + esc(c.id) + '">› חזרה</button>' : "") +
       (n ? '<button type="button" class="ghost step" data-step="1|' + esc(c.id) + '"><b>' + hhmm(n.s) + "</b>" + esc(n.title) + " ‹</button>" : "");
     return '<article class="card" data-toggle data-cid="' + esc(c.id) + '" tabindex="0"><div class="chn">' + esc(c.name) + label + "</div>" +
@@ -695,7 +696,7 @@
     for (var k = 0; k < 24; k += 3) { var a1 = pt(RO + 4, k * 60), a2 = pt(RO + 12, k * 60); svg += '<line x1="' + f1(a1[0]) + '" y1="' + f1(a1[1]) + '" x2="' + f1(a2[0]) + '" y2="' + f1(a2[1]) + '" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>'; }
     [[0, 180, 2], [6, 360, 185], [12, 180, 372], [18, 0, 185]].forEach(function (l) { svg += '<text x="' + l[1] + '" y="' + l[2] + '" font-size="15" font-weight="700">' + p2(l[0]) + "</text>"; });
     if (day === dstr(now)) { var nm = pt(RO + 14, (now - d0) / 60000); svg += '<circle class="nowdot" cx="' + f1(nm[0]) + '" cy="' + f1(nm[1]) + '" r="6"></circle>'; }
-    svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="9"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><text id="dTitle" x="180" y="220" font-size="16" font-weight="500"></text></svg>';
+    svg += '<line class="hand" id="dHand"></line><circle class="knob" id="dKnob" r="9"></circle><text id="dTime" x="180" y="192" font-size="40" font-weight="900"></text><foreignObject x="85" y="203" width="190" height="30" style="pointer-events:none"><div xmlns="http://www.w3.org/1999/xhtml" id="dTitle" dir="auto"></div></foreignObject></svg>';
     h += '<div class="dialwrap">' + svg + '</div><p class="hint">גוררים את הטבעת כדי לטייל ביום. לחיצה על קטע עתידי מוסיפה תזכורת. החלקה הצידה מחליפה יום.</p>';
     h += '<button type="button" class="ghost" id="dNow" data-dnow hidden>חזרה לעכשיו</button>';
     h += '<article class="card dcard" id="dCard" aria-live="polite"></article>';
@@ -718,7 +719,7 @@
     $("#dTitle").textContent = s ? (s.p.title.length > 15 ? s.p.title.slice(0, 14) + "…" : s.p.title) : "";
     var cn = (G.channels.filter(function (c) { return c.id === chId; })[0] || {}).name || "";
     var live = s && isToday && s.p.s <= now && now < s.p.e;
-    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span>' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, chId, true) +
+    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span dir="ltr">' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, chId, true) +
       (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + esc(nx.p.title) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
     $("#dNow").hidden = !(isToday && scrub != null);
   }

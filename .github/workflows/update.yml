@@ -25,6 +25,9 @@ jobs:
       - name: Add Sport 1-6 match details
         continue-on-error: true
         run: node enrich_sport1.mjs
+      - name: Add Sport 5 match details
+        continue-on-error: true
+        run: node enrich_sport5.mjs
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:

@@ -46,7 +46,9 @@ export function enrich(guide, sched) { // sched: Map "no|YYYY-MM-DD" -> items
     for (const it of items) { const d = Math.abs(mins(it.time) - t); if (d < bd) { bd = d; best = it; } }
     if (!best) continue;
     const text = [best.name, best.desc].filter(Boolean).join(" · ");
-    if (text && text !== p.title && !p.desc) { p.desc = text; n++; }
+    const k = (x) => String(x).replace(/[^\p{L}\p{N}]/gu, "");
+    if (k(best.name).startsWith(k(p.title))) continue; // האתר לא מוסיף מידע על השם שכבר יש
+    if (text && !p.desc) { p.desc = text; n++; }
   }
   return n;
 }

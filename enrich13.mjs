@@ -24,13 +24,16 @@ export function parseWeek(html) {
   return week;
 }
 
+// תיאורים כלליים של האתר (לא של התוכנית) לא נכנסים
+const GENERIC = /LIVE|VOD|אתר תוכניות הטלוויזיה/;
+
 export function descByTitle(week) {
   const map = new Map();
   for (const day of week) {
     for (const s of day.shows || []) {
       const desc = String(s.desc || "").replace(/\s+/g, " ").trim();
       const k = norm(s.title);
-      if (k && desc && !map.has(k)) map.set(k, desc);
+      if (k && desc && !GENERIC.test(desc) && !map.has(k)) map.set(k, desc);
     }
   }
   return map;

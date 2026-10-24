@@ -23,14 +23,14 @@
     --accent-ink: #ffffff;
     --soft: #ebe7f6;
     --live: #c8381f;
-    --c-ent: #ff6a2b; --c-news: #1b2a8f; --c-life: #6fcbb8; --c-oth: #c9c7d1;
+    --c-ent: #ff6a2b; --c-sport: #34c759; --c-news: #1b2a8f; --c-life: #6fcbb8; --c-oth: #c9c7d1;
     --font-body: "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     --font-display: "Secular One", "Heebo", system-ui, Arial, sans-serif;
   }
   :root[data-theme="dark"] {
     --bg: #15131f; --surface: #201d2e; --ink: #f1effa; --muted: #b3aecb; --line: #38334d;
     --accent: #9aa6ff; --accent-ink: #10102a; --soft: #2a2640; --live: #ff8466;
-    --c-ent: #ff7f45; --c-news: #8a96ff; --c-life: #5cbfa9; --c-oth: #6b6780;
+    --c-ent: #ff7f45; --c-sport: #34c759; --c-news: #8a96ff; --c-life: #5cbfa9; --c-oth: #6b6780;
     color-scheme: dark;
   }
 
@@ -162,7 +162,7 @@
   /* dial */
   .dialwrap { display: flex; justify-content: center; }
   #dial { width: 100%; max-width: min(360px, 36vh); height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
-  #dial .k-ent { fill: var(--c-ent); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
+  #dial .k-ent { fill: var(--c-ent); } #dial .k-sport { fill: var(--c-sport); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
   #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
   #dial text { direction: rtl; unicode-bidi: plaintext; fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
   #dTitle { text-align: center; font: 500 16px/30px var(--font-body); color: var(--ink); white-space: nowrap; overflow: hidden; unicode-bidi: plaintext; pointer-events: none; }
@@ -201,7 +201,7 @@
   :root {
     --bg: #f2f2f7; --surface: #ffffff; --ink: #1c1c1e; --muted: #6c6c70; --line: #e5e5ea;
     --accent: #0a5fd6; --accent-ink: #ffffff; --soft: rgba(118,118,128,.12); --live: #c0392b;
-    --c-ent: #ff9500; --c-news: #5856d6; --c-life: #30b0c7; --c-oth: #c7c7cc;
+    --c-ent: #ff9500; --c-sport: #34c759; --c-news: #5856d6; --c-life: #30b0c7; --c-oth: #c7c7cc;
     --glass: rgba(255,255,255,.62); --glass-line: rgba(255,255,255,.8); --glass-edge: rgba(0,0,0,.14);
     --sel: rgba(118,118,128,.16); --sheet: rgba(250,250,252,.86); --barbg: rgba(242,242,247,.82);
     --font-body: -apple-system, "SF Pro Text", "SF Hebrew", "Heebo", system-ui, "Segoe UI", Arial, sans-serif;
@@ -210,7 +210,7 @@
   :root[data-theme="dark"] {
     --bg: #000000; --surface: #1c1c1e; --ink: #ffffff; --muted: #a1a1a6; --line: #38383a;
     --accent: #4da3ff; --accent-ink: #00142e; --soft: rgba(118,118,128,.24); --live: #ff6b5e;
-    --c-ent: #ff9f0a; --c-news: #7d7aff; --c-life: #40c8e0; --c-oth: #636366;
+    --c-ent: #ff9f0a; --c-sport: #34c759; --c-news: #7d7aff; --c-life: #40c8e0; --c-oth: #636366;
     --glass: rgba(72,72,78,.55); --glass-line: rgba(255,255,255,.2); --glass-edge: rgba(255,255,255,.1);
     --sel: rgba(0,0,0,.34); --sheet: rgba(52,52,58,.84); --barbg: rgba(0,0,0,.72);
   }
@@ -671,8 +671,10 @@
 
 
   // ---- שעון היום ----
-  var CX = 180, CY = 180, RO = 150, RI = 92, KIND = { news: "חדשות", ent: "בידור", life: "אורח חיים", oth: "אחר" };
+  var CX = 180, CY = 180, RO = 150, RI = 92, KIND = { news: "חדשות", sport: "ספורט", ent: "בידור", life: "אורח חיים", oth: "אחר" };
   function pgOf(t) {
+    var ch = G && G.channels.filter(function (c) { return c.id === chId; })[0];
+    if ((ch && ch._n === "sport") || /ליגת|ליגה|(^|\s)ל\.\s|כדורגל|כדורסל|יורוליג|NBA|פרמייר|גביע|אולפן ספורט|מונדיאל/.test(t)) return "sport";
     if (/חדשות|מהדורה|מבזק|פוליטי/.test(t)) return "news";
     if (/בוקר|מטבח|שף|אוכל|בישול|בריאות|טיול|(^|\s)עם(\s|\.|$)/.test(t)) return "life";
     if (/תשדיר|קליפ|שידור חוזר|פרסומות|מוזיקה/.test(t)) return "oth";
@@ -1047,7 +1049,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-24.2", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-24.3", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

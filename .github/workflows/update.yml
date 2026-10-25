@@ -34,6 +34,12 @@ jobs:
       - name: Add ONE match details
         continue-on-error: true
         run: node enrich_one.mjs
+      - name: Add Keshet 12 summaries
+        continue-on-error: true
+        run: node enrich_keshet.mjs
+      - name: Add HOT summaries (all channels, fills the gaps)
+        continue-on-error: true
+        run: node enrich_hot.mjs
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:

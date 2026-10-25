@@ -835,7 +835,7 @@
     list.forEach(function (c) {
       (by.get(c.id) || []).forEach(function (p) {
         if (p.e <= now) return;
-        if (qExact ? p.title === qExact : tokOk(p.title.toLowerCase(), toks)) hits.push({ c: c, p: p });
+        if (qExact ? p.title === qExact : tokOk((p.title + " " + p.desc).toLowerCase(), toks)) hits.push({ c: c, p: p, viaDesc: !qExact && !tokOk(p.title.toLowerCase(), toks) });
       });
     });
     hits.sort(function (a, b) { return a.p.s - b.p.s; });
@@ -851,7 +851,7 @@
     h += '<h2 class="sech">שידורים קרובים (' + hits.length + (hits.length > 80 ? ", מוצגים 80 הראשונים" : "") + ")</h2>";
     h += hits.slice(0, 80).map(function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
+      return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
         '<button type="button" class="rbt" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">⏰</button></div>';
     }).join("");
     return h;
@@ -1058,7 +1058,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-24.4", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-25.1", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

@@ -31,6 +31,9 @@ jobs:
       - name: Add Kan 11 summaries
         continue-on-error: true
         run: node enrich_kan.mjs
+      - name: Add ONE match details
+        continue-on-error: true
+        run: node enrich_one.mjs
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:

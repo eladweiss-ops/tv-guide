@@ -1258,7 +1258,7 @@
     if (t.closest("[data-favadd]")) { favPick = true; startSearch("", false); return; }
     var fp = t.closest("[data-favpick]");
     if (fp) { var ft2 = fp.getAttribute("data-favpick"); FAV.add(ft2); saveFav(); updFav(); favPick = false; setSearch(false); openFavs(); pill("★ " + ft2 + " נוסף למועדפים", 1800); return; }
-    if (t.closest("[data-favpickoff]")) { favPick = false; render(); return; }
+    if (t.closest("[data-favpickoff]")) { setSearch(false); openFavs(); return; } // ביטול: חוזרים למועדפים
     if (t.closest("[data-favclear]")) { if (!delArm) { delArm = true; } else { FAV.clear(); saveFav(); updFav(); delArm = false; if (tab === "dial" && !q.trim()) render(); } $("#favBody").innerHTML = favHtml(); return; }
     if (t.closest("[data-favclose]")) { closeFavs(); return; }
     var rcb = t.closest("[data-recent]");
@@ -1279,6 +1279,7 @@
     var tb = t.closest("[data-tab]");
     if (tb) {
       var nt = tb.getAttribute("data-tab");
+      if (!$("#qwrap").hidden) { setSearch(false); if (nt === tab) { window.scrollTo(0, SCR[tab] || 0); return; } } // לשונית סוגרת את החיפוש
       if (nt === tab) { if (prevTab && prevTab !== tab) nt = prevTab; else { window.scrollTo({ top: 0, behavior: "smooth" }); return; } } // לחיצה שנייה: חזרה למסך הקודם
       prevTab = tab; SCR[tab] = window.scrollY; tab = nt; store("tvg.tab", tab); scrollNext = tab === "grid" && SCR.grid == null; render();
       window.scrollTo(0, SCR[tab] || 0); return;
@@ -1345,7 +1346,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.9", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.10", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

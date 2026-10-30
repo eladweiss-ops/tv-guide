@@ -5,6 +5,7 @@
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr;
   TVG.askCal = askCal;
   TVG.calWelcome = calWelcome;
+  TVG.calAdd = calAdd;
   TVG.cancelRem = cancelRem;
   TVG.closeRem = closeRem;
   TVG.downloadIcs = downloadIcs;
@@ -101,13 +102,13 @@
         '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + esc(leadTxt(ex.lead, ex.ts)) + ".</p>" +
         (TVG.srv() ? '<button type="button" class="ghost" data-ledit="' + esc(ex.k) + '">🔔 שינוי מועד ההתראה</button>' : "") +
         '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
-        '<p class="credit">' + (TVG.srv() ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
+        '<p class="credit">' + (TVG.srv() ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : TVG.isAndroid ? "הביטול מוריד את התזכורת מהרשימה. אם האירוע נוסף ל-Google Calendar, מוחקים אותו שם." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
       $("#rem").hidden = false; $("#scrim2").hidden = false; return;
     }
     $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(TVG.chName(r.id)) + "</span><span>" + TVG.dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
       leadPicker(r.p.s.getTime(), r.lead, true) +
-      '<button type="button" class="btn" data-ics>' + (TVG.pushOn ? "⏰ הוספת תזכורת" : "הוספה ליומן עם תזכורת") + '</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
-      (TVG.srv() ? "" : '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>');
+      '<button type="button" class="btn" data-ics>' + (TVG.pushOn ? "⏰ הוספת תזכורת" : TVG.isAndroid ? "📅 הוספה ל-Google Calendar" : "הוספה ליומן עם תזכורת") + '</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
+      (TVG.srv() ? "" : TVG.isAndroid ? '<p class="credit">ייפתח Google Calendar עם האירוע מוכן לשמירה. ההתראה שם לפי ברירת המחדל של היומן, לא בדיוק למועד שבחרת.</p>' : '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>');
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
   function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; TVG.rem = null; TVG.LP = null; }
@@ -115,6 +116,12 @@
     var url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
     var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+  // הוספה ליומן הרגיל: באייפון קובץ .ics שנפתח ביומן, באנדרואיד קישור ל-Google Calendar (קובץ .ics שם רק יורד)
+  function calAdd(r) {
+    if (!TVG.isAndroid) { saveIcs(TVG.icsText(r), "reminder.ics"); return; }
+    var w = null; try { w = window.open(TVG.gcalUrl(r), "_blank", "noopener"); } catch (e) {}
+    if (!w) location.href = TVG.gcalUrl(r);
   }
   function downloadIcs() {
     if (!TVG.rem) return;
@@ -124,13 +131,14 @@
     TVG.REMS.push(recOf(TVG.rem));
     TVG.saveRems();
     if (TVG.srv()) { TVG.syncRems().then(function (ok) { TVG.pill(TVG.pushOn ? "⏰ נזכיר לך " + leadTxt(TVG.REMS[TVG.REMS.length - 1].lead, TVG.REMS[TVG.REMS.length - 1].ts) : ok ? "נוסף ליומן 'לוח שידורים'" : "נשמר. היומן יתעדכן כשיהיה חיבור", 1800); }); }
-    else { saveIcs(TVG.icsText(TVG.rem), "reminder.ics"); TVG.pill("נוסף ליומן", 1600); }
+    else { calAdd(TVG.rem); TVG.pill(TVG.isAndroid ? "נפתח Google Calendar. לוחצים שם ״שמירה״" : "נוסף ליומן", TVG.isAndroid ? 3500 : 1600); }
     closeRem(); TVG.render();
   }
   function cancelRem(k) {
     var x = TVG.hasRem(k); if (!x) return;
     TVG.REMS = TVG.REMS.filter(function (y) { return y.k !== k; }); TVG.saveRems();
     if (TVG.srv()) { TVG.syncRems(); TVG.pill("התזכורת בוטלה", 3500, "החזר", function () { if (!TVG.hasRem(x.k)) { TVG.REMS.push(x); TVG.saveRems(); TVG.syncRems(); TVG.render(); TVG.pill("הוחזרה ✓", 1200); } }); }
+    else if (TVG.isAndroid) TVG.pill("התזכורת בוטלה. אם נוספה ל-Google Calendar, מוחקים אותה שם", 4000);
     else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(TVG.icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); TVG.pill("התזכורת בוטלה", 1800); }
     closeRem(); TVG.render();
   }
@@ -146,6 +154,15 @@
     }, "🔔 שינוי", function () { openLead(ks); });
   }
   function askCal() {
+    if (TVG.isAndroid) { // באנדרואיד אין יומן מנוי: התראות פוש קודם, Google Calendar כגיבוי
+      $("#remBody").innerHTML = TVG.canPush && !TVG.pushOn ?
+        '<h2>איך להזכיר לך?</h2><p class="remnote">הכי פשוט ומדויק: התראה שקופצת בטלפון בזמן שבחרת, גם כשהאפליקציה סגורה.</p>' +
+        '<button type="button" class="btn" data-pushon>🔔 התראות לטלפון (מומלץ)</button><button type="button" class="ghost" data-calics>📅 הוספה ל-Google Calendar</button>' +
+        '<p class="credit">ביומן ההתראה תהיה לפי ברירת המחדל שלו, לא בדיוק לזמן שבחרת.</p>' :
+        '<h2>להוסיף ל-Google Calendar?</h2><p class="remnote">ייפתח היומן עם האירוע מוכן לשמירה. ההתראה שם לפי ברירת המחדל של היומן, לא בדיוק לזמן שבחרת.</p>' +
+        '<button type="button" class="btn" data-calics>📅 הוספה ל-Google Calendar</button><button type="button" class="ghost" data-remclose>סגירה</button>';
+      $("#rem").hidden = false; $("#scrim2").hidden = false; return;
+    }
     if (TVG.canPush && !TVG.pushOn) {
       $("#remBody").innerHTML = '<h2>איך להזכיר לך?</h2><p class="remnote">הכי פשוט ומדויק: התראה שקופצת בטלפון בזמן שבחרת, גם כשהאפליקציה סגורה.</p>' +
         '<button type="button" class="btn" data-pushon>🔔 התראות לטלפון (מומלץ)</button><button type="button" class="ghost" data-calsetup>📅 דרך יומן "לוח שידורים"</button><button type="button" class="ghost" data-calics>להוסיף ליומן הרגיל שלי</button>';

@@ -6,6 +6,7 @@
   TVG.calUrl = calUrl;
   TVG.chName = chName;
   TVG.favBtn = favBtn;
+  TVG.gcalUrl = gcalUrl;
   TVG.findProg = findProg;
   TVG.hasRem = hasRem;
   TVG.icsText = icsText;
@@ -89,6 +90,12 @@
     var k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
     var p = (TVG.by.get(id) || []).filter(function (x) { return x.s.getTime() === ts; })[0];
     return p ? { id: id, p: p } : null;
+  }
+  // קישור "הוספה ל-Google Calendar" (באנדרואיד webcal/‏.ics לא עובדים). אי אפשר להעביר דרכו שעת התראה מדויקת
+  function gcalUrl(r) {
+    var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : "");
+    return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ttl) + "&dates=" + icsT(p.s) + "/" + icsT(p.e) +
+      "&details=" + encodeURIComponent((p.desc || "").slice(0, 300));
   }
   function chName(id) { return (TVG.G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || ""; }
   function icsText(r, cancel) {

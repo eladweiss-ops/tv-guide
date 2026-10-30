@@ -14,8 +14,7 @@
   // ---- התראות פוש ישירות לטלפון ----
   var VAPID = "BCOXYdOEbd_FudtM1149DTOT_kQYsUtiATFGx2KyrmYie4lWrQwiNsmsjwVlKrkkZwv3-MHmhMrUGo9sJShrcjU";
   TVG.canPush = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent),
-      standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+  var isIOS = TVG.isIOS, standalone = TVG.isStandalone;
   if (TVG.canPush) { try { navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {} }
   if (TVG.pushOn && TVG.canPush && Notification.permission !== "granted") { TVG.pushOn = false; TVG.store("tvg.push", "0"); }
   function b64u(s) { var p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
@@ -25,11 +24,22 @@
       .then(function (sub) { return fetch(CAL_API + "/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.myTok(), sub: sub.toJSON() }) }); })
       .then(function (r) { if (!r.ok) throw 0; return true; });
   }
+  // איך מאשרים התראות אחרי שנדחו: ההוראה תלויה במכשיר, ובאנדרואיד גם באם האפליקציה מותקנת
+  function denyMsg() {
+    if (TVG.isAndroid) return "ההתראות לא אושרו. " + (standalone ? "אפשר לאשר דרך פרטי האפליקציה ← התראות" : "אפשר לאשר בלחיצה על סמל המנעול ליד הכתובת ← הרשאות ← התראות");
+    return "ההתראות לא אושרו. אפשר לאשר בהגדרות ← התראות ← לוח שידורים";
+  }
+  // באנדרואיד, אחרי שהתראות הופעלו מציעים (פעם אחת) להתקין את האפליקציה
+  function offerInstall() {
+    if (!TVG.isAndroid || !TVG.dip || TVG.store("tvg.instOffered") === "1") return;
+    TVG.store("tvg.instOffered", "1");
+    setTimeout(function () { if (TVG.dip) TVG.pill("רוצים את הלוח כאפליקציה במסך הבית?", 6000, "התקנה", function () { TVG.install(); }); }, 3000);
+  }
   function enablePush() {
     if (!TVG.canPush) { TVG.pill(isIOS && !standalone ? "התראות עובדות רק מהאפליקציה שבמסך הבית" : "המכשיר הזה לא תומך בהתראות", 2600); return; }
     var pend = TVG.rem; TVG.myTok();
     Notification.requestPermission().then(function (perm) {
-      if (perm !== "granted") { TVG.pill("ההתראות לא אושרו. אפשר לאשר בהגדרות ← התראות ← לוח שידורים", 3500); return; }
+      if (perm !== "granted") { TVG.pill(denyMsg(), 5000); return; }
       TVG.pill("מפעיל התראות…", 4000);
       return pushReg().then(function () {
         TVG.pushOn = true; TVG.store("tvg.push", "1");
@@ -39,6 +49,7 @@
           else if (pend && !TVG.hasRem(TVG.remKey(pend.id, pend.p.s))) TVG.quickAdd([pend]); else TVG.render();
           fetch(CAL_API + "/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.calTok, test: 1 }) });
           if (!pend && !TVG.REMS.length) TVG.pill("🔔 ההתראות הופעלו! שלחנו התראת בדיקה", 3000);
+          offerInstall();
         });
       });
     }).catch(function () { TVG.pill("לא הצלחתי להפעיל התראות, נסו שוב", 2500); });
@@ -77,8 +88,8 @@
     var rec = { k: "p|" + ts + "|" + Math.random().toString(36).slice(2, 7), id: "", ts: ts, end: ts + 3600000, title: title, ch: "תזכורת אישית", desc: "", lead: TVG.fitLead(ts, TVG.pLead), at: Date.now() };
     if (!TVG.srv() && TVG.canPush) { pendRec = rec; enablePush(); return; }
     TVG.REMS.push(rec); TVG.saveRems();
-    if (TVG.srv()) TVG.syncRems(); else TVG.saveIcs(TVG.icsText({ id: "personal", p: { title: title, s: d, e: new Date(rec.end), desc: "" }, lead: rec.lead }), "reminder.ics");
-    TVG.closeRem(); TVG.render(); TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
+    if (TVG.srv()) TVG.syncRems(); else TVG.calAdd({ id: "personal", p: { title: title, s: d, e: new Date(rec.end), desc: "" }, lead: rec.lead });
+    TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח Google Calendar. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
   function pushCard() {
     if (TVG.pushOn) return '<details class="calopt"><summary>🔔 התראות לטלפון פעילות ✓</summary><p class="remnote">תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div></details>';
@@ -87,6 +98,7 @@
     return "";
   }
   function calCard() {
+    if (TVG.isAndroid) return ""; // יומן מנוי (webcal) לא עובד באנדרואיד
     if (TVG.calMode === "sub") return (TVG.syncBad ? '<div class="note">⚠️ השינוי האחרון עוד לא הגיע ליומן. <button type="button" class="ghost" data-calsync>לנסות שוב</button></div>' : "") +
       '<details class="calopt"><summary>📅 יומן "לוח שידורים" מחובר ✓</summary><p class="remnote">כל תזכורת שמוסיפים או מבטלים כאן מתעדכנת ביומן לבד (בדרך כלל תוך רבע שעה).</p>' +
       '<div class="bar"><a class="ghost" data-calsub href="' + esc(TVG.calUrl()) + '">חיבור היומן מחדש</a><button type="button" class="ghost" data-calics>להפסיק להשתמש ביומן הייעודי</button></div>' +

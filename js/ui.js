@@ -17,5 +17,10 @@
     var el = document.getElementById(id); if (!el) return;
     el.addEventListener("click", function (e) { e.stopPropagation(); if (id === "scrim") { TVG.openSheet(false); TVG.render(); } else { TVG.closeRem(); TVG.closeFavs(); } });
   });
+  // שדה שקיבל פוקוס בתוך חלון תחתון נגלל לתצוגה, כדי שהמקלדת (במיוחד באנדרואיד) לא תכסה אותו
+  document.addEventListener("focusin", function (e) {
+    var t = e.target; if (!t || !t.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !t.closest(".sheet")) return;
+    setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (er) {} }, 320);
+  });
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
 })(window.TVG);

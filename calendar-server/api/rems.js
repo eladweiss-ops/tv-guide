@@ -1,6 +1,7 @@
 // GET  /api/rems?t=TOKEN        → רשימת התזכורות (לשחזור באפליקציה)
 // POST /api/rems {t, rems:[...]} → שמירת הרשימה (היומן המנוי מתעדכן ממנה)
 import { okToken, load, save, clean } from "./_store.js";
+import { reschedule } from "./_push.js";
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -18,7 +19,8 @@ export default async function handler(req, res) {
       if (!okToken(body.t)) return res.status(400).json({ error: "bad token" });
       const rems = clean(body.rems);
       await save(body.t, rems);
-      return res.status(200).json({ ok: true, n: rems.length });
+      const sch = await reschedule(body.t, rems).catch((e) => ({ error: e.message }));
+      return res.status(200).json({ ok: true, n: rems.length, sch });
     }
     return res.status(405).end();
   } catch (e) {

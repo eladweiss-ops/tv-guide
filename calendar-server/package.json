@@ -2,5 +2,8 @@
   "name": "tv-guide-cal",
   "private": true,
   "type": "module",
-  "dependencies": { "@vercel/blob": "^1.1.1" }
+  "dependencies": {
+    "@vercel/blob": "^1.1.1",
+    "web-push": "^3.6.7"
+  }
 }

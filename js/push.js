@@ -26,14 +26,13 @@
   }
   // איך מאשרים התראות אחרי שנדחו: ההוראה תלויה במכשיר, ובאנדרואיד גם באם האפליקציה מותקנת
   function denyMsg() {
-    if (TVG.isAndroid) return "ההתראות לא אושרו. " + (standalone ? "אפשר לאשר דרך פרטי האפליקציה ← התראות" : "אפשר לאשר בלחיצה על סמל המנעול ליד הכתובת ← הרשאות ← התראות");
+    if (TVG.isAndroid) return "ההתראות לא אושרו. " + (standalone ? "אפשר לאשר דרך פרטי האפליקציה ← התראות" : "אפשר לאשר בהגדרות האתר בדפדפן (לרוב סמל המנעול ליד הכתובת) ← הרשאות ← התראות");
     return "ההתראות לא אושרו. אפשר לאשר בהגדרות ← התראות ← לוח שידורים";
   }
   // באנדרואיד, אחרי שהתראות הופעלו מציעים (פעם אחת) להתקין את האפליקציה
   function offerInstall() {
     if (!TVG.isAndroid || !TVG.dip || TVG.store("tvg.instOffered") === "1") return;
-    TVG.store("tvg.instOffered", "1");
-    setTimeout(function () { if (TVG.dip) TVG.pill("רוצים את הלוח כאפליקציה במסך הבית?", 6000, "התקנה", function () { TVG.install(); }); }, 3000);
+    setTimeout(function () { if (TVG.dip) TVG.store("tvg.instOffered", "1"), TVG.pill("רוצים את הלוח כאפליקציה במסך הבית?", 6000, "התקנה", function () { TVG.install(); }); }, 3000);
   }
   function enablePush() {
     if (!TVG.canPush) { TVG.pill(isIOS && !standalone ? "התראות עובדות רק מהאפליקציה שבמסך הבית" : "המכשיר הזה לא תומך בהתראות", 2600); return; }
@@ -89,7 +88,7 @@
     if (!TVG.srv() && TVG.canPush) { pendRec = rec; enablePush(); return; }
     TVG.REMS.push(rec); TVG.saveRems();
     if (TVG.srv()) TVG.syncRems(); else TVG.calAdd({ id: "personal", p: { title: title, s: d, e: new Date(rec.end), desc: "" }, lead: rec.lead });
-    TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח Google Calendar. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
+    TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח יומן Google. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
   function pushCard() {
     if (TVG.pushOn) return '<details class="calopt"><summary>🔔 התראות לטלפון פעילות ✓</summary><p class="remnote">תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div></details>';

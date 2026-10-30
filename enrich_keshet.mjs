@@ -1,6 +1,7 @@
 // מוסיף תקצירים לתוכניות של קשת 12, מלוח השידורים של mako (שבוע קדימה, תקציר לכל תוכנית).
 // הרצה: node enrich_keshet.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
+import { fillGaps } from "./fill.mjs";
 
 const API = "https://www.mako.co.il/AjaxPage?jspName=EPGResponse.jsp";
 const HEADERS = { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-language": "he", referer: "https://www.mako.co.il/tv-tv-schedule" };
@@ -12,7 +13,7 @@ const key = (x) => String(x).replace(/[^\p{L}\p{N}]/gu, "");
 
 export function parseEpg(j) {
   return (j && j.programs || []).map((x) => ({ start: local(x.StartTimeUTC), title: String(x.ProgramName || "").trim(), desc: String(x.EventDescription || "").replace(/\s+/g, " ").trim(), rr: !!x.RerunBroadcast }))
-    .filter((x) => x.start && x.desc);
+    .filter((x) => x.start && x.title);
 }
 
 export function enrich(guide, items) {
@@ -33,9 +34,12 @@ async function main() {
   if (!res.ok) throw new Error(`mako → ${res.status}`);
   const items = parseEpg(await res.json());
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
-  const r = enrich(guide, items);
+  const kIds = guide.channels.filter((c) => /^(ערוץ\s+)?קשת( 12)?( hd)?$/i.test(String(c.name).trim())).map((c) => c.id);
+  const filled = fillGaps(guide, kIds, items);
+  if (filled) console.log(`קשת 12: הושלמו ${filled} שידורים בימים שחסרו בוואלה`);
+  const r = enrich(guide, items.filter((x) => x.desc));
   console.log(`קשת 12: ${items.length} תוכניות באתר, ${r.n} עודכנו (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
-  if (r.n) await writeFile("guide.json", JSON.stringify(guide));
+  if (r.n || filled) await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich_keshet.mjs")) {

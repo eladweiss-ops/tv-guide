@@ -1,6 +1,7 @@
 // מוסיף תקצירים לתוכניות של רשת 13 ב-guide.json, מהלוח הרשמי באתר הערוץ.
 // הרצה: node enrich13.mjs   (אחרי scrape.mjs). אם האתר לא נגיש, guide.json נשאר כמו שהוא.
 import { readFile, writeFile } from "node:fs/promises";
+import { fillGaps } from "./fill.mjs";
 
 const URL13 = "https://13tv.co.il/tv-guide/";
 
@@ -53,11 +54,21 @@ export function enrich(guide, map) {
 async function main() {
   const res = await fetch(URL13, { headers: { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-language": "he" } });
   if (!res.ok) throw new Error(`${URL13} → ${res.status}`);
-  const map = descByTitle(parseWeek(await res.text()));
+  const week = parseWeek(await res.text());
+  const map = descByTitle(week);
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
+  const items = [];
+  for (const day of week) for (const s of day.shows || []) {
+    if (!s.show_date || !s.start_time) continue;
+    const raw = String(s.title || "").trim(), desc = String(s.desc || "").replace(/\s+/g, " ").trim();
+    items.push({ start: s.show_date + "T" + String(s.start_time).padStart(5, "0"), title: raw.replace(/\s*[-–]\s*ש\.?\s*ח\.?\s*$/, ""), desc: GENERIC.test(desc) ? "" : desc, rr: /ש\.?\s*ח\.?\s*$/.test(raw) });
+  }
+  const ids = guide.channels.filter((c) => /^רשת(\s|$)/.test(String(c.name).trim())).map((c) => c.id);
+  const filled = fillGaps(guide, ids, items);
   const r = enrich(guide, map);
+  if (filled) console.log(`רשת 13: הושלמו ${filled} שידורים בימים שחסרו בוואלה`);
   console.log(`רשת 13: ${map.size} תקצירים באתר, ${r.n} תוכניות עודכנו (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
-  if (r.n) await writeFile("guide.json", JSON.stringify(guide));
+  if (r.n || filled) await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich13.mjs")) {

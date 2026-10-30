@@ -1,6 +1,7 @@
 // מוסיף תקצירים לתוכניות של כאן 11, מהלוח הרשמי באתר כאן.
 // הרצה: node enrich_kan.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
+import { fillGaps, nextDays } from "./fill.mjs";
 
 const API = "https://www.kan.org.il/umbraco/surface/LoadBroadcastSchedule/LoadSchedule";
 const KAN11 = "4444", PAGE = "1517";
@@ -54,7 +55,7 @@ export function enrich(guide, items) {
 
 async function main() {
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
-  const days = [...new Set(guide.programs.map((p) => p.start.slice(0, 10)))].sort().slice(0, 8);
+  const days = [...new Set([...guide.programs.map((p) => p.start.slice(0, 10)), ...nextDays(8)])].sort().filter((d) => d >= nextDays(1)[0]).slice(0, 9);
   const items = []; let ok = 0, fail = 0;
   for (const day of days) {
     const [y, m, d] = day.split("-");
@@ -65,9 +66,12 @@ async function main() {
     } catch (e) { fail++; if (fail === 1) console.error("kan:", e.message); }
     await sleep(400);
   }
+  const kanIds = guide.channels.filter((c) => /^(HD )?כאן( 11)?( HD)?$/.test(String(c.name).trim())).map((c) => c.id);
+  const filled = fillGaps(guide, kanIds, items);
   const r = enrich(guide, items);
+  if (filled) console.log(`כאן 11: הושלמו ${filled} שידורים בימים שחסרו בוואלה`);
   console.log(`כאן 11: ${ok} ימים נקראו, ${fail} נכשלו, ${items.length} תוכניות באתר, ${r.n} עודכנו (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
-  if (r.n) await writeFile("guide.json", JSON.stringify(guide));
+  if (r.n || filled) await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich_kan.mjs")) {

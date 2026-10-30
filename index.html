@@ -298,6 +298,15 @@
   details.calopt summary::-webkit-details-marker { display: none; }
   details.calopt summary::after { content: " ›"; color: var(--muted); }
   details.calopt[open] summary::after { content: " ‹"; }
+  .lp { align-items: center; }
+  .lpsel select { min-height: 40px; padding: 4px 30px 4px 14px; border-radius: 999px; font: inherit; font-size: 0.92rem; background-color: var(--soft); border: 0; width: auto; }
+  .lpsel.on select { background-color: var(--accent); color: #fff; }
+  .lpcustom { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .lpcustom[hidden] { display: none; }
+  .lpcustom .btn { flex: none; width: auto; margin: 0; padding: 0 18px; }
+  .lpcustom input { flex: 1; min-width: 0; min-height: 44px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: inherit; padding: 6px 12px; font: inherit; direction: ltr; }
+  .lpnow { margin-top: 8px; }
+  .rbts { display: flex; gap: 6px; flex: none; }
   .pill .pillact { margin-inline-start: 10px; border: 0; background: transparent; color: #64d2ff; font: inherit; font-weight: 800; padding: 4px 6px; cursor: pointer; }
   .remall { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 18px; background: var(--soft); }
   .remall span { flex: 1; font-weight: 700; }
@@ -664,32 +673,101 @@
     return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
       "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:0", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
       "SUMMARY:" + icsEsc(ttl), "DESCRIPTION:" + icsEsc((p.desc || "").slice(0, 300)),
-      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + lead + "M", "END:VALARM",
+      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + (r.lead != null ? r.lead : lead) + "M", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"].join("\r\n");
   }
   var pillFn = null;
-  function pill(t, ms, actLabel, fn) {
-    var el = $("#pill"); pillFn = fn || null;
-    el.innerHTML = esc(t) + (fn ? ' <button type="button" class="pillact" data-pillact>' + esc(actLabel || "ביטול") + "</button>" : "");
+  var pillFn2 = null;
+  function pill(t, ms, actLabel, fn, act2, fn2) {
+    var el = $("#pill"); pillFn = fn || null; pillFn2 = fn2 || null;
+    el.innerHTML = esc(t) + (fn2 ? ' <button type="button" class="pillact" data-pillact2>' + esc(act2) + "</button>" : "") + (fn ? ' <button type="button" class="pillact" data-pillact>' + esc(actLabel || "ביטול") + "</button>" : "");
     el.hidden = false; clearTimeout(pillT); if (ms) pillT = setTimeout(function () { el.hidden = true; pillFn = null; }, fn ? Math.max(ms, 4500) : ms);
   }
+  // ---- בחירת מועד ההתראה ----
+  var LEAD_MAIN = [10, 30, 60];
+  var LEAD_MORE = [0, 5, 15, 45, 120, 180, 1440];
+  function leadName(m) {
+    if (!m) return "בתחילת השידור";
+    if (m < 60) return m + " דק׳ לפני";
+    if (m === 60) return "שעה לפני"; if (m === 120) return "שעתיים לפני";
+    if (m === 1440) return "יום לפני";
+    if (m % 60 === 0 && m < 1440) return m / 60 + " שעות לפני";
+    return "";
+  }
+  function isStdLead(m) { return LEAD_MAIN.indexOf(m) >= 0 || LEAD_MORE.indexOf(m) >= 0; }
+  function leadTxt(m, ts) { // "10 דק׳ לפני", או לשעה מסוימת: "ב־19:45" / "ב־ראשון 19:45"
+    if (isStdLead(m) && leadName(m)) return leadName(m);
+    var a = new Date(ts - m * 60000), same = dstr(a) === dstr(new Date(ts));
+    return "ב־" + (same ? "" : dayLabel(dstr(a)) + " ") + hhmm(a);
+  }
+  function okLead(ts, m) { return ts - m * 60000 > Date.now() + 30000; }
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function localVal(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+  var LP = null; // {keys:[...]} לעריכת תזכורות קיימות, או null לתזכורת חדשה (rem)
+  function leadPicker(ts, cur, allowCustom) {
+    var custom = !isStdLead(cur) && allowCustom;
+    var h = '<div class="lbl">מתי להזכיר?</div><div class="chips lp" role="group">' + LEAD_MAIN.filter(function (m) { return okLead(ts, m); }).map(function (m) {
+      return '<button type="button" class="chip" data-lp="' + m + '" aria-pressed="' + (cur === m) + '">' + leadName(m).replace(" לפני", "") + "</button>";
+    }).join("");
+    var more = LEAD_MORE.filter(function (m) { return okLead(ts, m); }), inMore = more.indexOf(cur) >= 0;
+    h += '<label class="lpsel' + (inMore || custom ? " on" : "") + '"><select data-lpsel aria-label="עוד אפשרויות">' +
+      '<option value=""' + (!inMore && !custom ? " selected" : "") + ">עוד…</option>" +
+      more.map(function (m) { return '<option value="' + m + '"' + (cur === m ? " selected" : "") + ">" + leadName(m) + "</option>"; }).join("") +
+      (allowCustom ? '<option value="custom"' + (custom ? " selected" : "") + ">🕒 בשעה מסוימת…</option>" : "") + "</select></label></div>";
+    if (allowCustom) {
+      var now = new Date(Date.now() + 60000), max = new Date(ts - 60000), val = new Date(ts - (cur || 0) * 60000);
+      if (val > max) val = max; if (val < now) val = now;
+      h += '<div class="lpcustom" data-lpbox' + (custom ? "" : " hidden") + '><input type="datetime-local" data-lpdt min="' + localVal(now) + '" max="' + localVal(max) + '" value="' + localVal(val) + '" aria-label="מועד ההתראה">' +
+        '<button type="button" class="btn sm" data-lpset>קביעה</button></div>';
+    }
+    h += '<p class="credit lpnow">⏰ ההתראה: ' + esc(leadTxt(cur, ts)) + " · " + (function () { var a = new Date(ts - cur * 60000); return dayLabel(dstr(a)) + " " + hhmm(a); })() + "</p>";
+    return h;
+  }
+  function setLead(m) {
+    if (LP) {
+      var n = 0;
+      REMS.forEach(function (x) { if (LP.keys.indexOf(x.k) >= 0 && okLead(x.ts, m)) { x.lead = m; n++; } });
+      if (!n) { pill("השעה הזו כבר עברה", 1600); return; }
+      saveRems(); syncRems(); openLead(LP.keys); render();
+      pill("⏰ ההתראה עודכנה", 1300);
+      return;
+    }
+    if (!rem) return;
+    if (!okLead(rem.p.s.getTime(), m)) { pill("השעה הזו כבר עברה", 1600); return; }
+    rem.lead = m; if (isStdLead(m)) { lead = m; store("tvg.lead", String(m)); }
+    openRem(rem);
+  }
+  function openLead(keys) { // שינוי מועד ההתראה לתזכורות שכבר נוספו
+    var xs = REMS.filter(function (x) { return keys.indexOf(x.k) >= 0 && x.ts > Date.now(); });
+    if (!xs.length) return;
+    LP = { keys: keys }; rem = null;
+    var x = xs[0], one = xs.length === 1;
+    $("#remBody").innerHTML = "<h2>" + esc(one ? x.title : xs.length + " תזכורות") + "</h2>" +
+      (one ? '<div class="meta"><span>' + esc(x.ch) + "</span><span>" + dayLabel(dstr(new Date(x.ts))) + "</span><span>" + hhmm(new Date(x.ts)) + "</span></div>" : '<p class="remnote">הבחירה תחול על כולן.</p>') +
+      leadPicker(x.ts, x.lead, one) +
+      '<button type="button" class="btn" data-remclose>סיום</button>' +
+      (calMode === "sub" ? '<p class="credit">השינוי יגיע ליומן "לוח שידורים" בעדכון הבא שלו.</p>' : "");
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+  }
   function openRem(r) {
-    rem = r;
+    rem = r; LP = null;
+    if (r.lead == null) r.lead = okLead(r.p.s.getTime(), lead) ? lead : 0;
     var ex = hasRem(remKey(r.id, r.p.s));
     if (ex) {
       $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(chName(r.id)) + "</span><span>" + dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
-        '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + ex.lead + " דקות לפני השידור.</p>" +
+        '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + esc(leadTxt(ex.lead, ex.ts)) + ".</p>" +
+        (calMode === "sub" ? '<button type="button" class="ghost" data-ledit="' + esc(ex.k) + '">🔔 שינוי מועד ההתראה</button>' : "") +
         '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
         '<p class="credit">' + (calMode === "sub" ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
       $("#rem").hidden = false; $("#scrim2").hidden = false; return;
     }
     $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(chName(r.id)) + "</span><span>" + dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
-      '<div class="lbl">התראה לפני השידור</div><div class="chips" role="group">' + [5, 10, 30].map(function (m) { return '<button type="button" class="chip" data-lead="' + m + '" aria-pressed="' + (lead === m) + '">' + m + " דקות</button>"; }).join("") + "</div>" +
+      leadPicker(r.p.s.getTime(), r.lead, true) +
       '<button type="button" class="btn" data-ics>הוספה ליומן עם תזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
       '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>';
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
-  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; rem = null; }
+  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; rem = null; LP = null; }
   function saveIcs(text, name) {
     var url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
     var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -700,7 +778,7 @@
     var k = remKey(rem.id, rem.p.s);
     if (hasRem(k)) { openRem(rem); return; } // לא מוסיפים פעמיים
     if (!calMode) { askCal(); return; }
-    REMS.push({ k: k, id: rem.id, ts: rem.p.s.getTime(), end: rem.p.e.getTime(), title: rem.p.title, ch: chName(rem.id), desc: (rem.p.desc || "").slice(0, 300), lead: lead, at: Date.now() });
+    REMS.push(recOf(rem));
     saveRems();
     if (calMode === "sub") { syncRems().then(function (ok) { pill(ok ? "נוסף ליומן 'לוח שידורים'" : "נשמר. היומן יתעדכן כשיהיה חיבור", 1800); }); }
     else { saveIcs(icsText(rem), "reminder.ics"); pill("נוסף ליומן", 1600); }
@@ -713,15 +791,16 @@
     else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); pill("התזכורת בוטלה", 1800); }
     closeRem(); render();
   }
-  function recOf(r) { return { k: remKey(r.id, r.p.s), id: r.id, ts: r.p.s.getTime(), end: r.p.e.getTime(), title: r.p.title, ch: chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: lead, at: Date.now() }; }
+  function recOf(r) { var ts = r.p.s.getTime(), m = r.lead != null ? r.lead : lead; if (!okLead(ts, m)) m = 0; return { k: remKey(r.id, r.p.s), id: r.id, ts: ts, end: r.p.e.getTime(), title: r.p.title, ch: chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: m, at: Date.now() }; }
   // הוספה בלחיצה אחת כשיש יומן ייעודי, עם "ביטול" בהודעה למקרה של טעות
   function quickAdd(list) {
     var add = list.filter(function (r) { return r.p.s > new Date() && !hasRem(remKey(r.id, r.p.s)); }).map(recOf);
-    if (!add.length) { pill("כבר יש תזכורת לכל אלה ✓", 1500); return; }
+    if (!add.length) { pill(list.some(function (r) { return r.p.s > new Date(); }) ? "כבר יש תזכורת לכל אלה ✓" : "התוכנית כבר התחילה", 1500); return; }
     REMS = REMS.concat(add); saveRems(); syncRems(); render();
-    pill(add.length === 1 ? "⏰ נזכיר לך " + lead + " דק׳ לפני" : "⏰ נוספו " + add.length + " תזכורות", 3000, "ביטול", function () {
-      var ks = add.map(function (x) { return x.k; }); REMS = REMS.filter(function (x) { return ks.indexOf(x.k) < 0; }); saveRems(); syncRems(); render(); pill("בוטל", 1200);
-    });
+    var ks = add.map(function (x) { return x.k; });
+    pill(add.length === 1 ? "⏰ נזכיר לך " + leadTxt(add[0].lead, add[0].ts) : "⏰ נוספו " + add.length + " תזכורות", 5000, "ביטול", function () {
+      REMS = REMS.filter(function (x) { return ks.indexOf(x.k) < 0; }); saveRems(); syncRems(); render(); pill("בוטל", 1200);
+    }, "🔔 שינוי", function () { openLead(ks); });
   }
   function askCal() {
     $("#remBody").innerHTML = '<h2>להקים יומן ייעודי?</h2><p class="remnote">אפשר להקים ביומן של הטלפון יומן נפרד בשם "לוח שידורים". כל תזכורת שתוסיפו או תבטלו כאן תופיע או תימחק בו לבד, בלי קבצים ובלי כפילויות.</p>' +
@@ -739,7 +818,7 @@
         '<a class="btn" data-calsub href="' + esc(calUrl()) + '">הרשמה ליומן</a><button type="button" class="ghost" data-remclose>סגירה</button>' +
         '<p class="credit">שינויים מגיעים ליומן בעדכון הבא שלו (בדרך כלל עד רבע שעה). את התדירות אפשר לקבוע בהגדרות ← יומן ← חשבונות ← יומנים מנויים.</p>';
       if (rem && !hasRem(remKey(rem.id, rem.p.s))) {
-        var p = rem.p; REMS.push({ k: remKey(rem.id, p.s), id: rem.id, ts: p.s.getTime(), end: p.e.getTime(), title: p.title, ch: chName(rem.id), desc: (p.desc || "").slice(0, 300), lead: lead, at: Date.now() });
+        REMS.push(recOf(rem));
         saveRems(); syncRems(); render();
       }
     });
@@ -770,10 +849,10 @@
       var d = new Date(x.ts), dl = dayLabel(dstr(d));
       if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
       var live = x.ts <= now;
-      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub">' + esc(x.ch) + " · " + (live ? "משודר עכשיו" : "התראה " + x.lead + " דק׳ לפני") + "</span></span></button>" +
+      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub">' + esc(x.ch) + " · " + (live ? "משודר עכשיו" : "🔔 " + leadTxt(x.lead, x.ts)) + "</span></span></button>" +
         (live ? "</div>" : askK === x.k
           ? '</div><div class="confirm"><span>לבטל את התזכורת?</span><button type="button" class="btn sm danger" data-remcancel="' + esc(x.k) + '">כן, לבטל</button><button type="button" class="ghost sm" data-remkeep>להשאיר</button></div>'
-          : '<button type="button" class="rbt" data-remask="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button></div>');
+          : '<span class="rbts">' + (calMode === "sub" ? '<button type="button" class="rbt" data-ledit="' + esc(x.k) + '" aria-label="שינוי מועד ההתראה: ' + esc(x.title) + '">🔔</button>' : "") + '<button type="button" class="rbt" data-remask="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button></span></div>');
     });
     return h;
   }
@@ -1331,6 +1410,7 @@
       if (!calMode && !hasRem(remKey(rr.id, rr.p.s))) { rem = rr; askCal(); return; } // אין עדיין יומן: מציעים להקים
       openRem(rr); return;
     }
+    if (t.closest("[data-pillact2]")) { var f2 = pillFn2; pillFn2 = null; $("#pill").hidden = true; if (f2) f2(); return; }
     if (t.closest("[data-pillact]")) { var f = pillFn; pillFn = null; $("#pill").hidden = true; if (f) f(); return; }
     var ra2 = t.closest("[data-remall]");
     if (ra2) {
@@ -1339,7 +1419,15 @@
       if (calMode === "sub") quickAdd(all); else { rem = all[0] || null; askCal(); }
       return;
     }
-    var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
+    var lp = t.closest("[data-lp]"); if (lp) { setLead(+lp.getAttribute("data-lp")); return; }
+    var le = t.closest("[data-ledit]"); if (le) { askK = null; openLead([le.getAttribute("data-ledit")]); return; }
+    if (t.closest("[data-lpset]")) {
+      var inp = $("[data-lpdt]"), ts0 = LP ? (hasRem(LP.keys[0]) || {}).ts : rem && rem.p.s.getTime(), d0 = inp && inp.value ? new Date(inp.value) : null;
+      if (!d0 || isNaN(d0) || !ts0) { pill("בחרו תאריך ושעה", 1500); return; }
+      if (d0.getTime() >= ts0) { pill("ההתראה צריכה להיות לפני תחילת התוכנית", 2000); return; }
+      if (d0.getTime() < Date.now()) { pill("השעה הזו כבר עברה", 1600); return; }
+      setLead(Math.max(0, Math.round((ts0 - d0.getTime()) / 60000))); return;
+    }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
     var rc = t.closest("[data-remcancel]"); if (rc) { askK = null; cancelRem(rc.getAttribute("data-remcancel")); return; }
     var ra = t.closest("[data-remask]"); if (ra) { askK = ra.getAttribute("data-remask"); render(); clearTimeout(askT); askT = setTimeout(function () { if (askK) { askK = null; if (tab === "rems") render(); } }, 6000); return; }
@@ -1452,6 +1540,10 @@
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
+    if (t.hasAttribute && t.hasAttribute("data-lpsel")) {
+      if (t.value === "custom") { var bx = $("[data-lpbox]"); if (bx) { bx.hidden = false; var ip = $("[data-lpdt]"); if (ip) try { ip.focus(); if (ip.showPicker) ip.showPicker(); } catch (er) {} } return; }
+      if (t.value !== "") setLead(+t.value); return;
+    }
     if (t.id === "chSel") { chId = t.value; scrub = null; scrollNext = true; render(); return; }
     var id = t.getAttribute && t.getAttribute("data-opt");
     if (!id) return;
@@ -1467,7 +1559,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.22", BUILD = "2026-10-30.22", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.23", BUILD = "2026-10-30.23", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

@@ -126,8 +126,15 @@ async function list(tmdb, type, extra) {
 }
 
 // ---------- מיזוג ושליפת פרטים ----------
+// סרטים וסדרות לסירוגין, כל אחד לפי הסדר שלו. ציוני הפופולריות של TMDB לא בני השוואה בין הסוגים
+// (סדרות תמיד גבוהות יותר), ומיון משותף השאיר שורה של סדרות בלבד.
 export function mergeRow(a, b, sorter) {
-  return [...a, ...b].sort(sorter).slice(0, ROW_LIMIT);
+  const x = [...a].sort(sorter), y = [...b].sort(sorter), out = [];
+  for (let i = 0; out.length < ROW_LIMIT && (i < x.length || i < y.length); i++) {
+    if (i < x.length) out.push(x[i]);
+    if (i < y.length && out.length < ROW_LIMIT) out.push(y[i]);
+  }
+  return out;
 }
 
 const hasHeb = (s) => /[֐-׿]/.test(s || "");

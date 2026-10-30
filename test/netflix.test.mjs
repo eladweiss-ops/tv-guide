@@ -226,3 +226,13 @@ test("run: חריגת רשת לא זורקת", async () => {
   console.error = () => {};
   assert.equal(await run({ tmdbKey: "k", dir }), null);
 });
+
+test("mergeRow: סרטים וסדרות לסירוגין גם כשלסדרות פופולריות גבוהה בהרבה", async () => {
+  const { mergeRow } = await import("../netflix.mjs");
+  const m = Array.from({ length: 20 }, (_, i) => ({ type: "movie", id: i, pop: 10 - i * 0.1 }));
+  const t = Array.from({ length: 20 }, (_, i) => ({ type: "tv", id: 100 + i, pop: 900 - i }));
+  const r = mergeRow(m, t, (a, b) => b.pop - a.pop);
+  assert.equal(r.length, 20);
+  assert.equal(r.filter((x) => x.type === "movie").length, 10);
+  assert.equal(r[0].type, "movie"); assert.equal(r[1].type, "tv");
+});

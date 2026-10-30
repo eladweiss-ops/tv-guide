@@ -298,6 +298,55 @@
   details.calopt summary::-webkit-details-marker { display: none; }
   details.calopt summary::after { content: " ›"; color: var(--muted); }
   details.calopt[open] summary::after { content: " ‹"; }
+  .pill .pillact { margin-inline-start: 10px; border: 0; background: transparent; color: #64d2ff; font: inherit; font-weight: 800; padding: 4px 6px; cursor: pointer; }
+  .remall { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 18px; background: var(--soft); }
+  .remall span { flex: 1; font-weight: 700; }
+
+  /* ===== כיוון 4 · צבע חי (Aurora) ===== */
+  :root {
+    --g-sport: linear-gradient(135deg,#5E5CE6,#BF5AF2); --g-ent: linear-gradient(135deg,#FF9F0A,#FF375F);
+    --g-news: linear-gradient(135deg,#0A84FF,#5AC8FA); --g-life: linear-gradient(135deg,#30D158,#00B8A9); --g-oth: linear-gradient(135deg,#8E8E93,#48484A);
+    --k-sport: #A27BFF; --k-ent: #FF7A3D; --k-news: #3EA2FF; --k-life: #2FD08A; --k-oth: #8E8E93;
+    --c-sport: #A27BFF; --c-ent: #FF7A3D; --c-news: #3EA2FF; --c-life: #2FD08A;
+    --accent: #FF7A1A; --accent-ink: #1A0B02;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E0F14; --surface: rgba(255,255,255,.07); --ink: #FFFFFF; --muted: #A6A7B3; --line: rgba(255,255,255,.1);
+    --soft: rgba(255,255,255,.09); --glass: rgba(30,31,40,.62); --glass-line: rgba(255,255,255,.14); --glass-edge: rgba(0,0,0,.4);
+    --sel: rgba(255,255,255,.12); --sheet: rgba(26,27,35,.92); --barbg: rgba(14,15,20,.72); --live: #FF6B5E;
+    --c-sport: #A27BFF; --c-ent: #FF7A3D; --c-news: #3EA2FF; --c-life: #2FD08A; --c-oth: #5A5B66; --accent: #FF7A1A; --accent-ink: #1A0B02;
+  }
+  body { background: var(--bg); }
+  body::before, body::after { content: ""; position: fixed; z-index: -1; border-radius: 50%; pointer-events: none; filter: blur(90px); }
+  body::before { top: -140px; right: -100px; width: 380px; height: 380px; background: #FF5E3A; opacity: .38; }
+  body::after { top: 300px; left: -150px; width: 340px; height: 340px; background: #6D4CFF; opacity: .32; }
+  :root:not([data-theme="dark"]) body::before { opacity: .16; } :root:not([data-theme="dark"]) body::after { opacity: .13; }
+  select, .srow, .list, .day[aria-pressed="true"] { background: var(--surface); }
+  .chn { color: var(--accent); }
+  /* כרטיס תוכנית בצבע הסוג */
+  .pc { color: #fff; background: var(--g-ent); border: 0; box-shadow: 0 10px 28px rgba(0,0,0,.22); }
+  .pc.k-sport { background: var(--g-sport); } .pc.k-news { background: var(--g-news); } .pc.k-life { background: var(--g-life); } .pc.k-oth { background: var(--g-oth); }
+  .pc .chn, .pc .meta, .pc .meta span, .pc .none, .pc p, .pc .next, .pc .cur { color: #fff; }
+  .pc .meta, .pc .next { opacity: .9; }
+  .pc .badge { background: rgba(0,0,0,.25); color: #fff; }
+  .pc .ghost, .pc .step, .pc .fav { background: rgba(255,255,255,.2); color: #fff; }
+  .pc .btn.rem { background: #fff; color: #111; box-shadow: none; }
+  .pc .btn.rem.on { background: rgba(0,0,0,.28); color: #fff; }
+  .pc .prog { background: rgba(255,255,255,.25); } .pc .prog i { background: #fff; }
+  .pc .more { border-top-color: rgba(255,255,255,.35); }
+  /* שורות: פס צבע לפי סוג, ותקציר שנפתח במקום */
+  .srow { border-inline-start: 5px solid var(--k-ent); }
+  .srow.k-sport { border-inline-start-color: var(--k-sport); } .srow.k-news { border-inline-start-color: var(--k-news); } .srow.k-life { border-inline-start-color: var(--k-life); } .srow.k-oth { border-inline-start-color: var(--k-oth); }
+  .srow { flex-wrap: wrap; row-gap: 6px; } .srow > .go { flex: 1 1 100%; } .srow > .go + * { margin-inline-start: auto; }
+  .syn { margin: -6px 0 12px; padding: 12px 16px; border-radius: 0 0 20px 20px; background: var(--soft); line-height: 1.5; font-size: .98rem; }
+  .synb { border: 0; border-radius: 999px; background: var(--soft); color: var(--ink); font-weight: 700; padding: 0 12px; min-height: 40px; font-size: .9rem; }
+  .synb[aria-expanded="true"] { background: var(--ink); color: var(--bg); }
+  .gsearch { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  /* אי דינמי: ספירה לאחור לתזכורת הבאה */
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; } .acts .btn.rem { flex: 1; min-width: 0; }
+  .island { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px auto 8px; width: min(100%, 300px); height: 40px; padding: 0 16px; box-sizing: border-box; border-radius: 20px; background: #000; color: #fff; font-weight: 700; font-size: .9rem; border: 0; }
+  .island b { color: #FF9F0A; white-space: nowrap; }
+  .island span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -480,6 +529,8 @@
         seen[lid][p.start] = o; by.get(lid).push(o);
       });
     });
+    var dt = {}; by.forEach(function (a) { a.forEach(function (p) { if (p.desc && !dt[p.title]) dt[p.title] = p.desc; }); });
+    by.forEach(function (a) { a.forEach(function (p) { if (!p.desc && dt[p.title]) p.desc = dt[p.title]; }); }); // אותה תוכנית בשעה אחרת - אותו תקציר
     by.forEach(function (a) {
       a.sort(function (x, y) { return x.s - y.s; });
       a.forEach(function (p, i) { p.e = a[i + 1] ? a[i + 1].s : new Date(p.s.getTime() + 3600000); });
@@ -516,7 +567,12 @@
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
-  var descHtml = function (p, cid, small) { return (p.desc ? "<p>" + esc(p.desc) + "</p>" : '<p class="none">אין תקציר זמין לתוכנית הזו.</p>') + remBtn(p, cid, small) + (cid ? favBtn(p) : ""); };
+  function synText(p, cid) {
+    if (p.desc) return "<p>" + esc(p.desc) + "</p>";
+    var qq = encodeURIComponent(p.title + " " + (cid ? chName(cid) : "") + " תקציר");
+    return '<p class="none">אין לנו תקציר לתוכנית הזו. <a class="gsearch" href="https://www.google.com/search?q=' + qq + '" target="_blank" rel="noopener">🔎 חיפוש בגוגל</a></p>';
+  }
+  var descHtml = function (p, cid, small) { return synText(p, cid) + remBtn(p, cid, small) + (cid ? favBtn(p) : ""); };
 
   // תזכורת: קובץ יומן (.ics) עם התראה לפני תחילת התוכנית. אתר סטטי לא יכול לשלוח פוש כשהוא סגור, אבל יומן הטלפון יכול.
   var lead = +(store("tvg.lead") || 10), rem = null, tapPending = false, tapAt = null, pillT = null;
@@ -577,7 +633,12 @@
       "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + lead + "M", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"].join("\r\n");
   }
-  function pill(t, ms) { var el = $("#pill"); el.textContent = t; el.hidden = false; clearTimeout(pillT); if (ms) pillT = setTimeout(function () { el.hidden = true; }, ms); }
+  var pillFn = null;
+  function pill(t, ms, actLabel, fn) {
+    var el = $("#pill"); pillFn = fn || null;
+    el.innerHTML = esc(t) + (fn ? ' <button type="button" class="pillact" data-pillact>' + esc(actLabel || "ביטול") + "</button>" : "");
+    el.hidden = false; clearTimeout(pillT); if (ms) pillT = setTimeout(function () { el.hidden = true; pillFn = null; }, fn ? Math.max(ms, 4500) : ms);
+  }
   function openRem(r) {
     rem = r;
     var ex = hasRem(remKey(r.id, r.p.s));
@@ -614,9 +675,19 @@
   function cancelRem(k) {
     var x = hasRem(k); if (!x) return;
     REMS = REMS.filter(function (y) { return y.k !== k; }); saveRems();
-    if (calMode === "sub") { syncRems().then(function (ok) { pill(ok ? "בוטל. יימחק מהיומן בעדכון הבא שלו" : "בוטל. היומן יתעדכן כשיהיה חיבור", 2000); }); }
+    if (calMode === "sub") { syncRems(); pill("התזכורת בוטלה", 3500, "החזר", function () { if (!hasRem(x.k)) { REMS.push(x); saveRems(); syncRems(); render(); pill("הוחזרה ✓", 1200); } }); }
     else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); pill("התזכורת בוטלה", 1800); }
     closeRem(); render();
+  }
+  function recOf(r) { return { k: remKey(r.id, r.p.s), id: r.id, ts: r.p.s.getTime(), end: r.p.e.getTime(), title: r.p.title, ch: chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: lead, at: Date.now() }; }
+  // הוספה בלחיצה אחת כשיש יומן ייעודי, עם "ביטול" בהודעה למקרה של טעות
+  function quickAdd(list) {
+    var add = list.filter(function (r) { return r.p.s > new Date() && !hasRem(remKey(r.id, r.p.s)); }).map(recOf);
+    if (!add.length) { pill("כבר יש תזכורת לכל אלה ✓", 1500); return; }
+    REMS = REMS.concat(add); saveRems(); syncRems(); render();
+    pill(add.length === 1 ? "⏰ נזכיר לך " + lead + " דק׳ לפני" : "⏰ נוספו " + add.length + " תזכורות", 3000, "ביטול", function () {
+      var ks = add.map(function (x) { return x.k; }); REMS = REMS.filter(function (x) { return ks.indexOf(x.k) < 0; }); saveRems(); syncRems(); render(); pill("בוטל", 1200);
+    });
   }
   function askCal() {
     $("#remBody").innerHTML = '<h2>להקים יומן ייעודי?</h2><p class="remnote">אפשר להקים ביומן של הטלפון יומן נפרד בשם "לוח שידורים". כל תזכורת שתוסיפו או תבטלו כאן תופיע או תימחק בו לבד, בלי קבצים ובלי כפילויות.</p>' +
@@ -679,10 +750,12 @@
     if (sg.p.s > now) openRem({ id: chId, p: sg.p }); else pill(sg.p.e > now ? "התוכנית משודרת עכשיו" : "התוכנית כבר שודרה", 1400);
   }
   function inMin(d, now) { var m = Math.max(1, Math.round((d - now) / 60000)); return m < 60 ? m + " דק׳" : Math.floor(m / 60) + " שע׳" + (m % 60 ? " " + (m % 60) + " דק׳" : ""); }
+  function synBtn(v) { return '<button type="button" class="synb" data-syn="' + esc(v) + '" aria-expanded="false">תקציר</button>'; }
+  function synBox(v, p, cid) { return '<div class="syn" data-synbox="' + esc(v) + '" hidden>' + synText(p, cid) + "</div>"; }
   function airRow(c, p, sub) {
     var v = c.id + "|" + p.s.getTime();
-    return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" +
-      '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>";
+    return '<div class="srow k-' + kindOf(c.id, p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" + synBtn(v) +
+      '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, p, c.id);
   }
   function soonHtml(now) {
     var soon = [], favs = [];
@@ -715,17 +788,18 @@
   }
   function nowCard(c, now) {
     var a = by.get(c.id) || [], ix = nowIdx(a, c, now), i = ix.i, k = ix.k;
-    if (i < 0) return '<article class="card" data-cid="' + esc(c.id) + '"><div class="chn">' + esc(c.name) + '</div><p class="none">אין נתוני שידור לשעה הזו.</p></article>';
+    if (i < 0) return '<article class="card pc k-oth" data-cid="' + esc(c.id) + '"><div class="chn">' + esc(c.name) + '</div><p class="none">אין נתוני שידור לשעה הזו.</p></article>';
     var p = a[k], n = a[k + 1], live = k === i, pct = Math.round((now - p.s) / (p.e - p.s) * 100);
     var label = live ? "" : '<span class="badge">' + (k - i === 1 ? "הבא בתור" : "בעוד " + (k - i) + " תוכניות") + "</span>";
     var meta = '<span dir="ltr">' + hhmm(p.s) + "–" + hhmm(p.e) + "</span><span>" + (live ? "נותרו " + Math.max(1, Math.round((p.e - now) / 60000)) + " דק׳" : "מתחיל בעוד " + inMin(p.s, now) + (dstr(p.s) !== dstr(now) ? " · " + dayLabel(dstr(p.s)) : "")) + "</span>";
     var nav = (k > i ? '<button type="button" class="ghost step" data-step="-1|' + esc(c.id) + '">› חזרה</button>' : "") +
       (n ? '<button type="button" class="ghost step" data-step="1|' + esc(c.id) + '"><b>' + hhmm(n.s) + "</b>" + esc(n.title) + " ‹</button>" : "");
-    return '<article class="card" data-toggle data-cid="' + esc(c.id) + '" tabindex="0"><div class="chn">' + esc(c.name) + label + "</div>" +
+    return '<article class="card pc k-' + kindOf(c.id, p.title) + '" data-toggle data-cid="' + esc(c.id) + '" tabindex="0"><div class="chn">' + esc(c.name) + label + "</div>" +
       '<h2 class="cur">' + esc(p.title) + "</h2>" + '<div class="meta">' + meta + "</div>" +
-      (live ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' : remBtn(p, c.id, false)) +
+      (live ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' : "") +
+      '<div class="acts">' + (live ? "" : remBtn(p, c.id, false)) + '<button type="button" class="ghost synt" data-opentog>📖 תקציר</button></div>' +
       (nav ? '<div class="nav' + (k > i && n ? " two" : "") + '">' + nav + "</div>" : "") +
-      '<div class="more">' + descHtml(p, c.id) + "</div></article>";
+      '<div class="more">' + synText(p, c.id) + favBtn(p) + "</div></article>";
   }
   var RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   function stepCard(cid, dir) {
@@ -807,8 +881,13 @@
 
   // ---- שעון היום ----
   var CX = 180, CY = 180, RO = 150, RI = 92, KIND = { news: "חדשות", sport: "ספורט", ent: "בידור", life: "אורח חיים", oth: "אחר" };
-  function pgOf(t) {
-    var ch = G && G.channels.filter(function (c) { return c.id === chId; })[0];
+  function kindOf(cid, t) {
+    var ch = G && G.channels.filter(function (c) { return c.id === cid; })[0];
+    if ((ch && ch._n === "sport") || /ליגת|ליגה|(^|\s)ל\.\s|כדורגל|כדורסל|יורוליג|NBA|פרמייר|גביע|אולפן ספורט|מונדיאל/.test(t)) return "sport";
+    return pgOf(t, true);
+  }
+  function pgOf(t, noCh) {
+    var ch = !noCh && G && G.channels.filter(function (c) { return c.id === chId; })[0];
     if ((ch && ch._n === "sport") || /ליגת|ליגה|(^|\s)ל\.\s|כדורגל|כדורסל|יורוליג|NBA|פרמייר|גביע|אולפן ספורט|מונדיאל/.test(t)) return "sport";
     if (/חדשות|מהדורה|מבזק|פוליטי/.test(t)) return "news";
     if (/בוקר|מטבח|שף|אוכל|בישול|בריאות|טיול|(^|\s)עם(\s|\.|$)/.test(t)) return "life";
@@ -863,6 +942,7 @@
     $("#dTitle").textContent = s ? (s.p.title.length > 15 ? s.p.title.slice(0, 14) + "…" : s.p.title) : "";
     var cn = (G.channels.filter(function (c) { return c.id === chId; })[0] || {}).name || "";
     var live = s && isToday && s.p.s <= now && now < s.p.e;
+    $("#dCard").className = "card dcard pc k-" + (s ? kindOf(chId, s.p.title) : "oth");
     $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span dir="ltr">' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, chId, true) +
       (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + esc(nx.p.title) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
     $("#dNow").hidden = !(isToday && scrub != null);
@@ -974,11 +1054,16 @@
       }).join("");
     }
     if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
+    if (qExact) {
+      var todo = hits.filter(function (x) { return !hasRem(remKey(x.c.id, x.p.s)); }).length;
+      h += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני כל " + (todo === 1 ? "שידור" : todo + " השידורים") + "?" : "✓ יש תזכורת לכל השידורים") + "</span>" +
+        (todo ? '<button type="button" class="btn sm" data-remall="' + esc(qExact) + '">' + (calMode === "sub" ? "כן, להזכיר" : "להקים תזכורות") + "</button>" : "") + "</div>";
+    }
     h += '<h2 class="sech">שידורים קרובים (' + hits.length + (hits.length > 80 ? ", מוצגים 80 הראשונים" : "") + ")</h2>";
     h += hits.slice(0, 80).map(function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
-        '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>";
+      return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
+        synBtn(v) + '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, x.p, x.c.id);
     }).join("");
     return h;
   }
@@ -1012,7 +1097,12 @@
     var picking = !nf && !rems && needsPick(), searching = !nf && !!q.trim();
     var chips = (!picking && !searching && !nf && !rems && tab !== "dial") ? chipsHtml() : "";
     var body = nf ? vNf() : (searching ? vSearch() : rems ? vRems() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
-    $("#main").innerHTML = (nf ? "" : note) + chips + body;
+    var isl = "";
+    if (!nf && !searching && !picking) {
+      var nowMs = Date.now(), nx = REMS.filter(function (x) { return x.ts > nowMs && x.ts - nowMs < 6 * 3600000; })[0];
+      if (nx) { var mm = Math.max(1, Math.round((nx.ts - nowMs) / 60000)); isl = '<button type="button" class="island" data-jump="' + esc(nx.k) + '"><span>⏰ ' + esc(nx.title) + "</span><b>" + (mm < 60 ? "בעוד " + mm + " דק׳" : "ב-" + hhmm(new Date(nx.ts))) + "</b></button>"; }
+    }
+    $("#main").innerHTML = isl + (nf ? "" : note) + chips + body;
     document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = sel.size ? String(sel.size) : "";
@@ -1090,7 +1180,21 @@
     if (t.closest("#dial")) { if (tapPending) { tapPending = false; tapDial(); } return; }
     var st = t.closest("[data-step]"); if (st) { var sp = st.getAttribute("data-step").split("|"); stepCard(sp[1], +sp[0]); return; }
     if (t.closest("#sBtn")) { setSearch($("#qwrap").hidden); return; }
-    var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
+    var rm = t.closest("[data-rem]");
+    if (rm) {
+      var rr = findProg(rm.getAttribute("data-rem")); if (!rr) return;
+      if (calMode === "sub" && !hasRem(remKey(rr.id, rr.p.s)) && rm.classList.contains("rbt")) { quickAdd([rr]); return; } // מהרשימות: לחיצה אחת
+      if (!calMode && !hasRem(remKey(rr.id, rr.p.s))) { rem = rr; askCal(); return; } // אין עדיין יומן: מציעים להקים
+      openRem(rr); return;
+    }
+    if (t.closest("[data-pillact]")) { var f = pillFn; pillFn = null; $("#pill").hidden = true; if (f) f(); return; }
+    var ra2 = t.closest("[data-remall]");
+    if (ra2) {
+      var tt = ra2.getAttribute("data-remall"), all = [];
+      G.channels.forEach(function (c) { (by.get(c.id) || []).forEach(function (p) { if (p.title === tt && p.s > new Date()) all.push({ id: c.id, p: p }); }); });
+      if (calMode === "sub") quickAdd(all); else { rem = all[0] || null; askCal(); }
+      return;
+    }
     var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
     var rc = t.closest("[data-remcancel]"); if (rc) { askK = null; cancelRem(rc.getAttribute("data-remcancel")); return; }
@@ -1154,7 +1258,10 @@
       saveSel(); buildSheet(); return;
     }
     if (t.closest("[data-dnow]")) { scrub = null; updateDial(dialT()); return; }
-    var tg = t.closest("[data-toggle]"); if (tg) { tg.classList.toggle("open"); return; }
+    var sy = t.closest("[data-syn]");
+    if (sy) { var bx = document.querySelector('[data-synbox="' + sy.getAttribute("data-syn").replace(/"/g, '\\"') + '"]'); if (bx) { bx.hidden = !bx.hidden; sy.setAttribute("aria-expanded", String(!bx.hidden)); sy.textContent = bx.hidden ? "תקציר" : "סגור"; } return; }
+    if (t.closest("a.gsearch")) return;
+    var tg = t.closest("[data-toggle]"); if (tg) { tg.classList.toggle("open"); var ob = tg.querySelector("[data-opentog]"); if (ob) ob.textContent = tg.classList.contains("open") ? "סגירת התקציר" : "📖 תקציר"; return; }
     if (t.closest("#chBtn") || t.closest("[data-open]")) { openSheet(true); return; }
     if (t.closest("#done") || t.closest("#scrim")) { openSheet(false); render(); return; }
   });
@@ -1193,7 +1300,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.4", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.6", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
@@ -1239,7 +1346,8 @@
   setInterval(refresh, 60000);
   document.addEventListener("visibilitychange", refresh);
 
-  setTheme(store("tvg.theme") || "light");
+  if (store("tvg.v5") !== "1") { store("tvg.v5", "1"); store("tvg.theme", "dark"); } // העיצוב החדש נולד כהה; אפשר לחזור לבהיר בהגדרות
+  setTheme(store("tvg.theme") || "dark");
   setInst();
   load().then(function (r) {
     G = r.g; isSample = r.s; classify(); index();

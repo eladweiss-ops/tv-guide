@@ -1,7 +1,8 @@
 // התראות פוש: מנויים לכל משתמש, שליחה, ותזמון מדויק דרך Upstash QStash (אם הוגדר QSTASH_TOKEN)
 import webpush from "web-push";
 import { put, list } from "@vercel/blob";
-import { SELF, QBASE, remPayload } from "./_snz.js";
+import { QBASE, remPayload, fireDest } from "./_snz.js";
+import { validSub } from "./_val.js";
 export { remPayload };
 
 export async function readJson(p, dflt) {
@@ -28,23 +29,42 @@ export async function sendTo(t, payload) {
   return { ok, total: subs.length };
 }
 
-// מסנכרן את התזמונים מול רשימת התזכורות: מוסיף חדשות, מבטל שבוטלו או ששונו
-export async function reschedule(t, rems) {
+// תקרות תזמון לכל משתמש
+export const MAX_SCHED = 60;        // כמה תזכורות עתידיות מתוזמנות במקביל; הקרובות ביותר מתוזמנות, השאר נשמרות (ביומן) אך בלי פוש מדויק
+export const MAX_PUBLISH_DAY = 300; // תקציב פרסומים ל-QStash לכל טוקן ליום (נשמר ב-sched/<t>.json תחת __q)
+
+// מסנכרן את התזמונים מול רשימת התזכורות: מוסיף חדשות, מבטל שבוטלו או ששונו. תזכורות שלא השתנו (אותו זמן ±דקה) לא נוגעים בהן.
+// d (לבדיקות): {getSubs, readJson, writeJson, fetch, now}
+export async function reschedule(t, rems, d = {}) {
   const token = process.env.QSTASH_TOKEN;
   if (!token) return { skipped: "no QSTASH_TOKEN" };
-  const subs = await getSubs(t);
-  const sched = await readJson(`sched/${t}.json`, {});
-  const now = Date.now(), want = {};
+  const gs = d.getSubs || getSubs, rj = d.readJson || readJson, wj = d.writeJson || writeJson, fx = d.fetch || fetch;
+  const now = d.now ? d.now() : Date.now();
+  const subs = await gs(t);
+  const sched = await rj(`sched/${t}.json`, {});
+  const day = Math.floor(now / 86400000);
+  let q = sched.__q; delete sched.__q;
+  if (!q || q.d !== day) q = { d: day, n: 0 };
+  let want = {};
   if (subs.length) for (const r of rems) { const at = r.ts - (r.lead || 0) * 60000; if (at > now - 30000 && r.ts > now) want[r.k] = Math.max(at, now + 5000); }
-  let added = 0, removed = 0;
+  // תקרה: רק ה-MAX_SCHED הקרובות ביותר
+  let capped = 0;
+  const ks = Object.keys(want);
+  if (ks.length > MAX_SCHED) {
+    ks.sort((x, y) => want[x] - want[y]);
+    const keep = {}; for (const k of ks.slice(0, MAX_SCHED)) keep[k] = want[k];
+    capped = ks.length - MAX_SCHED; want = keep;
+  }
+  let added = 0, removed = 0, limited = false;
   for (const k of Object.keys(sched)) {
     if (want[k] && Math.abs(sched[k].at - want[k]) < 60000) { delete want[k]; continue; }
-    try { await fetch(`${QBASE()}/v2/messages/${sched[k].id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } }); } catch (e) {}
+    try { await fx(`${QBASE()}/v2/messages/${sched[k].id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } }); } catch (e) {}
     delete sched[k]; removed++;
   }
   for (const [k, at] of Object.entries(want)) {
-    const dest = `${SELF}/api/fire?s=${process.env.FIRE_SECRET}`;
-    const r = await fetch(`${QBASE()}/v2/publish/${dest}`, {
+    if (q.n >= MAX_PUBLISH_DAY) { limited = true; break; }
+    q.n++;
+    const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2" },
       body: JSON.stringify({ t, k, at }),
@@ -52,8 +72,12 @@ export async function reschedule(t, rems) {
     const j = await r.json().catch(() => ({}));
     if (r.ok && j.messageId) { sched[k] = { at, id: j.messageId }; added++; } else console.log("qstash publish failed", r.status, JSON.stringify(j).slice(0, 200));
   }
-  await writeJson(`sched/${t}.json`, sched);
-  return { added, removed, total: Object.keys(sched).length };
+  sched.__q = q;
+  await wj(`sched/${t}.json`, sched);
+  const out = { added, removed, total: Object.keys(sched).length - 1 };
+  if (capped) out.capped = capped;
+  if (limited) out.limited = "daily";
+  return out;
 }
 export async function dropSched(t, k) {
   const sched = await readJson(`sched/${t}.json`, {});

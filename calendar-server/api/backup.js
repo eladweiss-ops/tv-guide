@@ -2,6 +2,7 @@
 // POST /api/backup {t, data:{...}}   → שמירת ההגדרות (ערוצים, מועדפים, נושאים, תזכורות...)
 import { put, list } from "@vercel/blob";
 import { okToken } from "./_store.js";
+import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
 const KEYS = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.recent", "tvg.topics"];
 const path = (t) => `backup/${t}.json`;
@@ -21,8 +22,12 @@ export default async function handler(req, res) {
       return res.status(200).json(j);
     }
     if (req.method === "POST") {
-      const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+      if (!allow("bk:ip:" + clientIp(req), 30)) return tooMany(res);
+      const rb = readBody(req, 262144);
+      if (!rb.ok) return res.status(rb.status).json({ error: rb.error });
+      const body = rb.body;
       if (!okToken(body.t)) return res.status(400).json({ error: "bad token" });
+      if (!allow("bk:t:" + body.t, 12)) return tooMany(res);
       const data = {}; let size = 0;
       for (const k of KEYS) {
         const v = body.data && body.data[k];
@@ -35,6 +40,6 @@ export default async function handler(req, res) {
     }
     return res.status(405).end();
   } catch (e) {
-    return res.status(500).json({ error: String(e && e.message || e) });
+    return fail(res, e, "backup");
   }
 }

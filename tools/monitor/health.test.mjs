@@ -65,7 +65,7 @@ test("ערוץ חסר בלוח", () => {
 });
 
 test("נטפליקס", () => {
-  const items = Object.fromEntries(Array.from({ length: 50 }, (_, i) => ["t" + i, { rating: i < 5 ? 7 : undefined }]));
+  const items = Object.fromEntries(Array.from({ length: 50 }, (_, i) => ["t" + i, i < 5 ? { ratings: { imdb: 7 }, vote: 7 } : { vote: 7 }]));
   const ok = evaluateNetflix({ v: 2, updated: "2026-10-30T08:00:00Z", items }, NOW);
   assert.deepEqual(ok.problems, []); assert.equal(ok.info.rated, 5);
   assert.ok(evaluateNetflix({ v: 1, updated: "2026-10-30T08:00:00Z", items }, NOW).problems.length);

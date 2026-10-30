@@ -1,19 +1,9 @@
 // /cal/TOKEN.ics → יומן "לוח שידורים" שהטלפון נרשם אליו. כל תזכורת היא אירוע עם התראה.
 import { okToken, load } from "./_store.js";
 import { getSubs } from "./_push.js";
+import { esc, fold } from "./_ics.js";
 
-const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;");
 const t = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-// שורות ארוכות מקופלות לפי התקן (75 בתים)
-function fold(line) {
-  const out = []; let cur = "", bytes = 0;
-  for (const ch of line) {
-    const b = Buffer.byteLength(ch);
-    if (bytes + b > 73) { out.push(cur); cur = " "; bytes = 1; }
-    cur += ch; bytes += b;
-  }
-  out.push(cur); return out.join("\r\n");
-}
 
 export default async function handler(req, res) {
   const tok = String(req.query.t || "");

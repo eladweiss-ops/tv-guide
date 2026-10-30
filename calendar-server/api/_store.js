@@ -24,5 +24,5 @@ export function clean(arr) {
   return arr.slice(0, 300).map((x) => ({
     k: String(x.k || "").slice(0, 80), title: String(x.title || "").slice(0, 200), ch: String(x.ch || "").slice(0, 80),
     desc: String(x.desc || "").slice(0, 400), ts: +x.ts, end: +x.end, lead: Number.isFinite(+x.lead) ? Math.max(0, Math.min(10080, Math.round(+x.lead))) : 10,
-  })).filter((x) => x.k && x.title && x.ts > 0 && x.end > x.ts && x.end > now - 86400000);
+  })).filter((x) => x.k && !x.k.startsWith("__") && x.title && x.ts > 0 && x.end > x.ts && x.end > now - 86400000);
 }

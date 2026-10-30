@@ -1,12 +1,21 @@
 // נקרא על ידי QStash בדיוק בזמן ההתראה. שולח פוש אם התזכורת עדיין קיימת ולא שונתה.
-import { load } from "./_store.js";
+// אימות: ?s=FIRE_SECRET (הודעות שכבר תוזמנו) או חתימת QStash (Upstash-Signature) כשהוגדרו מפתחות החתימה
+import { load, okToken } from "./_store.js";
 import { sendTo, remPayload, dropSched } from "./_push.js";
+import { fireAuthorized, rawBodyOf } from "./_sig.js";
+import { fail } from "./_guard.js";
+
+export const config = { api: { bodyParser: false } }; // צריך את הגוף הגולמי לאימות תקציר החתימה
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
-  if (!process.env.FIRE_SECRET || req.query.s !== process.env.FIRE_SECRET) return res.status(403).end();
   try {
-    const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    let raw;
+    try { raw = await rawBodyOf(req); } catch (e) { return res.status(e.status || 400).end(); }
+    if (!fireAuthorized(req, raw)) return res.status(403).end();
+    let b;
+    try { b = JSON.parse(raw || "{}"); } catch (e) { return res.status(400).json({ error: "bad request" }); }
+    if (!b || !okToken(b.t) || typeof b.k !== "string") return res.status(400).json({ error: "bad request" });
     const rems = await load(b.t);
     const r = rems.find((x) => x.k === b.k);
     if (!r) return res.status(200).json({ skipped: "cancelled" });
@@ -19,6 +28,6 @@ export default async function handler(req, res) {
     await dropSched(b.t, b.k);
     return res.status(200).json(out);
   } catch (e) {
-    return res.status(500).json({ error: String(e && e.message || e) });
+    return fail(res, e, "fire");
   }
 }

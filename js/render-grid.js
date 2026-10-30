@@ -10,7 +10,7 @@
     var rows = (TVG.by.get(TVG.chId) || []).filter(function (p) { return dstr(p.s) === TVG.day; });
     h += '<div class="list">' + (rows.length ? rows.map(function (p) {
       var cls = p.s <= now && now < p.e ? " now" : (p.e <= now ? " past" : "");
-      return '<div class="row' + cls + '" data-toggle tabindex="0"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) +
+      return '<div class="row' + cls + '" data-toggle data-pts="' + p.s.getTime() + '" tabindex="0"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) +
         (cls === " now" ? '<span class="tag">משודר עכשיו</span>' : "") + '</span><div class="more">' + descHtml(p, TVG.chId) + "</div></div>";
     }).join("") : '<div class="row"><span></span><span class="none">אין נתונים ליום הזה.</span></div>') + "</div>";
     return h;

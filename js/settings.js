@@ -26,7 +26,7 @@
     themeSel = t; TVG.store("tvg.theme", t);
     var eff = t === "auto" ? (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t;
     document.documentElement.setAttribute("data-theme", eff);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", eff === "dark" ? "#000000" : "#f2f2f7");
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", eff === "dark" ? "#0E0F14" : "#f2f2f7");
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }

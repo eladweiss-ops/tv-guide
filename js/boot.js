@@ -24,7 +24,8 @@
     var st0 = TVG.store("tvg.tab"); TVG.tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
     TVG.scrollNext = TVG.tab === "grid";
     TVG.render();
-    if (TVG.needsPick() && TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
+    if (TVG.afterBoot) TVG.afterBoot(); // nav.js: ?rem= ?q= מהכתובת
+    if (TVG.needsPick() && $("#rem").hidden &&TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
     // לשונית נטפליקס מופיעה רק אם הקובץ netflix.json קיים
     fetch("netflix.json", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })

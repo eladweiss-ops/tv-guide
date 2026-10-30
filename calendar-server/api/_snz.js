@@ -56,12 +56,26 @@ export function remPayload(r, o = {}) {
   return p;
 }
 
+const snzPath = (t, k) => `snz/${t}/${createHash("sha256").update(k).digest("hex").slice(0, 24)}.json`; // בלוב נפרד לכל תזכורת
+
+// ביטול נודניק שתוזמן ("ביטול" בהודעה באפליקציה): מוחק את ההודעה ב-QStash ומנקה את הרשומה
+export async function cancelSnooze(t, k, deps) {
+  const now = deps.now ? deps.now() : Date.now(), path = snzPath(t, k);
+  const cur = await deps.readJson(path, null);
+  if (!cur || !cur.id || !(cur.at > now)) return { status: 200, json: { ok: true, cancelled: false } };
+  const token = process.env.QSTASH_TOKEN;
+  const r = await deps.fetch(`${QBASE()}/v2/messages/${cur.id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } });
+  if (!r.ok && r.status !== 404) return { status: 502, json: { error: "cancel failed" } };
+  await deps.writeJson(path, {});
+  return { status: 200, json: { ok: true, cancelled: true } };
+}
+
 // מתזמן הודעה חד-פעמית. deps: {fetch, readJson, writeJson, now}
 export async function scheduleSnooze(t, k, m, deps) {
   const token = process.env.QSTASH_TOKEN;
   if (!token) return { status: 503, json: { error: "no scheduler" } };
   const now = deps.now ? deps.now() : Date.now();
-  const path = `snz/${t}/${createHash("sha256").update(k).digest("hex").slice(0, 24)}.json`; // בלוב נפרד לכל תזכורת
+  const path = snzPath(t, k);
   const cur = await deps.readJson(path, null);
   if (cur && cur.m === m && now - cur.ts < SNZ_DEDUP && cur.at > now) return { status: 200, json: { ok: true, at: cur.at, m: cur.m, dup: true } };
   const at = now + m * 60000;
@@ -84,7 +98,7 @@ export async function handleSnooze(b, deps) {
   const k = String(b.k || "");
   if (!k || k.length > 80) return { status: 400, json: { error: "bad key" } };
   const m = b.m == null || b.m === "" ? 5 : +b.m;
-  if (!Number.isInteger(m) || m < 1 || m > 60) return { status: 400, json: { error: "bad minutes" } };
+  if (!b.cancel && (!Number.isInteger(m) || m < 1 || m > 60)) return { status: 400, json: { error: "bad minutes" } };
   const now = deps.now ? deps.now() : Date.now();
   let t;
   if (b.s) { // מ-SW: חתימה
@@ -95,6 +109,7 @@ export async function handleSnooze(b, deps) {
     if (!deps.okToken(b.t)) return { status: 400, json: { error: "bad token" } };
     t = b.t;
   } else return { status: 403, json: { error: "unauthorized" } };
+  if (b.cancel) return cancelSnooze(t, k, deps);
   const rems = await deps.load(t);
   if (!rems.some((x) => x.k === k)) return { status: 404, json: { error: "no such reminder" } };
   return scheduleSnooze(t, k, m, deps);

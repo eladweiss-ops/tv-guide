@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     const name = r.title + (r.ch ? " (" + r.ch + ")" : "");
     lines.push("BEGIN:VEVENT", "UID:" + r.k.replace(/[^\w|.-]/g, "") + "@tv-guide", "DTSTAMP:" + now, "DTSTART:" + t(r.ts), "DTEND:" + t(r.end),
       "SUMMARY:" + esc(name), "DESCRIPTION:" + esc(r.desc || ""),
-      ...(push ? [] : ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + esc(name), "TRIGGER:-PT" + (r.lead != null ? r.lead : 10) + "M", "END:VALARM"]), "END:VEVENT");
+      ...(push ? [] : ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + esc(name), "TRIGGER:-PT" + (r.lead != null ? r.lead : 10) + "M", "END:VALARM", ...(r.dbl && r.lead > 0 ? ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + esc(name), "TRIGGER:PT0S", "END:VALARM"] : [])]), "END:VEVENT");
   }
   lines.push("END:VCALENDAR");
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");

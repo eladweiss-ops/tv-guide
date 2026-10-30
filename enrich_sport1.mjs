@@ -3,6 +3,7 @@
 // הרצה: node enrich_sport1.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
 import { fits, agreement } from "./sportfit.mjs";
+import { fillGaps } from "./fill.mjs";
 
 const BASE = "https://sport1.maariv.co.il/broadcast-schedule/";
 const SITE = { 1: "2", 2: "3", 3: "4", 4: "5", 6: "1" }; // מספר הערוץ → channel_id באתר
@@ -84,9 +85,17 @@ async function main() {
       await sleep(300);
     }
   }
+  // ימים שחסרים בוואלה לערוץ מסוים – משלימים מהלוח של האתר
+  let filled = 0;
+  for (const no of Object.keys(SITE)) {
+    const ids = guide.channels.filter((c) => sportNo(c.name) === no).map((c) => c.id);
+    const items = [];
+    for (const day of days) for (const it of sched.get(no + "|" + day) || []) items.push({ start: day + "T" + it.time, title: it.name, desc: it.desc || "", lv: it.live ? 1 : 0 });
+    filled += fillGaps(guide, ids, items);
+  }
   const n = enrich(guide, sched);
-  console.log(`ספורט 1: ${ok} עמודים נקראו, ${fail} נכשלו, ${n} תוכניות קיבלו פירוט`);
-  if (n) await writeFile("guide.json", JSON.stringify(guide));
+  console.log(`ספורט 1: ${ok} עמודים נקראו, ${fail} נכשלו, ${n} תוכניות קיבלו פירוט, ${filled} שידורים הושלמו בימים חסרים`);
+  if (n || filled) await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich_sport1.mjs")) {

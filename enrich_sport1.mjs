@@ -2,6 +2,7 @@
 // וואלה כותבת למשל "ליגת ווינר 26/27", והאתר כותב "מכבי ת"א - הפועל חיפה · ליגת ווינר 2026/27".
 // הרצה: node enrich_sport1.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
+import { fits, agreement } from "./sportfit.mjs";
 
 const BASE = "https://sport1.maariv.co.il/broadcast-schedule/";
 const SITE = { 1: "2", 2: "3", 3: "4", 4: "5", 6: "1" }; // מספר הערוץ → channel_id באתר
@@ -54,10 +55,13 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       for (const p of progs) { const d = Math.abs(mins(it.time) - mins(p.start.slice(11, 16))); if (d < bd) { bd = d; bp = p; } }
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
+    const ag = agreement([...pick].map(([p, { it }]) => ({ title: p.title, text: [it.name, it.desc].filter(Boolean).join(" · ") })));
+    if (ag < 0.4) { console.log("ספורט 1: דילגתי על", g, Math.round(ag * 100) + "%"); continue; }
     for (const [p, { it: best }] of pick) {
+      const text = [best.name, best.desc].filter(Boolean).join(" · ");
+      if (!fits(p.title, text)) continue;
       p.lv = best.live ? 1 : 0; // ישיר או מוקלט, לפי האתר
       if (p.desc) continue;
-      const text = [best.name, best.desc].filter(Boolean).join(" · ");
       if (!text || key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) continue;
       p.desc = text; n++;
     }

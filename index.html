@@ -501,7 +501,7 @@
   var GRANK = {}; GROUPS.forEach(function (g, i) { GRANK[g[0]] = i; });
   // שמות שוואלה נותנת לערוצים, והשם שמוצג במקומם. אפשר להוסיף שורות.
   var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14", "מוסיקה 24": "ערוץ 24", "מוזיקה 24": "ערוץ 24", "SPORT 3": "ספורט 3", "SPORT 3 HD": "ספורט 3", "SPORT 4": "ספורט 4", "SPORT 4 HD": "ספורט 4", "SPORT 1": "ספורט 1", "SPORT 2": "ספורט 2",
-    "ערוץ הספורט": "ספורט 5", "ספורט 5 HD": "ספורט 5", "5+ LIVE": "5 LIVE", "5LIVE HD": "5 LIVE", "5+ GOLD": "5 GOLD", "5GOLD": "5 GOLD", "Sport 5 Stars": "5 STARS", "5MAX": "5 MAX",
+    "ערוץ הספורט": "ספורט 5", "5+ LIVE": "5 LIVE", "5LIVE HD": "5 LIVE", "5+ GOLD": "5 GOLD", "5GOLD": "5 GOLD", "Sport 5 Stars": "5 STARS", "5MAX": "5 MAX",
     "ערוץ ONE": "ONE", "ערוץ ONE HD": "ONE", "ONE 2 HD": "ONE 2" };
   // פענוח ישויות HTML בשמות (וואלה שולחת למשל &#x27; במקום גרש)
   function unent(t) {
@@ -510,7 +510,7 @@
       .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
   }
   // שמות שוואלה מחזירה מקולקלים ("?¥?¾??!"). אי אפשר לשחזר אותם, אז כאן שם ידני לפי מספר ערוץ. 3185 הוא ערוץ פעוטות לפי התוכניות שלו (ניחוש), ואפשר לתקן.
-  var NAMEFIX = { "3185": "ערוץ פעוטות (HOT 3185)" };
+  var NAMEFIX = { "3185": "ערוץ פעוטות (HOT 3185)", "521": "ספורט 5 HD · HOT" }; // 521: בוואלה זה לוח אחר לגמרי מערוץ הספורט
   function garbled(n) { return (n.match(/\?/g) || []).length >= 2 || /[¥¾µ°´²]/.test(n); }
   // איחוד אוטומטי: רק אותו ספק ואותו מפתח (בלי HD/SD/העתק). בין ספקים הלוחות שונים, ולכן לא מאחדים.
   function normKey(n) {
@@ -518,7 +518,7 @@
   }
   // קבוצות שבדקתי ידנית שהן אותו ערוץ בעל לוח זהה אבל השם שונה (אפשר להוסיף שורות)
   var MERGE = [["301", "3630", "3785", "3786"], ["3547", "3727"], ["205", "149"], ["353", "3179"],
-    ["289", "521"], ["322", "3600"], ["66", "321"], ["3550", "3551"]]; // ספורט 5 = ערוץ הספורט; 5 LIVE; 5 GOLD; ONE
+    ["322", "3600"], ["66", "321"], ["3550", "3551"]]; // 5 LIVE; 5 GOLD; ONE (נבדק: לוחות זהים)
   function cleanName(n) { return n.replace(/\s*[-–]?\s*(\(copy\)|משוכפל)/ig, "").replace(/\s+f?hd(?=\s|$)/ig, "").replace(/^hd\s+/i, "").replace(/\s+חדש$/, "").replace(/\s+/g, " ").trim() || n; }
   var IDMAP = {};
   function classify() {
@@ -596,8 +596,13 @@
         seen[lid][p.start] = o; by.get(lid).push(o);
       });
     });
-    var dt = {}; by.forEach(function (a) { a.forEach(function (p) { if (p.desc && !dt[p.title]) dt[p.title] = p.desc; }); });
-    by.forEach(function (a) { a.forEach(function (p) { if (!p.desc && dt[p.title]) p.desc = dt[p.title]; }); }); // אותה תוכנית בשעה אחרת - אותו תקציר
+    // אותה תוכנית בשעה אחרת באותו ערוץ - אותו תקציר. רק כשלכותרת יש תקציר אחד בלבד
+    // (כותרות כלליות כמו "NBA" או "ליגת ווינר" מופיעות עם תקצירים שונים, ולא מעתיקים אותן)
+    by.forEach(function (a) {
+      var dt = {};
+      a.forEach(function (p) { if (p.desc) { var e = dt[p.title]; if (!e) dt[p.title] = p.desc; else if (e !== p.desc) dt[p.title] = 1; } });
+      a.forEach(function (p) { var d = dt[p.title]; if (!p.desc && d && d !== 1) p.desc = d; });
+    });
     by.forEach(function (a) {
       a.sort(function (x, y) { return x.s - y.s; });
       a.forEach(function (p, i) { p.e = a[i + 1] ? a[i + 1].s : new Date(p.s.getTime() + 3600000); });
@@ -605,6 +610,7 @@
   }
 
   var MANY = 8;
+  window.__tvgAudit = function () { var o = {}; by.forEach(function (a, id) { o[id] = a.map(function (p) { return [p.s.getTime(), p.title, p.desc]; }); }); return { ch: G.channels.map(function (c) { return [c.id, c.name, c._g]; }), map: IDMAP, by: o }; };
   function needsPick() { return G.channels.length > MANY && !sel.size; }
   function baseChans() {
     var l = G.channels.filter(function (c) { return sel.has(c.id); });
@@ -1664,7 +1670,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.31", BUILD = "2026-10-30.31", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.32", BUILD = "2026-10-30.32", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

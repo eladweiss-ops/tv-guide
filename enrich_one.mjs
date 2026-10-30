@@ -2,6 +2,7 @@
 // וואלה כותבת למשל "ל. ספרדית 2026/27", ובאתר: "ליגה ספרדית: ברצלונה - ריאל מדריד".
 // הרצה: node enrich_one.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
+import { fits } from "./sportfit.mjs";
 
 const API = "https://www.one.co.il/api/tv-schedule/";
 const HEADERS = { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-language": "he", referer: "https://www.one.co.il/broadcasts" };
@@ -33,6 +34,7 @@ export function enrich(guide, items) {
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
     for (const [p, { it }] of pick) {
+      if (!fits(p.title, it.name)) continue;
       p.lv = it.live ? 1 : 0;
       if (p.desc || key(it.name).startsWith(key(p.title)) || key(p.title).startsWith(key(it.name))) continue;
       p.desc = it.name; n++;

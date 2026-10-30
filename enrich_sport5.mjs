@@ -1,6 +1,7 @@
 // מוסיף לתוכניות של ערוצי ספורט 5 את שם המשחק והמסגרת, מהלוח באתר ערוץ הספורט.
 // הרצה: node enrich_sport5.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
+import { fits, agreement } from "./sportfit.mjs";
 
 const API = "https://www.sport5.co.il/Ajax/GetBroadcastSheetData.aspx";
 const TYPES = ["5", "5P", "LIVE", "5STARS", "5MAX", "GOLD"];
@@ -61,7 +62,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     const c = chOf.get(String(p.ch)); if (!c) continue;
     const g = p.ch + "|" + c + "|" + p.start.slice(0, 10); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p);
   }
-  let n = 0;
+  let n = 0; const skipped = [];
   for (const [g, progs] of groups) {
     const items = sched.get(g.slice(g.indexOf("|") + 1)); if (!items || !items.length) continue; // כל ערוץ (SD/HD) מותאם בנפרד
     const pick = new Map();
@@ -70,17 +71,19 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       for (const p of progs) { const d = Math.abs(mins(it.time) - mins(p.start.slice(11, 16))); if (d < bd) { bd = d; bp = p; } }
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
+    // אם הלוח של הערוץ בוואלה לא מסכים עם האתר (למשל ערוץ אחר עם שם דומה) – לא נוגעים בו בכלל
+    const ag = agreement([...pick].map(([p, { it }]) => ({ title: p.title, text: it.rich || it.text })));
+    if (ag < 0.4) { skipped.push(g + " (" + Math.round(ag * 100) + "%)"); continue; }
     for (const [p, { it: best }] of pick) {
-      p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
       const text = best.rich || best.text;
-      // וואלה לפעמים טועה בכותרת (למשל "ליגת ווינר סל" למשחק כדורגל). האתר של הערוץ הוא המקור הנכון.
-      const kt = sportKind(p.title), ks = sportKind(text);
-      if (kt && ks && kt !== ks) { p.title = text.length > 70 ? text.slice(0, 70).replace(/\s+\S*$/, "") + "…" : text; if (text.length > 70) p.desc = text; else delete p.desc; n++; continue; }
+      if (!fits(p.title, text)) continue; // התיאור לא שייך לתוכנית הזו
+      p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
       if (p.desc) continue;
       if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;
       p.desc = text; n++;
     }
   }
+  if (skipped.length) console.log("ספורט 5: דילגתי על לוחות שלא תואמים לאתר:", skipped.join(", "));
   return n;
 }
 

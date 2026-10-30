@@ -149,3 +149,40 @@ test("cancel דרך ה-handler: מגבלת קצב לטוקן (20 לדקה) חל�
   assert.ok(codes.filter((c) => c === 429).length >= 2, codes.join(","));
   _resetLimits();
 });
+
+// ---- תיקוני סוכן השטן ----
+const { dropSched } = await import("../api/_push.js");
+test("ירי מאוחר של ההתראה המוקדמת (אחרי ts): stOnly שומר את k#s ולא מפרסם אותה מחדש", async () => {
+  const r = dblRem(0), d = mkSched();
+  await reschedule(TOK, [r], d);
+  d.calls.length = 0;
+  const late = r.ts + 60000; // דקה אחרי ההתחלה
+  const fd = { load: async () => [r], sendTo: async () => ({ ok: 1 }),
+    dropSched: (t, k) => dropSched(t, k, { ...d, now: () => late }),
+    reschedule: (t, rs) => reschedule(t, rs, { ...d, now: () => late }) };
+  await handleFire({ t: TOK, k: "k0", at: r.ts - 600000 }, fd, late);
+  assert.equal(d.calls.length, 0, "בלי מחיקה ובלי פרסום");
+  assert.ok(d.store[`sched/${TOK}.json`]["k0#s"]);
+  // k#s שכבר נמחקה (נורתה) לא מתפרסמת מחדש ע"י stOnly
+  delete d.store[`sched/${TOK}.json`]["k0#s"];
+  await reschedule(TOK, [{ ...r, stOnly: 1 }], { ...d, now: () => late });
+  assert.equal(d.calls.length, 0);
+});
+
+test("שמירה חוזרת של הרשימה תוך שניות אחרי ירי לא מתזמנת מחדש את ההתראה שנורתה (__f)", async () => {
+  const r = dblRem(0, { dbl: undefined }), d = mkSched();
+  await reschedule(TOK, [r], d);
+  const fireAt = r.ts - 600000;
+  await dropSched(TOK, "k0", { ...d, now: () => fireAt });
+  d.calls.length = 0;
+  await reschedule(TOK, [r], { ...d, now: () => fireAt + 10000 });
+  assert.equal(d.calls.length, 0, "לא מפרסם שוב");
+  const out = await reschedule(TOK, [r], { ...d, now: () => fireAt + 180000 });
+  assert.equal(out.added, 0);
+  assert.ok(!d.store[`sched/${TOK}.json`].__f, "הרישום פג");
+  // שינוי זמן כן מתזמן מחדש
+  const moved = { ...r, ts: r.ts + 7200000, end: r.end + 7200000 };
+  await dropSched(TOK, "k0", { ...d, now: () => fireAt }); // אין רשומה, no-op
+  const o2 = await reschedule(TOK, [moved], { ...d, now: () => fireAt + 5000 });
+  assert.equal(o2.added, 1);
+});

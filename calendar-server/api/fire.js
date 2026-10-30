@@ -30,7 +30,7 @@ export async function handleFire(b, d, now = Date.now()) {
   // תזמון המשך: תזכורות מעבר לתקרה (61+) או שנדחו בגלל תקציב יומי שאופס. כישלון כאן לא מפיל את ההודעה (QStash ינסה שוב וישלח פוש כפול)
   // תזכורת כפולה שעוד לא התחילה: נשארת ברשימה רק עם stOnly, כדי ש-reschedule לא ימחק את הודעת k#s ולא יתזמן שוב את ההתראה שנשלחה עכשיו
   const rest = rems.filter((x) => x.k !== b.k);
-  if (r.dbl && r.lead > 0 && r.ts > now + 5000) rest.push({ ...r, stOnly: 1 });
+  if (r.dbl && r.lead > 0 && r.ts > now - 120000) rest.push({ ...r, stOnly: 1 });
   try { out.sch = await d.reschedule(b.t, rest); } catch (e) { console.error("fire reschedule", e && e.message); }
   return { status: 200, json: out };
 }

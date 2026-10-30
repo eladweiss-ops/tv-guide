@@ -16,6 +16,13 @@
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
   var skip = 0;      // popstate שנגרמו על ידינו (go) ולא ממשתמש
+  var skipTimers = []; // כל go מגיע עם טיימר ביטחון: אם popstate לא הגיע, skip לא נתקע
+  function goBy(n) {
+    skip++;
+    var tm = setTimeout(function () { var i = skipTimers.indexOf(tm); if (i >= 0) skipTimers.splice(i, 1); if (skip > 0) skip--; }, 400);
+    skipTimers.push(tm);
+    history.go(-n);
+  }
   var queued = false;
 
   function navLayer(sel, close) {
@@ -36,7 +43,7 @@
     });
     try {
       while (depth < order.length) { depth++; history.pushState({ tvgLayer: order[depth - 1].n, d: depth }, "", location.href); }
-      if (depth > order.length) { var n = depth - order.length; depth = order.length; skip++; history.go(-n); }
+      if (depth > order.length) { var n = depth - order.length; depth = order.length; goBy(n); }
     } catch (e) {}
   }
   function closeTop() {
@@ -47,7 +54,7 @@
   }
   window.addEventListener("popstate", function (e) {
     var d = e.state && e.state.tvgLayer ? (e.state.d || 0) : 0;
-    if (skip > 0) { skip--; depth = d; return; }
+    if (skip > 0) { skip--; if (skipTimers.length) clearTimeout(skipTimers.shift()); depth = d; return; }
     if (d < depth) { // המשתמש חזר אחורה: סוגרים שכבה אחת (או יותר אם קפץ כמה)
       var guard = 6;
       while (depth > d && order.length && guard--) { depth--; closeTop(); sync0(); }
@@ -64,6 +71,7 @@
   });
 
   // רשומה שנשארה מרענון כשחלון היה פתוח: מאפסים אותה (לא מאבדים state אחר)
+  // (רשומות מתחתיה נשארות; "חזור" אליהן מתנקה ע"י sync: popstate -> go חוזר לבסיס. מעבר יזום אחורה כאן היה גורם לטעינה מחדש של הדף, כי הרשומות שייכות למסמך הקודם)
   try { if (history.state && history.state.tvgLayer) history.replaceState(null, "", location.href); } catch (e) {}
 
   navLayer("#sheet", function () { TVG.openSheet(false); TVG.render(); });
@@ -76,7 +84,7 @@
   // ---- פרמטרים בכתובת ----
   // לשונית: נקבעת לפני שהאפליקציה עולה, כדי שתיפתח ישר בלשונית הנכונה
   var P0 = new URLSearchParams(location.search), bootTab = P0.get("tab");
-  if (bootTab && TABS[bootTab]) TVG.store("tvg.tab", bootTab);
+  if (bootTab && TABS[bootTab] && !P0.get("rem") && P0.get("p") == null && !P0.has("q")) TVG.store("tvg.tab", bootTab); // קדימות: ?tab= רק כשאין rem/p/q
 
   function cleanUrl(drop) {
     try {
@@ -103,7 +111,7 @@
     try { p = new URL(u || location.href, location.href).searchParams; } catch (e) { return; }
     if (!TVG.G) { TVG.pendingUrl = u || location.href; return; }
     // קדימות (מקום אחד): rem > p > q > tab. rem: נודניק; p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
-    var tab = p.get("tab"), rem = p.get("rem"), pp = p.get("p"), hasQ = p.has("q"), q = p.get("q") || "";
+    var tab = p.get("tab"), rem = p.get("rem"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
     if (tab && !isBoot && !rem && pp == null) switchTab(tab);
     if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }

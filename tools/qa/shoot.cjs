@@ -222,6 +222,20 @@ function nfFixtureData() {
       assert(!(await vis("#favs")), "Escape closes favs"); assert(page.url() === url0, "still in app after Escape");
       await page.evaluate(() => document.querySelector("[data-rem]") && 0);
     });
+    await step("reload-with-layer-open", async () => { // רענון כשחלון פתוח: אין רשומת היסטוריה מתה, ו"חזור" הראשון לא "מת"
+      await fresh();
+      await page.click("#setBtn"); await page.waitForTimeout(300);
+      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(1200);
+      assert(await page.evaluate(() => !history.state), "state cleared after reload");
+      await page.click("#setBtn"); await page.waitForTimeout(300); assert(await vis("#setsheet"), "layer works after reload");
+      await page.goBack(); await page.waitForTimeout(500); assert(!(await vis("#setsheet")), "back closes layer after reload");
+    });
+    await step("tab-ignored-with-q", async () => { // קדימות: ?tab= לא נשמר כשיש ?q=
+      await fresh(); await page.evaluate(() => localStorage.removeItem("tvg.tab")); await fresh("?q=abc&tab=rems");
+      assert(await page.evaluate(() => TVG.tab !== "rems" && localStorage.getItem("tvg.tab") !== "rems"), "tab not stored when q present");
+      await page.evaluate(() => localStorage.removeItem("tvg.tab"));
+    });
+    await step("q-param-long", async () => { await fresh("?q=" + "x".repeat(300)); assert((await page.inputValue("#q")).length === 100, "q capped to 100"); });
     await step("tab-param", async () => {
       await fresh("?tab=rems"); assert(await page.evaluate(() => TVG.tab === "rems"), "tab=rems"); assert(hasNoSnoozeParams(), "url cleaned " + page.url());
       await snap("12_tab_param_rems");

@@ -22,7 +22,8 @@ export function wantedSchedule(rems, now) {
   for (const r of rems) {
     const at = r.ts - (r.lead || 0) * 60000;
     if (!r.stOnly && at > now - 30000 && r.ts > now) want[r.k] = Math.max(at, now + 5000);
-    if (r.dbl && r.lead > 0 && r.ts > now + 5000) want[r.k + START_SUFFIX] = r.ts;
+    // stOnly: גם ירי מאוחר של ההתראה המוקדמת (עד ~2 דקות אחרי ts) לא מוחק את k#s שעוד ממתינה. reschedule לא מפרסם אותה מחדש (רק משאיר קיימת)
+    if (r.dbl && r.lead > 0 && r.ts > now + (r.stOnly ? -120000 : 5000)) want[r.k + START_SUFFIX] = r.ts;
   }
   return want;
 }

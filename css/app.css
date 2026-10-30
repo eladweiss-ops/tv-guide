@@ -128,7 +128,7 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; min-height: 38px; font-size: 0.92rem; font-weight: 500; }
   .sheet .chips { gap: 6px; }
-  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--ink); font-weight: 700; }
   .gh { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 6px; font-weight: 700; color: var(--accent); }
   .gh .ghost { min-height: 38px; padding: 4px 12px; font-size: 0.9rem; font-weight: 500; color: var(--ink); }
   .opt .sub { margin-inline-start: auto; }
@@ -225,7 +225,8 @@
   .ghost { border: 0; background: var(--soft); border-radius: 999px; padding: 8px 18px; }
   .step { border-radius: 16px; }
   .chip { border: 0; background: var(--soft); min-height: 40px; padding: 4px 16px; }
-  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  /* בחירה עדינה (לא כתום מלא, כדי שלא יתחרה בכפתור הראשי): מילוי כתום שקוף + טבעת */
+  .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--accent); font-weight: 700; }
   select { border: 0; border-radius: 24px; min-height: 50px; padding: 10px 18px; background: var(--surface); }
   .days { background: var(--soft); border-radius: 26px; padding: 3px; gap: 0; }
   .day { border: 0; background: transparent; border-radius: 23px; min-height: 52px; }
@@ -408,7 +409,7 @@
   .shcard { display: flex; align-items: center; justify-content: center; height: min(300px, 38vh); border-radius: 18px; background: var(--soft); color: var(--muted); overflow: hidden; }
   .shcard img { height: 100%; width: auto; max-width: 100%; object-fit: contain; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
   .btn.wa { background: #25D366; color: #05301E; }
-  .ghost.shcopy { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  .ghost.shcopy { background: var(--soft); border: 0; color: var(--ink); } /* כמו כפתור משני רגיל (.ghost) */
   .ghost.shbtn { margin-top: 4px; }
   /* ===== נטפליקס 2.0: לשונית ודף תוכן ===== */
   .nfsec { display: flex; flex-direction: column; gap: 8px; }

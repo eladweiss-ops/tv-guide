@@ -8,7 +8,7 @@ Set-Location $PSScriptRoot
 $log = Join-Path $PSScriptRoot "hot-local.log"
 function Run($cmd) { & cmd /c "$cmd 2>&1" | Out-File $log -Append -Encoding utf8 }
 "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm') ===" | Out-File $log -Append -Encoding utf8
-Run "git pull --rebase --autostash"
+# המשיכה מ-GitHub והבדיקה שהקוד מאושר נעשות ב-tools/home/runner.ps1 לפני שהקובץ הזה רץ
 Run "node enrich_hot.mjs"
 Run "node extra_channels.mjs"
 git add guide.json hot-cache.json extra-cache.json

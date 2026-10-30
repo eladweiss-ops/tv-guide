@@ -146,7 +146,7 @@
     else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(TVG.icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); TVG.pill("התזכורת בוטלה", 1800); }
     closeRem(); TVG.render();
   }
-  function recOf(r) { if (TVG.landCh && TVG.landCh === r.id && !TVG.sel.has(r.id)) { TVG.sel.add(r.id); TVG.saveSel(); } /* נכנס מדף נחיתה: הערוץ מצטרף רק עכשיו, כשהוגדרה תזכורת */ var ts = r.p.s.getTime(), m = fitLead(ts, r.lead != null ? r.lead : TVG.lead); return { k: TVG.remKey(r.id, r.p.s), id: r.id, ts: ts, end: r.p.e.getTime(), title: r.p.title, ch: TVG.chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: m, at: Date.now(), dbl: r.dbl && m > 0 ? 1 : undefined }; }
+  function recOf(r) { if (TVG.landCh && TVG.landCh === r.id && !TVG.sel.has(r.id)) { TVG.sel.add(r.id); TVG.saveSel(); TVG.landAdded = TVG.chNice(TVG.chName(r.id)); } /* נכנס מדף נחיתה: הערוץ מצטרף רק עכשיו, כשהוגדרה תזכורת */ var ts = r.p.s.getTime(), m = fitLead(ts, r.lead != null ? r.lead : TVG.lead); return { k: TVG.remKey(r.id, r.p.s), id: r.id, ts: ts, end: r.p.e.getTime(), title: r.p.title, ch: TVG.chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: m, at: Date.now(), dbl: r.dbl && m > 0 ? 1 : undefined }; }
   // הוספה בלחיצה אחת כשיש יומן ייעודי, עם "ביטול" בהודעה למקרה של טעות
   function quickAdd(list) {
     var add = list.filter(function (r) { return r.p.s > new Date() && !TVG.hasRem(TVG.remKey(r.id, r.p.s)); }).map(recOf);

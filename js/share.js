@@ -1,4 +1,4 @@
-/* js/share.js - שיתוף תוכנית: חלון תחתון עם תצוגת הודעת הוואטסאפ, בחירה "טקסט / כרטיס צבעוני", וקישור עמוק ?p=<ערוץ>|<התחלה>.
+/* js/share.js - שיתוף תוכנית: חלון תחתון עם תצוגה מקדימה של מה שיישלח (טקסט קצר, או כרטיס 1200x630 עם קוד QR וקישור), וקישור קצר ?p=<ערוץ>.<YYMMDDHHMM>. דף הנחיתה של הקישור: landing.js.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, render-common, render-dial, events. */
 (function (TVG) {
   TVG.files["share"] = 1;
@@ -43,7 +43,8 @@
       title: String(p.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: "יום " + TVG.DAYS[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1),
       time: hhmm(d),
-      ch: TVG.bidi(TVG.chName(r.id)),
+      chRaw: TVG.chNice(TVG.chName(r.id)),
+      ch: TVG.bidi(TVG.chName(r.id)), // עם בידוד LTR: לתצוגה בלבד (HTML/קנבס), לא לטקסט שנשלח
       live: p.lv === 1,
       link: linkOf(r.id, p),
       syn: synOf(p),
@@ -52,9 +53,10 @@
   }
   var RLM = "\u200F", CTA = "📅 להוספה ליומן ותזכורת:";
   function textOf(x, cardOnly) { // במצב כרטיס: רק הקריאה לפעולה והקישור (הפרטים כבר בתמונה)
+    // RLM רק בתחילת שורה שמתחילה באימוג'י (לא צמוד ל-_ או *, שוואטסאפ לא מזהה כעיצוב אחרת); שורות שמתחילות בעברית כבר RTL
     if (cardOnly) return [RLM + CTA, x.link].join("\n");
-    var l = [RLM + x.emoji + " *" + x.title + "*", RLM + x.day + " · " + x.time + " · " + x.ch + (x.live ? " · ישיר" : "")];
-    if (x.syn) l.push(RLM + "_" + x.syn.replace(/_/g, " ") + "_");
+    var l = [RLM + x.emoji + " *" + x.title + "*", x.day + " · " + x.time + " · " + x.chRaw + (x.live ? " · ישיר" : "")];
+    if (x.syn) l.push("_" + x.syn.replace(/_/g, " ") + "_");
     l.push("", RLM + CTA, x.link);
     return l.join("\n");
   }
@@ -63,8 +65,8 @@
     var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
     var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
     if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
-    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"rtl\">" + esc(x.title) + "</bdi></b></div>" +
-      '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi>" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "") + "</div>" +
+    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +
+      '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi dir=\"rtl\">" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "") + "</div>" +
       (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") + '<div class="shgap"></div>' + cta + "</div>";
   }
   function shareBtn(p, cid) {
@@ -130,16 +132,23 @@
       ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 5;
       lay.lines.forEach(function (ln, k) { ctx.fillText("\u2067" + ln + "\u2069", R, y + k * lh); });
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      // לוח זכוכית תחתון: ערוץ (ימין), יום ושעה (שמאל)
-      var py = 400, ph = 166;
-      ctx.fillStyle = "rgba(255,255,255,.22)"; rr(ctx, PAD, py, MW, ph, 44); ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 2; rr(ctx, PAD + 1, py + 1, MW - 2, ph - 2, 43); ctx.stroke();
+      // לוח זכוכית תחתון: ערוץ + יום (ימין), שעה גדולה (שמאל). משמאל ללוח: קוד QR לדף הנחיתה. מתחת: הקישור הקצר
+      var py = 392, ph = 168, qs = ph, q = TVG.qr ? TVG.qr(x.link) : null, px = PAD, pw = MW;
+      if (q) { px = PAD + qs + 20; pw = MW - qs - 20; }
+      ctx.fillStyle = "rgba(255,255,255,.22)"; rr(ctx, px, py, pw, ph, 44); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 2; rr(ctx, px + 1, py + 1, pw - 2, ph - 2, 43); ctx.stroke();
+      if (q) {
+        ctx.fillStyle = "#fff"; rr(ctx, PAD, py, qs, ph, 38); ctx.fill();
+        var m = Math.max(2, Math.floor((qs - 24) / q.n)), sz = m * q.n, ox = PAD + Math.round((qs - sz) / 2), oy = py + Math.round((ph - sz) / 2);
+        ctx.fillStyle = "#111"; for (var rr0 = 0; rr0 < q.n; rr0++) for (var cc0 = 0; cc0 < q.n; cc0++) if (q.get(rr0, cc0)) ctx.fillRect(ox + cc0 * m, oy + rr0 * m, m, m);
+      }
       ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.direction = "rtl";
-      var chs = 60; ctx.font = "800 " + chs + "px " + F; while (ctx.measureText(x.ch).width > 520 && chs > 36) { chs -= 4; ctx.font = "800 " + chs + "px " + F; }
-      ctx.fillText(x.ch, R - 40, py + 100);
-      ctx.textAlign = "left"; ctx.direction = "ltr"; ctx.font = "800 104px " + F; ctx.fillText(x.time, PAD + 44, py + 118);
-      var tw = ctx.measureText(x.time).width;
-      ctx.direction = "rtl"; ctx.textAlign = "left"; ctx.font = "700 44px " + F; ctx.globalAlpha = 0.95; ctx.fillText(x.day, PAD + 44 + tw + 30, py + 104); ctx.globalAlpha = 1;
+      var tw0 = 0; ctx.font = "800 100px " + F; tw0 = ctx.measureText(x.time).width;
+      var maxW = pw - 36 - 36 - tw0 - 30, chs = 48; ctx.font = "800 " + chs + "px " + F; while (ctx.measureText(x.ch).width > maxW && chs > 30) { chs -= 2; ctx.font = "800 " + chs + "px " + F; }
+      ctx.fillText(x.ch, px + pw - 36, py + 78);
+      ctx.font = "700 40px " + F; ctx.globalAlpha = 0.95; ctx.fillText(x.day, px + pw - 36, py + 134); ctx.globalAlpha = 1;
+      ctx.textAlign = "left"; ctx.direction = "ltr"; ctx.font = "800 100px " + F; ctx.fillText(x.time, px + 36, py + 118);
+      ctx.font = "600 28px " + F; ctx.globalAlpha = 0.92; ctx.textAlign = "right"; ctx.fillText(x.link.replace(/^https?:\/\//, ""), R, py + ph + 44); ctx.globalAlpha = 1;
       return new Promise(function (res, rej) { c.toBlob(function (b) { if (b) res(b); else rej(new Error("toBlob")); }, "image/png"); });
     });
   }
@@ -149,8 +158,8 @@
     if (S && S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
     S = { id: r.id, p: r.p, mode: "text", blob: null, url: null };
     TVG.rem = null; TVG.LP = null;
-    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">ככה זה ייראה אצל מי שמקבל</p><div id="shPrev"></div>' +
-      '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div>' +
+    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
+      '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div><p class="shnote" id="shNote" hidden>הקישור מופיע גם בתמונה</p>' +
       '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
@@ -170,6 +179,7 @@
   }
   function syncChips() {
     [].forEach.call(document.querySelectorAll("[data-shmode]"), function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-shmode") === S.mode)); });
+    var n = $("#shNote"); if (n) n.hidden = S.mode !== "card";
   }
   function openWa(text) {
     var u = "https://wa.me/?text=" + encodeURIComponent(text);

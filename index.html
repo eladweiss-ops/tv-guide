@@ -549,7 +549,9 @@
       if (!m) return /^ערוץ הספורט$/.test(n) ? 50 : 100;
       return +m[1] * 10 + (/\+|פלוס/.test(n) ? 1 : /stars/i.test(n) ? 2 : /gold|גולד/i.test(n) ? 3 : /max/i.test(n) ? 4 : /live/i.test(n) ? 5 : 0);
     };
-    G.channels.sort(function (a, b) { return GRANK[a._g] - GRANK[b._g] || sk(a) - sk(b) || heb(a.name) - heb(b.name) || a.name.localeCompare(b.name, "he"); });
+    // ערוצי החינם לפי מספר הערוץ: כאן 11, קשת 12, רשת 13, ערוץ 14 ... ערוץ 24, ואחריהם ערוצים בלי מספר
+    var bk = function (c) { if (c._g !== "broad") return 0; var n = chNum(c); return n == null ? 500 : n; };
+    G.channels.sort(function (a, b) { return GRANK[a._g] - GRANK[b._g] || bk(a) - bk(b) || sk(a) - sk(b) || heb(a.name) - heb(b.name) || a.name.localeCompare(b.name, "he"); });
   }
 
   // נתוני דוגמה (קשת בלבד): מוצגים רק כשהדף לא מצליח לקרוא את guide.json.
@@ -1197,6 +1199,20 @@
     TI = Array.from(m.values()); TIt = now; return TI;
   }
   function tokOk(tl, toks) { for (var i = 0; i < toks.length; i++) if (tl.indexOf(toks[i]) < 0) return false; return true; }
+  // חיפוש חכם: קיצורים של קבוצות וערים ("מ. תא", "ת״א", "ב״ש") ומילים נרדפות לענפים
+  function canon(x) {
+    return (" " + String(x || "").toLowerCase().replace(/[״”“]/g, '"').replace(/[׳’]/g, "'").replace(/תל[-־]אביב/g, "תל אביב") + " ")
+      .replace(/([\s\-–(])ת"?א(?=[\s\-–),.:])/g, "$1תל אביב")
+      .replace(/([\s\-–(])ב"?ש(?=[\s\-–),.:])/g, "$1באר שבע").replace(/([\s\-–(])פ"ת(?=[\s\-–),.:])/g, "$1פתח תקווה").replace(/([\s\-–(])ק"ש(?=[\s\-–),.:])/g, "$1קריית שמונה")
+      .replace(/([\s\-–(])מ\.\s?(?=\S)/g, "$1מכבי ").replace(/([\s\-–(])ה\.\s?(?=\S)/g, "$1הפועל ").replace(/([\s\-–(])ב\.\s?(?=\S)/g, '$1בית"ר ')
+      .replace(/\s+/g, " ");
+  }
+  var SYN = { "כדורסל": ["כדורסל", "סל", "יורוליג", "יורוקאפ", "nba"], "כדורגל": ["כדורגל", "ליגת העל", "ליגה", "פרמייר", "ליגת האלופות", "גביע"], "טניס": ["טניס", "atp", "wta"] };
+  function smartOk(hc, toks) {
+    for (var i = 0; i < toks.length; i++) { var alts = SYN[toks[i]] || [toks[i]], ok = false; for (var j = 0; j < alts.length; j++) if (hc.indexOf(alts[j]) >= 0) { ok = true; break; } if (!ok) return false; }
+    return true;
+  }
+  function pc(p) { if (p._c == null) p._c = canon(p.title + " " + (p.desc || "")); return p._c; }
   function suggestions(term) {
     var toks = term.toLowerCase().split(/\s+/).filter(Boolean); if (!toks.length) return [];
     var mine = scope === "mine" ? new Set(chans().map(function (c) { return c.id; })) : null, out = [];
@@ -1224,7 +1240,7 @@
     if ((m = t.match(/^בית"?ר\s+(.+)$/))) a.push("ב. " + m[1]);
     return a;
   }
-  function topicHit(p, alts) { var h = (p.title + " " + (p.desc || "")).toLowerCase(); return alts.some(function (a) { return h.indexOf(a) >= 0; }); }
+  function topicHit(p, alts) { var h = (p.title + " " + (p.desc || "")).toLowerCase(), hc = pc(p); return alts.some(function (a) { return h.indexOf(a) >= 0 || hc.indexOf(canon(a).trim()) >= 0; }); }
   function topicAirs(t, limit) {
     var now = new Date(), alts = topicAlts(t), out = [];
     G.channels.forEach(function (c) { (by.get(c.id) || []).forEach(function (p) { if (p.e > now && topicHit(p, alts)) out.push({ c: c, p: p }); }); });
@@ -1275,6 +1291,7 @@
   }
   function vSearch() {
     var now = new Date(), term = q.trim().toLowerCase(), toks = term.split(/\s+/).filter(Boolean), hits = [], alts = topicAlts(term);
+    var ctoks = canon(term).trim().split(" ").filter(Boolean);
     var list = scope === "mine" ? chans() : G.channels, dEnd = new Date(now); dEnd.setHours(23, 59, 59, 999); var wEnd = now.getTime() + 7 * 864e5, tEnd = tonightEnd();
     list.forEach(function (c) {
       (by.get(c.id) || []).forEach(function (p) {
@@ -1283,7 +1300,7 @@
         if (sWhen === "today" && p.s >= tEnd) return;
         if (sWhen === "week" && p.s.getTime() >= wEnd) return;
         var hay = (p.title + " " + p.desc).toLowerCase();
-        if (qExact ? p.title === qExact : (tokOk(hay, toks) || topicHit(p, alts.slice(1)))) hits.push({ c: c, p: p, viaDesc: !qExact && !tokOk(p.title.toLowerCase(), toks) });
+        if (qExact ? p.title === qExact : (tokOk(hay, toks) || topicHit(p, alts.slice(1)) || smartOk(pc(p), ctoks))) hits.push({ c: c, p: p, viaDesc: !qExact && !tokOk(p.title.toLowerCase(), toks) });
       });
     });
     hits.sort(function (a, b) { return a.p.s - b.p.s; });
@@ -1635,7 +1652,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.29", BUILD = "2026-10-30.29", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.30", BUILD = "2026-10-30.30", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

@@ -43,6 +43,15 @@ export function typeOf(name) {
 }
 
 const mins = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+// ענף הספורט לפי הטקסט: "fb" כדורגל, "bb" כדורסל, "" לא ידוע
+export function sportKind(t) {
+  t = String(t || "");
+  if (/כדורגל/.test(t)) return "fb";
+  if (/כדורסל|ווינר סל|יורוליג|יורוקאפ|\bNBA\b/i.test(t)) return "bb";
+  if (/פרמייר ליג|לה ליגה|סרייה א|בונדסליגה|ליגת האלופות|ליג 1/.test(t)) return "fb";
+  return "";
+}
+
 export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> items [{time, ...}]
   const chOf = new Map(guide.channels.map((c) => [String(c.id), typeOf(c.name)]).filter((x) => x[1]));
   const key = (x) => String(x).replace(/^ישיר!?\s*/, "").replace(/[^\p{L}\p{N}]/gu, "");
@@ -63,8 +72,11 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     }
     for (const [p, { it: best }] of pick) {
       p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
-      if (p.desc) continue;
       const text = best.rich || best.text;
+      // וואלה לפעמים טועה בכותרת (למשל "ליגת ווינר סל" למשחק כדורגל). האתר של הערוץ הוא המקור הנכון.
+      const kt = sportKind(p.title), ks = sportKind(text);
+      if (kt && ks && kt !== ks) { p.title = text.length > 70 ? text.slice(0, 70).replace(/\s+\S*$/, "") + "…" : text; if (text.length > 70) p.desc = text; else delete p.desc; n++; continue; }
+      if (p.desc) continue;
       if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;
       p.desc = text; n++;
     }

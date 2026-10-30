@@ -1,11 +1,13 @@
-// Service worker: רק התראות פוש (בלי מטמון, כדי לא להפריע לעדכונים האוטומטיים)
+// Service worker (v2): רק התראות פוש (בלי מטמון, כדי לא להפריע לעדכונים האוטומטיים)
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: "לוח שידורים", body: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || "לוח שידורים", {
-    body: d.body || "", tag: d.tag || undefined, icon: "icon-192.png", badge: "icon-192.png", data: { url: d.url || "./" }, renotify: true,
+  // סימן כיוון מימין-לשמאל בתחילת כל שורה, כדי שהאייפון ייישר את ההתראה לימין גם כשהיא מתחילה באימוג'י או במספר
+  const RLM = "\u200F", rtl = (t) => String(t || "").split("\n").map((l) => RLM + l).join("\n");
+  e.waitUntil(self.registration.showNotification(rtl(d.title || "לוח שידורים"), {
+    body: rtl(d.body), dir: "rtl", lang: "he", tag: d.tag || undefined, icon: "icon-192.png", badge: "icon-192.png", data: { url: d.url || "./" }, renotify: true,
   }));
 });
 self.addEventListener("notificationclick", (e) => {

@@ -78,17 +78,28 @@ const SOURCES = [
   } },
 ];
 
+// מטמון: מה שהצליח פעם נשמר ב-extra-cache.json. ערוץ 14 חוסם שרתים מחוץ לישראל,
+// אז המחשב בבית ממלא את המטמון והעדכון הלילי משתמש בו. ימים חדשים מחליפים ימים ישנים.
+async function readCache() { try { return JSON.parse(await readFile("extra-cache.json", "utf8")); } catch (e) { return {}; } }
+function mergeDays(old, fresh, first) {
+  const freshDays = new Set(fresh.map((x) => x.start.slice(0, 10)));
+  return dedupe([...(old || []).filter((x) => x.start.slice(0, 10) >= first && !freshDays.has(x.start.slice(0, 10))), ...fresh]);
+}
+
 async function main() {
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
+  const cache = await readCache();
   const days = nextDays(8), first = days[0];
   const norm = (s) => String(s).replace(/\s|HD/gi, "").toLowerCase();
   let changed = false;
   for (const src of SOURCES) {
     // אם וואלה כבר מביא את הערוץ, לא מוסיפים כפול
     if (guide.channels.some((c) => c.id !== src.id && norm(c.name) === norm(src.name))) { console.log(src.name, "כבר קיים בוואלה"); continue; }
-    let items;
-    try { items = dedupe((await src.load(days)).filter((x) => x.start.slice(0, 10) >= first)); }
-    catch (e) { console.log(src.name, "נכשל:", e.message); continue; }
+    let fresh = [];
+    try { fresh = dedupe((await src.load(days)).filter((x) => x.start.slice(0, 10) >= first)); }
+    catch (e) { console.log(src.name, "נכשל:", e.message, "(משתמש במטמון)"); }
+    const items = mergeDays(cache[src.id] && cache[src.id].items, fresh.length >= 10 ? fresh : [], first);
+    if (fresh.length >= 10) cache[src.id] = { at: new Date().toISOString(), items };
     if (items.length < 10) { console.log(src.name, "מעט מדי שידורים:", items.length); continue; }
     guide.programs = guide.programs.filter((p) => p.ch !== src.id);
     if (!guide.channels.some((c) => c.id === src.id)) guide.channels.push({ id: src.id, name: src.name, prov: src.prov });
@@ -97,6 +108,7 @@ async function main() {
     changed = true;
   }
   if (changed) await writeFile("guide.json", JSON.stringify(guide));
+  await writeFile("extra-cache.json", JSON.stringify(cache));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.log("extra_channels נכשל:", e.message); process.exit(0); });

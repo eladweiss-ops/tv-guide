@@ -7,7 +7,8 @@ $log = Join-Path $PSScriptRoot "hot-local.log"
 "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm') ===" | Out-File $log -Append -Encoding utf8
 git pull --rebase --autostash 2>&1 | Out-File $log -Append -Encoding utf8
 node enrich_hot.mjs 2>&1 | Out-File $log -Append -Encoding utf8
-git add guide.json hot-cache.json
+node extra_channels.mjs 2>&1 | Out-File $log -Append -Encoding utf8
+git add guide.json hot-cache.json extra-cache.json
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
   git commit -m "HOT summaries (home computer)" 2>&1 | Out-File $log -Append -Encoding utf8

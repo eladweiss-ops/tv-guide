@@ -307,6 +307,11 @@
   .lpcustom input { flex: 1; min-width: 0; min-height: 44px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: inherit; padding: 6px 12px; font: inherit; direction: ltr; }
   .lpnow { margin-top: 8px; }
   .rbts { display: flex; gap: 6px; flex: none; }
+  .srow > .rsyn { flex: 1 1 100%; margin: 0; padding: 0 12px 4px; font-size: .95rem; line-height: 1.5; color: var(--muted); }
+  .rsyn p { margin: 0; }
+  .srow > .rsyn + .rbts { margin-inline-start: auto; }
+  .rclamp:not(.full) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .rsyn .moreb { margin-top: 2px; }
   .pill .pillact { margin-inline-start: 10px; border: 0; background: transparent; color: #64d2ff; font: inherit; font-weight: 800; padding: 4px 6px; cursor: pointer; }
   .remall { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 18px; background: var(--soft); }
   .remall span { flex: 1; font-weight: 700; }
@@ -855,7 +860,9 @@
       var d = new Date(x.ts), dl = dayLabel(dstr(d));
       if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
       var live = x.ts <= now;
-      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub">' + esc(x.ch) + " · " + (live ? "משודר עכשיו" : "🔔 " + leadTxt(x.lead, x.ts)) + "</span></span></button>" +
+      var fp = findProg(x.k), ds = (fp && fp.p.desc) || x.desc || "";
+      var syn = ds ? '<div class="rsyn"><p class="rclamp">' + esc(ds) + "</p>" + (ds.length > 90 ? '<button type="button" class="moreb" data-more data-l="הרחב">הרחב…</button>' : "") + "</div>" : "";
+      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub"><bdi>' + esc(x.ch) + "</bdi> · <bdi>" + (live ? "משודר עכשיו" : "🔔 " + esc(leadTxt(x.lead, x.ts))) + "</bdi></span></span></button>" + syn +
         (live ? "</div>" : askK === x.k
           ? '</div><div class="confirm"><span>לבטל את התזכורת?</span><button type="button" class="btn sm danger" data-remcancel="' + esc(x.k) + '">כן, לבטל</button><button type="button" class="ghost sm" data-remkeep>להשאיר</button></div>'
           : '<span class="rbts">' + (calMode === "sub" ? '<button type="button" class="rbt" data-ledit="' + esc(x.k) + '" aria-label="שינוי מועד ההתראה: ' + esc(x.title) + '">🔔</button>' : "") + '<button type="button" class="rbt" data-remask="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button></span></div>');
@@ -1516,7 +1523,7 @@
       saveSel(); buildSheet(); return;
     }
     if (t.closest("[data-dnow]")) { scrub = null; updateDial(dialT()); return; }
-    var mb = t.closest("[data-more]"); if (mb) { var pp = mb.previousElementSibling; if (pp) { pp.classList.toggle("full"); mb.textContent = pp.classList.contains("full") ? "פחות" : "עוד…"; } return; }
+    var mb = t.closest("[data-more]"); if (mb) { var pp = mb.previousElementSibling; if (pp) { pp.classList.toggle("full"); mb.textContent = pp.classList.contains("full") ? (mb.getAttribute("data-l") ? "צמצם" : "פחות") : (mb.getAttribute("data-l") ? "הרחב…" : "עוד…"); } return; }
     var sy = t.closest("[data-syn]");
     if (sy) { var bx = document.querySelector('[data-synbox="' + sy.getAttribute("data-syn").replace(/"/g, '\\"') + '"]'); if (bx) { bx.hidden = !bx.hidden; sy.setAttribute("aria-expanded", String(!bx.hidden)); sy.textContent = bx.hidden ? "תקציר" : "סגור"; } return; }
     if (t.closest("a.gsearch")) return;
@@ -1565,7 +1572,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.25", BUILD = "2026-10-30.25", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.26", BUILD = "2026-10-30.26", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

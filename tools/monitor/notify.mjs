@@ -1,17 +1,25 @@
 #!/usr/bin/env node
 /*
- * שליחת התראות טלגרם על תוצאות הניטור. Node 22, בלי תלויות.
- *   node tools/monitor/notify.mjs --health health.json --state state.json [--ux ux.txt] [--shots dir] --mode check|summary
- * מצב check (כל שעתיים): שולח רק במעבר ל-🔴 או חזרה ל-🟢. מצב summary (08:00 ישראל / force_summary): תמיד שולח סיכום.
- * בלי TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID – לא שולח, לא נכשל (רק מדפיס מה היה נשלח).
- * המצב נשמר בקובץ --state (ה-workflow שומר אותו ב-actions/cache, בלי commit).
+ * התראות טלגרם על תוצאות הניטור. Node 22, בלי תלויות. בטלגרם יש רק ארבעה סוגי הודעות:
+ *   🔴 תקלה   – רק במעבר מתקין לתקלה, או כשמתווספת תקלה חדשה (אין הודעת "חזר לתקין"; ההתאוששות מופיעה בסיכום הבא)
+ *   ☀️ יומי   – 08:00 ישראל: מצב טכני + UX + מספרים + תקלות שנפתחו/נסגרו ב-24 שעות
+ *   📅 שבועי  – יום ראשון בבוקר, במקום היומי
+ *   🗓 חודשי  – ב-1 לחודש בבוקר, במקום היומי
+ *   node tools/monitor/notify.mjs --print-mode --state S [--force]     (check|daily|weekly|monthly)
+ *   node tools/monitor/notify.mjs --health H --state S --mode M [--ux ux.txt] [--shots dir]
+ * בלי TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID – לא שולח ולא נכשל.
+ *
+ * המצב (קובץ --state, ב-actions/cache): { open:{key:{text,since}}, incidents:[…], history:[…], lastSummaryDate }.
+ * ההיסטוריה: רשומה לכל ריצה (סטטוס ומספרים מרכזיים), עד 35 ימים (~420 רשומות, כמה עשרות KB).
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { summaryLine, israelNow } from "./health.mjs";
+import { summaryLine, israelNow, dow, addDays } from "./health.mjs";
 
-const RLM = "‏"; // ‏ – כל שורה מתחילה בו כדי שהודעה עברית תוצג מימין לשמאל גם כשיש מספרים/לטינית
+const RLM = "‏"; // ‏ – כל שורה מתחילה בו כדי שהודעה עברית תוצג מימין לשמאל גם עם מספרים/לטינית
+export const HISTORY_DAYS = 35;
+const H = 36e5, DAY = 864e5;
 
 export const escapeHtml = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const line = (s) => RLM + s;
@@ -32,46 +40,143 @@ export function parseUx(text) {
 export const uxProblems = (ux) => {
   const p = [];
   if (!ux || !ux.ran) return p;
-  if (!ux.devices.length) p.push("בדיקת ה-UX לא הצליחה לרוץ");
+  if (!ux.devices.length) p.push("UX: בדיקת ה-UX לא הצליחה לרוץ");
   ux.stepFailures.forEach((s) => p.push("UX כשל בשלב – " + s));
   ux.errors.slice(0, 6).forEach((s) => p.push("UX שגיאת קונסולה – " + s));
-  if (ux.errors.length > 6) p.push("UX ועוד " + (ux.errors.length - 6) + " שגיאות קונסולה");
+  if (ux.errors.length > 6) p.push("UX ועוד שגיאות קונסולה");
   ux.overflow.forEach((s) => p.push("UX גלילה אופקית ב-" + s));
   return p;
 };
 
-// ───────── בחירת מצב אוטומטית ─────────
-// סיכום בוקר: כשהשעה בישראל 08:00-11:59 ועוד לא נשלח סיכום היום (עמיד לעיכובי cron של GitHub; ה-workflow רץ ב-05:00 וגם ב-06:00 UTC).
+// ───────── זהות תקלה ─────────
+// מפתח יציב: בלי מספרים (גיל בשעות, כמויות משתנים) כדי ש"אותה תקלה" לא תיחשב חדשה בכל ריצה.
+export const problemKey = (t) => String(t).replace(/\d+([.,]\d+)*/g, "#").replace(/\s+/g, " ").trim();
+
+// ───────── בחירת מצב ─────────
+// בין 08:00 ל-11:59 בישראל, פעם ביום (עמיד לעיכובי cron): ב-1 לחודש חודשי, ביום ראשון שבועי, אחרת יומי.
 export function pickMode({ prev, force = false, now = new Date() }) {
-  if (force) return "summary";
   const il = israelNow(now), hour = +il.slice(11, 13), today = il.slice(0, 10);
-  return hour >= 8 && hour < 12 && (!prev || prev.lastSummaryDate !== today) ? "summary" : "check";
+  if (!force && !(hour >= 8 && hour < 12 && (!prev || prev.lastSummaryDate !== today))) return "check";
+  if (today.endsWith("-01")) return "monthly";
+  if (dow(today) === 0) return "weekly";
+  return "daily";
 }
 
-// ───────── החלטה: האם לשלוח ─────────
-// prev: {status:"ok"|"bad", problems:[], since} או null. מחזיר {send, text, state}
-export function decide({ prev, problems, mode, summary, now = new Date() }) {
-  const status = problems.length ? "bad" : "ok";
-  const was = prev && prev.status === "bad" ? "bad" : "ok";
-  const state = { status, problems, since: prev && prev.status === status ? prev.since : now.toISOString(), checkedAt: now.toISOString() };
-  let text = null;
-  if (mode === "summary") {
-    text = status === "ok" ? "✅ " + summary : buildBad(problems, "🔴 בוקר טוב, יש בעיות בלוח שידורים");
-  } else if (status === "bad" && was === "ok") {
-    text = buildBad(problems, "🔴 נמצאו בעיות בלוח שידורים");
-  } else if (status === "ok" && was === "bad") {
-    text = "🟢 התקלה נפתרה · " + summary;
+// ───────── היסטוריה ─────────
+export function makeEntry(health, ux, now) {
+  const g = (health.info && health.info.guide) || {}, rep = g.channelsReport || {}, n = (health.info && health.info.netflix) || {}, c = (health.info && health.info.caches) || {};
+  const c14 = rep["ערוץ 14"];
+  return {
+    t: now.toISOString(), ok: health.problems.length === 0 && !uxProblems(ux).length,
+    programs: g.programs || 0, syn: g.synopsisPct || 0,
+    c14d: c14 && c14.days ? Object.values(c14.days).filter((x) => x > 0).length : 0,
+    nf: n.items || 0, nfr: n.rated || 0, x14At: c.x14At || null,
+  };
+}
+
+// ───────── החלטה ─────────
+// problems: כל התקלות הנוכחיות (טכניות + UX). בריצת check ה-UX לא נבדק, ולכן תקלות UX פתוחות נשארות פתוחות.
+export function decide({ prev, problems, mode, health, ux, now = new Date() }) {
+  const st = { open: {}, incidents: [], history: [], ...(prev || {}) };
+  st.open = { ...st.open }; st.incidents = st.incidents.map((i) => ({ ...i })); st.history = st.history.slice();
+  const nowIso = now.toISOString();
+  const cur = {};
+  for (const p of problems) cur[problemKey(p)] = p;
+  if (mode === "check") for (const k in st.open) if (/^UX/.test(st.open[k].text) && !(k in cur)) cur[k] = st.open[k].text;
+  const fresh = [], closed = [];
+  for (const k in cur) if (!(k in st.open)) { fresh.push(cur[k]); st.open[k] = { text: cur[k], since: nowIso }; st.incidents.push({ key: k, text: cur[k], opened: nowIso, closed: null }); }
+  for (const k of Object.keys(st.open)) if (!(k in cur)) {
+    closed.push(st.open[k].text); delete st.open[k];
+    const inc = st.incidents.find((i) => i.key === k && !i.closed); if (inc) inc.closed = nowIso;
   }
-  return { send: text != null, text, state };
+  for (const k in cur) st.open[k].text = cur[k]; // נוסח עדכני (מספרים)
+  st.history.push(makeEntry({ ...health, problems: Object.values(cur) }, ux, now));
+  const cutoff = now.getTime() - HISTORY_DAYS * DAY;
+  st.history = st.history.filter((h) => Date.parse(h.t) >= cutoff);
+  st.incidents = st.incidents.filter((i) => !i.closed || Date.parse(i.closed) >= cutoff);
+  st.status = Object.keys(cur).length ? "bad" : "ok";
+  st.checkedAt = nowIso;
+
+  let text = null;
+  const all = Object.values(cur);
+  if (mode === "check") { if (fresh.length) text = buildAlert(fresh, all.filter((p) => !fresh.includes(p))); }
+  else if (mode === "daily") text = buildDaily(st, all, health, ux, now);
+  else if (mode === "weekly") text = buildPeriod(st, all, health, ux, now, 7);
+  else if (mode === "monthly") text = buildPeriod(st, all, health, ux, now, 30);
+  if (mode !== "check") st.lastSummaryDate = israelNow(now).slice(0, 10);
+  return { send: text != null, text, state: st };
 }
-function buildBad(problems, head) {
-  return [line("<b>" + escapeHtml(head) + "</b>"), ...problems.map((p) => line("• " + escapeHtml(p)))].join("\n");
+
+// ───────── נוסחי הודעות ─────────
+const bullets = (a) => a.map((p) => line("• " + escapeHtml(p)));
+function buildAlert(fresh, still) {
+  const out = [line("🔴 <b>תקלה בלוח שידורים</b>"), ...bullets(fresh)];
+  if (still.length) out.push(line("עדיין פתוחות:"), ...bullets(still));
+  return out.join("\n");
 }
-// טקסט HTML לשליחה: סיכום תקין מקבל גם שורת UX
-export function formatText(text) {
-  if (!text) return text;
-  return text.split("\n").map((l) => (l.startsWith(RLM) ? l : line(l))).join("\n").replace(/^(‏)(✅|🟢)/, "$1$2");
+export function fmtDur(ms) { const h = ms / H; return h < 1 ? Math.max(1, Math.round(h * 60)) + " דקות" : h < 48 ? Math.round(h) + " שעות" : Math.round(h / 24) + " ימים"; }
+function statusBlock(all, health, ux) {
+  const out = [];
+  if (!all.length) {
+    out.push(line("✅ " + escapeHtml(summaryLine(health))));
+    out.push(line(ux.ran && ux.devices.length ? "✅ UX תקין · " + ux.devices.length + " מכשירים, בלי שגיאות וגלילה אופקית" : "UX: לא נבדק"));
+  } else {
+    out.push(line("🔴 <b>" + all.length + " תקלות פתוחות</b>"), ...bullets(all));
+    if (!health.problems.length && !(ux.ran && uxProblems(ux).length)) out.push(line("UX: לא נבדק"));
+  }
+  return out;
 }
+function buildDaily(st, all, health, ux, now) {
+  const since = now.getTime() - DAY;
+  const out = [line("☀️ <b>סיכום יומי · לוח שידורים</b>"), ...statusBlock(all, health, ux)];
+  const fixed = st.incidents.filter((i) => i.closed && Date.parse(i.closed) >= since);
+  const opened = st.incidents.filter((i) => Date.parse(i.opened) >= since);
+  if (fixed.length) out.push(line("✔ תוקן מאז אתמול: " + escapeHtml(fixed.map((i) => i.text.replace(/:.*$/, "")).join(", "))));
+  if (opened.length) out.push(line("🆕 נפתחו ב-24 השעות האחרונות: " + opened.length + (fixed.length ? " (מהן " + opened.filter((i) => i.closed).length + " נסגרו)" : "")));
+  if (!fixed.length && !opened.length) out.push(line("בלי תקלות חדשות ב-24 השעות האחרונות"));
+  return out.join("\n");
+}
+
+const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+const f1 = (x) => (Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 10) / 10).toLocaleString("en-US");
+function trendLine(label, cur, base, unit = "", baseName = "לפני") {
+  if (cur == null) return null;
+  if (base == null) return line(label + ": " + f1(cur) + unit + " (אין נתוני השוואה)");
+  const d = cur - base, arrow = Math.abs(d) < 0.05 ? "➡️" : d > 0 ? "📈" : "📉";
+  if (arrow === "➡️") return line(label + ": " + f1(cur) + unit + " ➡️ ללא שינוי " + baseName);
+  return line(label + ": " + f1(cur) + unit + " " + arrow + " " + (d > 0 ? "+" : "") + f1(d) + unit + " " + baseName);
+}
+export function buildPeriod(st, all, health, ux, now, days) {
+  const weekly = days === 7, end = now.getTime(), start = end - days * DAY;
+  const inW = st.history.filter((h) => Date.parse(h.t) > start);
+  // השוואה: שבועי = השבוע הקודם. חודשי (ההיסטוריה 35 ימים בלבד) = 7 הימים הראשונים בחלון מול 7 האחרונים.
+  const cmpCur = weekly ? inW : inW.filter((h) => Date.parse(h.t) >= end - 7 * DAY);
+  const cmpBase = weekly ? st.history.filter((h) => Date.parse(h.t) <= start && Date.parse(h.t) > start - 7 * DAY) : inW.filter((h) => Date.parse(h.t) <= start + 7 * DAY);
+  const baseName = weekly ? "לעומת השבוע הקודם" : "לעומת תחילת החודש";
+  const num = (a, k) => avg(a.map((h) => h[k]));
+  const out = [line(weekly ? "📅 <b>סיכום שבועי · לוח שידורים</b>" : "🗓 <b>סיכום חודשי · לוח שידורים</b>")];
+  out.push(...statusBlock(all, health, ux));
+  const okN = inW.filter((h) => h.ok).length;
+  out.push(line("<b>זמינות</b>: " + (inW.length ? f1((okN / inW.length) * 100) + "% (" + okN + " מתוך " + inW.length + " בדיקות)" : "אין נתונים")));
+  const incs = st.incidents.filter((i) => !i.closed || Date.parse(i.closed) >= start);
+  out.push(line("<b>תקלות</b>: " + (incs.length || "אין")));
+  for (const i of incs.slice(0, 8)) out.push(line("• " + escapeHtml(i.text.replace(/:.*$/, "")) + " · " + (i.closed ? fmtDur(Date.parse(i.closed) - Date.parse(i.opened)) : "פתוחה כבר " + fmtDur(end - Date.parse(i.opened)))));
+  if (incs.length > 8) out.push(line("• ועוד " + (incs.length - 8)));
+  out.push(line("<b>מגמות</b>"));
+  const lines = [
+    trendLine("תוכניות", num(cmpCur, "programs"), num(cmpBase, "programs"), "", baseName),
+    trendLine("תקצירים", num(cmpCur, "syn"), num(cmpBase, "syn"), "%", baseName),
+    trendLine("ימי ערוץ 14 בלוח", num(cmpCur, "c14d"), num(cmpBase, "c14d"), "", baseName),
+    trendLine("נטפליקס: פריטים עם דירוג", num(cmpCur, "nfr"), num(cmpBase, "nfr"), "", baseName),
+  ].filter(Boolean);
+  out.push(...(lines.length ? lines : [line("אין נתונים")]));
+  const dates = new Set(inW.map((h) => h.x14At && israelNow(new Date(h.x14At)).slice(0, 10)).filter(Boolean));
+  const span = new Set(inW.map((h) => israelNow(new Date(h.t)).slice(0, 10))).size;
+  out.push(line("<b>המחשב בבית</b>: עדכן ב-" + dates.size + " מתוך " + span + " ימים"));
+  return out.join("\n");
+}
+
+export const formatText = (text) => (text ? text.split("\n").map((l) => (l.startsWith(RLM) ? l : line(l))).join("\n") : text);
 
 // ───────── טלגרם ─────────
 export async function sendMessage({ token, chat, text, fetchFn = fetch }) {
@@ -93,20 +198,17 @@ export async function sendPhoto({ token, chat, file, caption, fetchFn = fetch })
 async function main() {
   const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
   const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
-  if (process.argv.includes("--print-mode")) { console.log(pickMode({ prev: readJson(arg("--state") || "monitor-state.json"), force: process.argv.includes("--force") })); return; }
-  const mode = arg("--mode") || "check";
-  const health = readJson(arg("--health") || "health.json") || { ok: false, problems: ["אין תוצאת בדיקת בריאות (health.json חסר)"], info: {} };
   const statePath = arg("--state") || "monitor-state.json";
   const prev = readJson(statePath);
+  if (process.argv.includes("--print-mode")) { console.log(pickMode({ prev, force: process.argv.includes("--force") })); return; }
+  const mode = arg("--mode") || "check";
+  const health = readJson(arg("--health") || "health.json") || { ok: false, problems: ["אין תוצאת בדיקת בריאות (health.json חסר)"], info: {} };
   const uxText = arg("--ux") && fs.existsSync(arg("--ux")) ? fs.readFileSync(arg("--ux"), "utf8") : "";
   const ux = parseUx(uxText);
   const problems = [...health.problems, ...uxProblems(ux)];
-  let summary = health.ok ? summaryLine(health) : "";
-  if (ux.ran && ux.devices.length && !uxProblems(ux).length) summary += " · UX תקין (" + ux.devices.length + " מכשירים)";
-  const d = decide({ prev, problems, mode, summary });
-  d.state.lastSummaryDate = mode === "summary" ? israelNow().slice(0, 10) : prev && prev.lastSummaryDate;
-  fs.writeFileSync(statePath, JSON.stringify(d.state, null, 1));
-  console.log("status:", d.state.status, "| prev:", prev ? prev.status : "none", "| mode:", mode, "| send:", d.send, "| problems:", problems.length);
+  const d = decide({ prev, problems, mode, health, ux });
+  fs.writeFileSync(statePath, JSON.stringify(d.state));
+  console.log("status:", d.state.status, "| mode:", mode, "| send:", d.send, "| problems:", problems.length, "| history:", d.state.history.length);
   if (!d.send) return;
   const token = process.env.TELEGRAM_BOT_TOKEN, chat = process.env.TELEGRAM_CHAT_ID;
   const text = formatText(d.text);
@@ -114,8 +216,7 @@ async function main() {
   try {
     const ok = await sendMessage({ token, chat, text });
     console.log("telegram message:", ok ? "sent" : "FAILED");
-    // צילום מסך רק כשה-UX נכשל
-    const shots = arg("--shots");
+    const shots = arg("--shots"); // צילום מסך רק כשה-UX נכשל
     if (ok && shots && uxProblems(ux).length && fs.existsSync(shots)) {
       const bad = ux.devices.find((x) => x.errors > 0 || x.sw > x.cw) || ux.devices[0];
       const files = fs.readdirSync(shots).filter((f) => bad && f.startsWith(bad.name + "_") && f.endsWith(".png")).sort();
@@ -123,6 +224,6 @@ async function main() {
         console.log("telegram photo", f, (await sendPhoto({ token, chat, file: path.join(shots, f), caption: escapeHtml(bad.name + " · " + f) })) ? "sent" : "FAILED");
       }
     }
-  } catch (e) { console.log("שליחת טלגרם נכשלה:", String(e.message).replace(token, "***")); }
+  } catch (e) { console.log("שליחת טלגרם נכשלה:", String(e.message).split(token).join("***")); }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) { await main(); process.exit(0); }

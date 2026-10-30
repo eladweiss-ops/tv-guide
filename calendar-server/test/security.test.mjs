@@ -16,12 +16,12 @@ const snz = await import("../api/_snz.js");
 const { encToken, decToken, signSnz, signSnzLegacy, verifySnz, SNZ_TTL } = snz;
 const { allow, _resetLimits, readBody } = await import("../api/_guard.js");
 const { validEndpoint, validSub } = await import("../api/_val.js");
-const { verifyQstashJwt, fireAuthorized, safeEq } = await import("../api/_sig.js");
+const { verifyQstashJwt, fireAuthorized, fireAuth, safeEq } = await import("../api/_sig.js");
 const { esc } = await import("../api/_ics.js");
 const { reschedule, MAX_SCHED, MAX_PUBLISH_DAY } = await import("../api/_push.js");
 const remsH = (await import("../api/rems.js")).default;
 const pushH = (await import("../api/push.js")).default;
-const fireH = (await import("../api/fire.js")).default;
+const { default: fireH, handleFire } = await import("../api/fire.js");
 const snoozeH = (await import("../api/snooze.js")).default;
 
 const TOK = "abcdefghij0123456789abcd";
@@ -83,11 +83,21 @@ test("push POST (כולל test:1), backup ו-snooze מוגבלים", async () =>
   assert.equal(r.code, 429);
 });
 
-test("מגבלת גודל גוף: rems 64KB, push 4KB, backup 256KB", async () => {
+test("מגבלת גודל גוף: rems 256KB (בבתים), push 4KB, backup 256KB", async () => {
   _resetLimits();
   let r = mockRes();
-  await remsH(mkReq({ body: { t: TOK, rems: [{ k: "x".repeat(70000) }] } }), r);
+  await remsH(mkReq({ body: { t: TOK, rems: [{ k: "x".repeat(270000) }] } }), r);
   assert.equal(r.code, 413);
+  // הגבלה בבתים ולא בתווים: 150K אותיות עבריות = 300KB בבתים אבל רק 150K תווים
+  r = mockRes();
+  await remsH(mkReq({ body: JSON.stringify({ t: TOK, pad: "א".repeat(150000) }) }), r);
+  assert.equal(r.code, 413);
+  assert.equal(readBody({ headers: {}, body: JSON.stringify({ p: "א".repeat(60) }) }, 100).status, 413);
+  assert.ok(readBody({ headers: {}, body: { p: "a".repeat(60) } }, 100).ok);
+  assert.equal(readBody({ headers: {}, body: { p: "א".repeat(60) } }, 100).status, 413);
+  // רשימה של 300 תזכורות טיפוסיות נכנסת בנוחות
+  const big = Array.from({ length: 300 }, (_, i) => ({ k: "12|" + (1800000000000 + i), title: "כותרת תוכנית ארוכה למדי", ch: "קשת 12", desc: "ד".repeat(150), ts: 1, end: 2, lead: 10 }));
+  assert.ok(readBody({ headers: {}, body: { t: TOK, rems: big } }, 262144).ok);
   r = mockRes();
   await pushH(mkReq({ headers: { "content-length": "5000" }, body: { t: TOK } }), r);
   assert.equal(r.code, 413);
@@ -147,7 +157,7 @@ test("reschedule: תקציב פרסומים יומי לכל טוקן", async () 
   assert.ok(out2.added >= 1 && !out2.limited);
 });
 
-test("reschedule: כתובת עם סוד בלי מפתחות QStash, בלי סוד כשיש מפתחות", async () => {
+test("reschedule: כתובת עם סוד; עם מפתחות עדיין סוד; בלי סוד רק עם QSTASH_STRICT=1", async () => {
   let d = mkSched();
   await reschedule(TOK, mkRems(1), d);
   assert.match(d.calls[0].url, /\/api\/fire\?s=test-secret-not-real$/);
@@ -155,9 +165,17 @@ test("reschedule: כתובת עם סוד בלי מפתחות QStash, בלי סו
   try {
     d = mkSched();
     await reschedule(TOK, mkRems(1), d);
+    assert.match(d.calls[0].url, /\/api\/fire\?s=test-secret-not-real$/, "מעבר מדורג: ?s= נשאר גם כשיש מפתחות");
+    process.env.QSTASH_STRICT = "1";
+    d = mkSched();
+    await reschedule(TOK, mkRems(1), d);
     assert.ok(d.calls[0].url.endsWith("/v2/publish/https://tv-guide-cal.vercel.app/api/fire"));
     assert.ok(!d.calls[0].url.includes("test-secret"));
-  } finally { delete process.env.QSTASH_CURRENT_SIGNING_KEY; }
+    delete process.env.QSTASH_CURRENT_SIGNING_KEY; // STRICT בלי מפתחות לא מסיר את הסוד
+    d = mkSched();
+    await reschedule(TOK, mkRems(1), d);
+    assert.match(d.calls[0].url, /\?s=/);
+  } finally { delete process.env.QSTASH_CURRENT_SIGNING_KEY; delete process.env.QSTASH_STRICT; }
 });
 
 // ---------- אימות מנוי פוש ----------
@@ -359,4 +377,100 @@ test("vercel.json: Referrer-Policy ו-nosniff על /api ועל /cal, וה-CORS �
   }
   assert.equal(by("/api/(.*)")["Access-Control-Allow-Origin"], "*");
   assert.deepEqual(v.rewrites, [{ source: "/cal/:t.ics", destination: "/api/cal?t=:t" }]);
+});
+
+// ---------- מצב אימות JWT בלוג ----------
+test("fireAuth: מדווח מצב JWT בלי סודות, סוד ישן ממשיך לעבוד", () => {
+  const body = "{}";
+  const mk = (sig, q = {}) => ({ query: q, headers: sig ? { "upstash-signature": sig } : {} });
+  assert.equal(fireAuth(mk(null), body, NOW).jwt, "nokeys");
+  process.env.QSTASH_CURRENT_SIGNING_KEY = "cur";
+  try {
+    assert.equal(fireAuth(mk(null, { s: "test-secret-not-real" }), body, NOW).jwt, "none");
+    assert.deepEqual(fireAuth(mk(jwt(body, "cur")), body, NOW), { ok: true, via: "jwt", jwt: "ok" });
+    assert.equal(fireAuth(mk(jwt(body, "bad")), body, NOW).jwt, "signature");
+    assert.equal(fireAuth(mk(jwt(body, "cur", { exp: 1 })), body, NOW).jwt, "expired");
+    assert.equal(fireAuth(mk(jwt(body, "cur", { sub: "https://x.example/api/fire" })), body, NOW).jwt, "url");
+    assert.equal(fireAuth(mk(jwt(body, "cur")), body + " ", NOW).jwt, "body");
+    assert.equal(fireAuth(mk("a.b"), body, NOW).jwt, "malformed");
+    const both = fireAuth(mk(jwt(body, "bad"), { s: "test-secret-not-real" }), body, NOW);
+    assert.deepEqual(both, { ok: true, via: "secret", jwt: "signature" }, "JWT לא תקין לא חוסם בזמן המעבר");
+  } finally { delete process.env.QSTASH_CURRENT_SIGNING_KEY; }
+});
+
+test("fire handler רושם מצב אימות בלוג ללא סודות", async () => {
+  const logs = []; const orig = console.log; console.log = (...a) => logs.push(a.join(" "));
+  try {
+    const r = mockRes();
+    await fireH(mkReq({ query: { s: "test-secret-not-real" }, body: "{bad" }), r);
+    const r2 = mockRes();
+    await fireH(mkReq({ body: "{}" }), r2);
+    assert.equal(r2.code, 403);
+  } finally { console.log = orig; }
+  assert.ok(logs.some((l) => /^fire auth allowed via=secret jwt=nokeys$/.test(l)));
+  assert.ok(logs.some((l) => /^fire auth denied via=none jwt=nokeys$/.test(l)));
+  assert.ok(!logs.join("\n").includes("test-secret-not-real"));
+});
+
+// ---------- fire: תזמון המשך ----------
+test("handleFire: אחרי שליחה ו-dropSched קורא ל-reschedule בלי התזכורת שנורתה", async () => {
+  const rems = mkRems(3), order = [];
+  const d = {
+    load: async () => rems,
+    sendTo: async () => { order.push("send"); return { ok: 1, total: 1 }; },
+    dropSched: async (t, k) => { order.push("drop:" + k); },
+    reschedule: async (t, rs) => { order.push("resched:" + rs.map((x) => x.k).join(",")); return { added: 1 }; },
+  };
+  const at = rems[0].ts - 10 * 60000;
+  const r = await handleFire({ t: TOK, k: "k0", at }, d, NOW);
+  assert.deepEqual(order, ["send", "drop:k0", "resched:k1,k2"]);
+  assert.deepEqual(r.json.sch, { added: 1 });
+});
+
+test("handleFire: כשל ב-reschedule לא מפיל את הירי; נודניק ותזכורת מבוטלת לא מתזמנים", async () => {
+  const rems = mkRems(2); let called = 0;
+  const base = { load: async () => rems, sendTo: async () => ({ ok: 1 }), dropSched: async () => {}, reschedule: async () => { called++; throw new Error("boom"); } };
+  const orig = console.error; console.error = () => {};
+  try {
+    const r = await handleFire({ t: TOK, k: "k0", at: rems[0].ts - 600000 }, base, NOW);
+    assert.equal(r.status, 200); assert.equal(r.json.ok, 1); assert.equal(called, 1);
+  } finally { console.error = orig; }
+  assert.equal((await handleFire({ t: TOK, k: "k0", snooze: 1 }, base, NOW)).json.ok, 1);
+  assert.equal(called, 1);
+  assert.deepEqual((await handleFire({ t: TOK, k: "nope" }, base, NOW)).json, { skipped: "cancelled" });
+});
+
+test("תזכורות 61+ ותקציב יומי שאופס מתוזמנות בירי הבא", async () => {
+  const d = mkSched(), rems = mkRems(65), key = "sched/" + TOK + ".json";
+  await reschedule(TOK, rems, d);
+  assert.equal(Object.keys(d.store[key]).filter((k) => k !== "__q").length, 60);
+  delete d.store[key].k0; // k0 נורתה ונמחקה; הירי קורא ל-reschedule ואז k60 נכנסת
+  const out = await reschedule(TOK, rems.filter((x) => x.k !== "k0"), d);
+  assert.equal(out.added, 1); assert.ok(d.store[key].k60);
+  const d2 = mkSched();
+  d2.store[key] = { __q: { d: Math.floor(NOW / 86400000), n: MAX_PUBLISH_DAY } };
+  assert.equal((await reschedule(TOK, mkRems(3), d2)).limited, "daily");
+  d2.now = () => NOW + 86400000;
+  const o2 = await reschedule(TOK, mkRems(3, 24), d2);
+  assert.ok(o2.added > 0 && !o2.limited);
+});
+
+// ---------- sendTo ----------
+test("sendTo מדלג על מנוי לא תקין בלי בקשת רשת ובלי מחיקה", async () => {
+  const { sendTo } = await import("../api/_push.js");
+  const good = { endpoint: "https://fcm.googleapis.com/fcm/send/x", keys: { p256dh: P, auth: A } };
+  const bad = { endpoint: "http://169.254.169.254/latest", keys: { p256dh: P, auth: A } };
+  const sent = []; let written = 0;
+  const d = { getSubs: async () => [good, bad], setSubs: async () => { written++; }, send: async (s) => { sent.push(s.endpoint); } };
+  const r = await sendTo(TOK, { title: "x" }, d);
+  assert.deepEqual(sent, [good.endpoint]);
+  assert.deepEqual(r, { ok: 1, total: 2 });
+  assert.equal(written, 0, "המנוי הלא תקין לא נמחק");
+});
+
+// ---------- לקוח ----------
+test("js/reminders.js מבחין בין 429/413 לשגיאת רשת", () => {
+  const c = file("../../js/reminders.js");
+  assert.match(c, /r\.status === 429/); assert.match(c, /retry-after/); assert.match(c, /r\.status === 413/);
+  assert.match(c, /גדולה מדי/);
 });

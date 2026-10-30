@@ -587,7 +587,9 @@
   saveRems();
   function remKey(id, s) { return id + "|" + (s.getTime ? s.getTime() : s); }
   function hasRem(k) { return REMS.filter(function (x) { return x.k === k; })[0] || null; }
-  function remCount() { var now = Date.now(); return REMS.filter(function (x) { return x.ts > now; }).length; }
+  // "הערב" נגמר ב-04:00 בבוקר: אחרי חצות זה עדיין אותו ערב
+  function tonightEnd() { var d = new Date(); if (d.getHours() >= 4) d.setDate(d.getDate() + 1); d.setHours(4, 0, 0, 0); return d.getTime(); }
+  function remCount() { var now = Date.now(), end = tonightEnd(); return REMS.filter(function (x) { return x.ts > now && x.ts < end; }).length; }
   // ---- יומן ייעודי "לוח שידורים" (יומן מנוי). השרת שומר את הרשימה ומגיש אותה כיומן ----
   var CAL_API = "https://tv-guide-cal.vercel.app";
   var calMode = store("tvg.calmode") || "", calTok = store("tvg.calTok") || "", syncBad = store("tvg.remDirty") === "1";
@@ -727,7 +729,7 @@
       '<p class="credit">"חיבור מחדש" – אם מחקת את היומן מהטלפון או החלפת מכשיר. "להפסיק" – תזכורות חדשות ייכנסו ליומן הרגיל של הטלפון, אחת-אחת.</p></details>';
     return '<div class="note">📅 אפשר להקים יומן נפרד בשם "לוח שידורים" שמתעדכן לבד, כולל ביטולים.<div class="bar"><button type="button" class="ghost" data-calsetup>הקמת יומן ייעודי</button></div></div>';
   }
-  var askK = null, askT = null;
+  var askK = null, askT = null, prevTab = null;
   function vRems() {
     var now = Date.now(), up = REMS.filter(function (x) { return x.end > now; });
     if (!up.length) return calCard() + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
@@ -1099,13 +1101,13 @@
     var body = nf ? vNf() : (searching ? vSearch() : rems ? vRems() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
     var isl = "";
     if (!nf && !searching && !picking) {
-      var nowMs = Date.now(), nx = REMS.filter(function (x) { return x.ts > nowMs && x.ts - nowMs < 6 * 3600000; })[0];
+      var nowMs = Date.now(), nx = REMS.filter(function (x) { return x.ts > nowMs && x.ts < tonightEnd(); })[0];
       if (nx) { var mm = Math.max(1, Math.round((nx.ts - nowMs) / 60000)); isl = '<button type="button" class="island" data-jump="' + esc(nx.k) + '"><span>⏰ ' + esc(nx.title) + "</span><b>" + (mm < 60 ? "בעוד " + mm + " דק׳" : "ב-" + hhmm(new Date(nx.ts))) + "</b></button>"; }
     }
     $("#main").innerHTML = isl + (nf ? "" : note) + chips + body;
     document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
-    $("#chCount").textContent = sel.size ? String(sel.size) : "";
+    $("#chCount").textContent = ""; // מספר הערוצים הוא לא התראה - לא מציגים
     updFav();
     $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס", rems: "התזכורות שלי" }[nf ? "nf" : tab] || "לוח שידורים");
     if (searching) $("#qwrap").hidden = false;
@@ -1235,8 +1237,9 @@
     if (t.closest("[data-install]")) { if (dip) { dip.prompt(); dip = null; setInst(); } return; }
     var tb = t.closest("[data-tab]");
     if (tb) {
-      var nt = tb.getAttribute("data-tab"); if (nt === tab) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-      SCR[tab] = window.scrollY; tab = nt; store("tvg.tab", tab); scrollNext = tab === "grid" && SCR.grid == null; render();
+      var nt = tb.getAttribute("data-tab");
+      if (nt === tab) { if (prevTab && prevTab !== tab) nt = prevTab; else { window.scrollTo({ top: 0, behavior: "smooth" }); return; } } // לחיצה שנייה: חזרה למסך הקודם
+      prevTab = tab; SCR[tab] = window.scrollY; tab = nt; store("tvg.tab", tab); scrollNext = tab === "grid" && SCR.grid == null; render();
       window.scrollTo(0, SCR[tab] || 0); return;
     }
     var pd = t.closest("[data-day]"); if (pd) { day = pd.getAttribute("data-day"); scrub = null; scrollNext = true; render(); return; }
@@ -1300,7 +1303,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.6", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.7", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

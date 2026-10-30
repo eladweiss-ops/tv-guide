@@ -8,6 +8,16 @@ const HEADERS = { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-langu
 
 const toMin = (s) => Date.parse(s.slice(0, 16) + ":00Z") / 60000;
 const key = (x) => String(x).replace(/\(ש\.?ח\.?\)|^ישיר!?\s*/g, "").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 12);
+// האם שני שמות מתארים את אותה תוכנית (וואלה מקצרת, HOT מוסיפה עונה/פרק). מעדיפים לפספס מאשר להצמיד תקציר לא נכון.
+const words = (x) => String(x).replace(/\(ש\.?ח\.?\)|^ישיר!?\s*/g, "").replace(/[^\p{L}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 1);
+export function sameShow(a, b) {
+  const ka = key(a).replace(/\d+/g, ""), kb = key(b).replace(/\d+/g, "");
+  if (!ka || !kb) return false;
+  if (ka === kb || ka.startsWith(kb.slice(0, 5)) || kb.startsWith(ka.slice(0, 5))) return true;
+  const wa = words(a), wb = new Set(words(b));
+  const common = wa.filter((w) => wb.has(w)).length;
+  return common >= 2 || (common === 1 && Math.min(wa.length, wb.size) === 1);
+}
 export function cleanSyn(s) { return String(s || "").replace(/\((ש\.?ח\.?|כת'? ?סמויות|כ' ?עב')\)/g, "").replace(/\s+/g, " ").trim(); }
 
 // "2026/10/27 02:00:00" → "2026-10-27T02:00"
@@ -44,10 +54,10 @@ export function enrich(guide, hot) {
     const hs = byCh.get(best);
     for (const p of list) {
       if (p.desc) continue;
-      const t = toMin(p.start), k = key(p.title); let pick = null, pd = 16;
-      for (const h of hs) { const d = Math.abs(toMin(h.start) - t) - (key(h.title) === k ? 10 : 0); if (d < pd) { pd = d; pick = h; } }
+      const t = toMin(p.start); let pick = null, pd = 16;
+      for (const h of hs) { const d = Math.abs(toMin(h.start) - t); if (d < pd && sameShow(p.title, h.title)) { pd = d; pick = h; } }
       if (!pick || !pick.desc || pick.desc.length < 12) continue;
-      p.desc = pick.desc; n++;
+      p.desc = pick.desc; p._hot = pick.title; n++;
     }
   }
   return { matched, n };
@@ -59,7 +69,11 @@ const CACHE = "hot-cache.json";
 async function readCache() { try { return JSON.parse(await readFile(CACHE, "utf8")); } catch { return {}; } }
 export function applyCache(guide, cache) {
   let n = 0;
-  for (const p of guide.programs) { if (p.desc) continue; const d = cache[p.ch + "|" + p.start]; if (d) { p.desc = d; n++; } }
+  for (const p of guide.programs) {
+    if (p.desc) continue; const e = cache[p.ch + "|" + p.start]; if (!e) continue;
+    if (typeof e === "string" || !e.t || !sameShow(p.title, e.t)) continue; // מטמון ישן או שם שלא מתאים - לא מצמידים
+    p.desc = e.d; n++;
+  }
   return n;
 }
 
@@ -80,8 +94,8 @@ async function main() {
   const before = new Set(guide.programs.filter((p) => p.desc).map((p) => p.ch + "|" + p.start));
   const r = enrich(guide, hot);
   const keep = new Date(now.getTime() - 864e5).toISOString().slice(0, 10), out = {};
-  for (const [k, v] of Object.entries(cache)) if (k.split("|")[1] >= keep) out[k] = v;
-  for (const p of guide.programs) { const k = p.ch + "|" + p.start; if (p.desc && !before.has(k)) out[k] = p.desc; }
+  for (const [k, v] of Object.entries(cache)) if (k.split("|")[1] >= keep && v && v.t) out[k] = v;
+  for (const p of guide.programs) { const k = p.ch + "|" + p.start; if (p._hot) { out[k] = { d: p.desc, t: p._hot }; delete p._hot; } }
   await writeFile(CACHE, JSON.stringify(out));
   console.log(`HOT: ${hot.length} תוכניות באתר, ${r.matched} ערוצים הותאמו, ${r.n} תוכניות קיבלו תקציר, ${Object.keys(out).length} במטמון`);
   await writeFile("guide.json", JSON.stringify(guide));

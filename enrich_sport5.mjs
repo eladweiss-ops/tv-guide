@@ -62,6 +62,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
     for (const [p, { it: best }] of pick) {
+      p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
       if (p.desc) continue;
       const text = best.rich || best.text;
       if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;

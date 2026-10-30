@@ -33,6 +33,7 @@ export function enrich(guide, items) {
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
     for (const [p, { it }] of pick) {
+      p.lv = it.live ? 1 : 0;
       if (p.desc || key(it.name).startsWith(key(p.title)) || key(p.title).startsWith(key(it.name))) continue;
       p.desc = it.name; n++;
     }
@@ -49,7 +50,7 @@ async function main() {
     try {
       const res = await fetch(API + `${d}-${m}-${y}`, { headers: HEADERS });
       if (!res.ok) throw new Error(String(res.status));
-      for (const x of await res.json()) { const c = oneNo(x.channel); if (c && x.time && x.name) items.push({ ch: c, start: String(x.time).slice(0, 16), name: String(x.name).trim() }); }
+      for (const x of await res.json()) { const c = oneNo(x.channel); if (c && x.time && x.name) items.push({ ch: c, start: String(x.time).slice(0, 16), name: String(x.name).trim(), live: !!x.isLive }); }
       ok++;
     } catch (e) { fail++; if (fail === 1) console.error("one:", e.message); }
     await sleep(300);

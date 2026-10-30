@@ -21,7 +21,8 @@ export function parseDay(html) {
     const t = (b.match(/class="show-starting-time">\s*(\d{1,2}:\d{2})/) || [])[1];
     const name = clean((b.match(/class="show-name">([\s\S]*?)<\/p>/) || [])[1]);
     const desc = clean((b.match(/class="show-description">([\s\S]*?)<\/p>/) || [])[1]);
-    if (t && name) out.push({ time: t.padStart(5, "0"), name, desc });
+    const live = /class="show-second-status">\s*ישיר/.test(b);
+    if (t && name) out.push({ time: t.padStart(5, "0"), name, desc, live });
   }
   return out;
 }
@@ -54,6 +55,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
     for (const [p, { it: best }] of pick) {
+      p.lv = best.live ? 1 : 0; // ישיר או מוקלט, לפי האתר
       if (p.desc) continue;
       const text = [best.name, best.desc].filter(Boolean).join(" · ");
       if (!text || key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) continue;

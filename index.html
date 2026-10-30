@@ -550,8 +550,8 @@
       G.programs.forEach(function (p) {
         var lid = IDMAP[p.ch] || p.ch;
         if ((lid === p.ch) !== leadPass || !by.has(lid)) return;
-        if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; return; }
-        var o = { title: unent(p.title), desc: p.desc || "", s: parse(p.start), rr: p.rr ? 1 : 0 };
+        if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; if (ex !== 1 && ex.lv < 0 && (p.lv === 0 || p.lv === 1)) ex.lv = p.lv; return; }
+        var o = { title: unent(p.title), desc: p.desc || "", s: parse(p.start), rr: p.rr ? 1 : 0, lv: p.lv === 1 ? 1 : p.lv === 0 ? 0 : -1 };
         seen[lid][p.start] = o; by.get(lid).push(o);
       });
     });
@@ -1091,6 +1091,8 @@
       var p = x.p, txt = p.title + " " + (p.desc || ""), k = p.desc ? epKey(p) : null;
       var isNew = /עונה חדשה|פרק חדש|בכורה|חדש!/.test(txt);
       var night = p.s.getHours() < 6; // סדרות בין חצות לשש בבוקר הן כמעט תמיד שידור חוזר
+      if (p.lv === 1 || /^ישיר/.test(p.title)) { x.rr = false; x.lv = true; if (k && !seen[k]) seen[k] = p.s.getTime(); return; }
+      if (p.lv === 0 && kindOf(x.c ? x.c.id : "", p.title) === "sport") { x.rr = true; return; } // ספורט שהאתר מסמן כלא-ישיר = מוקלט
       x.rr = !isNew && (p.rr || night || /ש\.ח|\(שח\)|שידור חוזר|מקוצר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
       if (k && !seen[k]) seen[k] = p.s.getTime();
     });
@@ -1166,17 +1168,18 @@
     LASTHITS = hits;
     // סדר: קודם מה שמשודר עכשיו, אחר כך שידורים ישירים וחדשים לפי שעה, ובסוף השידורים החוזרים
     var liveNow = function (x) { return x.p.s <= now && now < x.p.e; }, isLive = function (x) { return /ישיר|LIVE/i.test(x.p.title) || x.p.rr === 0 && /ישיר/.test(x.p.desc || ""); };
-    var g1 = hits.filter(liveNow), g2 = hits.filter(function (x) { return !liveNow(x) && !x.rr; }), g3 = hits.filter(function (x) { return !liveNow(x) && x.rr; });
+    var g1 = hits.filter(liveNow), gl = hits.filter(function (x) { return !liveNow(x) && x.lv; }), g2 = hits.filter(function (x) { return !liveNow(x) && !x.rr && !x.lv; }), g3 = hits.filter(function (x) { return !liveNow(x) && x.rr; });
     var row = function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      var tag = liveNow(x) ? '<span class="tagk now">● עכשיו</span> ' : isLive(x) ? '<span class="tagk live">ישיר</span> ' : x.rr ? '<span class="tagk rr">🔁 חוזר</span> ' : (series ? '<span class="tagk nw">✨ חדש</span> ' : "");
+      var tag = liveNow(x) ? '<span class="tagk now">● עכשיו</span> ' : (x.lv || isLive(x)) ? '<span class="tagk live">ישיר</span> ' : x.rr ? '<span class="tagk rr">' + (kindOf(x.c.id, x.p.title) === "sport" ? "📼 מוקלט" : "🔁 חוזר") + "</span> " : (series ? '<span class="tagk nw">✨ חדש</span> ' : "");
       return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + tag + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
         synBtn(v) + '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, x.p, x.c.id);
     };
     var cap = 80;
     if (g1.length) h += '<h2 class="sech">● משודר עכשיו (' + g1.length + ")</h2>" + g1.slice(0, cap).map(row).join("");
-    if (g2.length) h += '<h2 class="sech">' + (g1.length ? "בהמשך" : "שידורים קרובים") + " (" + g2.length + ")</h2>" + g2.slice(0, cap).map(row).join("");
-    if (g3.length) h += '<h2 class="sech">🔁 שידורים חוזרים (' + g3.length + ")</h2>" + g3.slice(0, cap).map(row).join("");
+    if (gl.length) h += '<h2 class="sech">📡 שידורים ישירים (' + gl.length + ")</h2>" + gl.slice(0, cap).map(row).join("");
+    if (g2.length) h += '<h2 class="sech">' + (g1.length || gl.length ? "עוד בהמשך" : "שידורים קרובים") + " (" + g2.length + ")</h2>" + g2.slice(0, cap).map(row).join("");
+    if (g3.length) h += '<h2 class="sech">🔁 חוזרים ומוקלטים (' + g3.length + ")</h2>" + g3.slice(0, cap).map(row).join("");
     return h;
   }
   function updFav() { $("#fvCount").textContent = FAV.size ? String(FAV.size) : ""; }
@@ -1454,7 +1457,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.17", BUILD = "2026-10-30.17", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.18", BUILD = "2026-10-30.18", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

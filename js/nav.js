@@ -70,6 +70,7 @@
   navLayer("#setsheet", function () { TVG.closeFavs(); });
   navLayer("#favs", function () { TVG.closeFavs(); });
   navLayer("#rem", function () { TVG.closeRem(); });
+  navLayer("#nfsheet", function () { if (TVG.closeNf) TVG.closeNf(); }); // דף תוכן נטפליקס (netflix.js)
   navLayer("#qwrap", function () { TVG.setSearch(false); });
 
   // ---- פרמטרים בכתובת ----

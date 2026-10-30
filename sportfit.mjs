@@ -4,7 +4,7 @@ const ABBR = [
   [/(^|[\s\-–(])ל\.\s?/g, "$1ליגה "], [/(^|[\s\-–(])ת"?א(?=$|[\s\-–),.])/g, "$1תל אביב"], [/(^|[\s\-–(])ב"?ש(?=$|[\s\-–),.])/g, "$1באר שבע"],
   [/(^|[\s\-–(])רג(?=$|[\s\-–),.])/g, "$1רמת גן"], [/(^|[\s\-–(])פ"?ת(?=$|[\s\-–),.])/g, "$1פתח תקווה"],
 ];
-const STOP = new Set("ישיר של עם את על נגד מחזור עונת עונה ליגת ליגה גביע תוכנית פרק משחק משחקי בין חלק".split(" "));
+const STOP = new Set("ישיר של עם את על נגד מחזור עונת עונה ליגת ליגה גביע תוכנית פרק משחק משחקי בין חלק ספורט הספורט חדשות מגזין אולפן מהדורה המהדורה שידור תקצירי המיטב".split(" "));
 export function words(t) {
   t = " " + String(t || "").replace(/[״”“]/g, '"') + " ";
   for (const [a, b] of ABBR) t = t.replace(a, b);
@@ -31,16 +31,18 @@ export function kind(t) {
 // כותרות כלליות בוואלה ("ל. צרפתית", "יורוליג", "NBA") – מתאימות לתיאור משחק מאותו ענף
 const GENERIC = /^(ישיר!?\s*)?(ל\.\s|ליגת|ליגה|גביע|יורוליג|יורוקאפ|NBA|NFL|NHL|ATP|WTA|טניס|כדורגל|כדורסל|המיטב|תקצירי|פרמייר|לה ליגה|סרייה|בונדסליגה|ליגת האלופות)/i;
 const MATCHLIKE = /[\p{L}"'.]\s?[-–]\s?[\p{L}]/u;
-export function fits(title, desc) {
+export function fits(title, desc, lenient) {
   const kt = kind(title), kd = kind(desc);
   if (kt && kd && kt !== kd) return false;
   const tw = words(title), dw = words(desc);
   for (const w of tw) if (dw.has(w)) return true;
-  if (GENERIC.test(String(title).trim())) return !!kd || (MATCHLIKE.test(desc) && !/תוכנית|מגזין|פרק/.test(desc));
+  // כותרת כללית ("ל. צרפתית", "NBA") מתאימה רק לתיאור שמראה במפורש את אותו ענף
+  // בערוץ שהלוח שלו מסכים עם האתר (lenient) מקבלים גם תיאור משחק בלי ענף מפורש
+  if (GENERIC.test(String(title).trim())) return kt && !lenient ? kd === kt : (kd ? kd === (kt || kd) : MATCHLIKE.test(desc) && !/תוכנית|מגזין|פרק|חדשות/.test(desc));
   return false;
 }
 // באיזו מידה לוח הערוץ בוואלה מסכים עם האתר: חלק המשבצות שמתאימות
-export function agreement(pairs) { // [{title, text}]
+export function agreement(pairs) { // [{title, text}] – לפי ההתאמה המחמירה
   if (!pairs.length) return 1;
-  return pairs.filter((x) => fits(x.title, x.text)).length / pairs.length;
+  return pairs.filter((x) => fits(x.title, x.text, false)).length / pairs.length;
 }

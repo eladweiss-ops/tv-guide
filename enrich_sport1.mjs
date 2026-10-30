@@ -59,7 +59,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     if (ag < 0.4) { console.log("ספורט 1: דילגתי על", g, Math.round(ag * 100) + "%"); continue; }
     for (const [p, { it: best }] of pick) {
       const text = [best.name, best.desc].filter(Boolean).join(" · ");
-      if (!fits(p.title, text)) continue;
+      if (!fits(p.title, text, ag >= 0.6)) continue;
       p.lv = best.live ? 1 : 0; // ישיר או מוקלט, לפי האתר
       if (p.desc) continue;
       if (!text || key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) continue;

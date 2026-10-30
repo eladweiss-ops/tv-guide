@@ -76,7 +76,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     if (ag < 0.4) { skipped.push(g + " (" + Math.round(ag * 100) + "%)"); continue; }
     for (const [p, { it: best }] of pick) {
       const text = best.rich || best.text;
-      if (!fits(p.title, text)) continue; // התיאור לא שייך לתוכנית הזו
+      if (!fits(p.title, text, ag >= 0.6)) continue; // התיאור לא שייך לתוכנית הזו
       p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
       if (p.desc) continue;
       if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;

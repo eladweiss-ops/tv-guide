@@ -28,7 +28,7 @@
 //       "genres": ["פעולה", "מדע בדיוני"],
 //       "runtime": 136,                   // דקות (סרט)  |  "seasons": 5 (סדרה)
 //       "imdb_id": "tt0133093",
-//       "link": "https://www.netflix.com/search?q=..",  // או קישור watch/providers של TMDB אם קיים
+//       "link": "https://www.netflix.com/search?q=..",  // תמיד חיפוש בנטפליקס: קישור TMDB מוביל לדף של TMDB ולא לנטפליקס
 //       "trailer": "vKQi3bBA1y8",         // מפתח YouTube, אם יש
 //       "vote": 8.2,                      // ציון TMDB (גיבוי כשאין IMDb)
 //       "ratings": { "imdb": 8.7, "rt": 83, "mc": 73 }  // רק שדות שקיימים; ללא OMDb חסר
@@ -100,7 +100,6 @@ export function shapeItem(type, he, en) {
   const ext = he.external_ids || {};
   const vids = (he.videos && he.videos.results) || [];
   const tr = vids.find((v) => v.site === "YouTube" && v.type === "Trailer") || vids.find((v) => v.site === "YouTube");
-  const pr = he["watch/providers"] && he["watch/providers"].results && he["watch/providers"].results.IL;
   const it = {
     id: he.id,
     type,
@@ -112,7 +111,7 @@ export function shapeItem(type, he, en) {
     backdrop: he.backdrop_path ? IMG + "w780" + he.backdrop_path : "",
     genres: (he.genres || []).map((g) => g.name).filter(Boolean),
     imdb_id: he.imdb_id || ext.imdb_id || "",
-    link: (pr && pr.link) || "https://www.netflix.com/search?q=" + encodeURIComponent(title),
+    link: "https://www.netflix.com/search?q=" + encodeURIComponent(title),
     trailer: tr ? tr.key : "",
     vote: he.vote_average ? Math.round(he.vote_average * 10) / 10 : 0,
   };

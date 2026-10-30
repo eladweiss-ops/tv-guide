@@ -191,6 +191,6 @@
     var qq = encodeURIComponent(p.title + " " + (cid ? TVG.chName(cid) : "") + " תקציר");
     return '<p class="none">אין לנו תקציר לתוכנית הזו. <a class="gsearch" href="https://www.google.com/search?q=' + qq + '" target="_blank" rel="noopener">🔎 חיפוש בגוגל</a></p>';
   }
-  var descHtml = function (p, cid, small) { return synText(p, cid) + TVG.remBtn(p, cid, small) + (cid ? TVG.favBtn(p) : ""); };
+  var descHtml = function (p, cid, small) { return synText(p, cid) + TVG.remBtn(p, cid, small) + (cid ? TVG.favBtn(p) + TVG.shareBtn(p, cid) : ""); };
   TVG.descHtml = descHtml;
 })(window.TVG);

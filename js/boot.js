@@ -24,6 +24,7 @@
     var st0 = TVG.store("tvg.tab"); TVG.tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
     TVG.scrollNext = TVG.tab === "grid";
     TVG.render();
+    TVG.openShared(); // share: ?p=<ערוץ>|<התחלה> (js/share.js)
     if (TVG.needsPick() && TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
     // לשונית נטפליקס מופיעה רק אם הקובץ netflix.json קיים
     fetch("netflix.json", { cache: "no-store" })

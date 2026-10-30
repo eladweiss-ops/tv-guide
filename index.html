@@ -90,7 +90,7 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","events","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","events","share","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

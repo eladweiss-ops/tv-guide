@@ -85,6 +85,40 @@ function serve() {
     await step("dial-drag-day", async () => { await fresh(); const nx = await page.$("[data-day]"); if (nx) { await nx.click(); await page.waitForTimeout(600); } await snap("09_dial_day"); });
     await step("dark", async () => { await fresh(); await page.click("#setBtn"); await page.waitForTimeout(500); await page.click('[data-theme-set="dark"]'); await page.waitForTimeout(400); await page.click("[data-setclose]"); await page.waitForTimeout(500); await snap("10_dark_dial"); });
 
+    await step("share-text", async () => { await fresh(); await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(500); await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (!b) throw new Error("no share btn; dCard=" + document.querySelector("#dCard").innerHTML.slice(-300) + " tab=" + TVG.tab + " ch=" + TVG.chId); b.click(); }); await page.waitForTimeout(700); await snap("11_share_text"); });
+    await step("share-card", async () => { await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("12_share_card"); });
+    await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); });
+    await step("deeplink", async () => {
+      await fresh();
+      const v = await page.evaluate(() => { const now = Date.now(); const ids = Array.from(TVG.sel); for (const id of ids) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000 * 1.2); if (a.length) { const p = a[Math.min(3, a.length - 1)]; return id + "%7C" + TVG.dstr(p.s) + "T" + TVG.hhmm(p.s); } } return null; });
+      if (!v) throw new Error("no program for deep link");
+      await page.goto(base + "index.html?p=" + v + "&x=1", { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
+      const u = await page.evaluate(() => location.search); if (u !== "?x=1") throw new Error("url not cleaned: " + u);
+      await snap("13_deeplink");
+      await page.goto(base + "index.html?p=208%7C2020-01-01T10:00", { waitUntil: "networkidle" }); await page.waitForTimeout(1000);
+      const t = await page.textContent("#pill"); if (!/כבר לא בלוח/.test(t)) throw new Error("gone toast: " + t);
+      await snap("13_deeplink_gone");
+    });
+    if (d.name === "iphone_375") await step("card-png", async () => {
+      await fresh();
+      const out = await page.evaluate(async () => {
+        const ch = (re) => (TVG.G.channels.filter(c => re.test(c.name))[0] || TVG.G.channels[0]).id;
+        const mk = (id, title, lv) => ({ id, p: { title, s: new Date(2026, 10, 1, 20, 55), lv } });
+        const S5 = ch(/ספורט 5\+/), K = ch(/כאן 11/), N = ch(/חדשות 12|רשת 13/);
+        const cases = [
+          mk(S5, "מכבי תל אביב – הפועל ירושלים", 1),
+          mk(K, "המהדורה המרכזית עם ירון דרוקמן ואורחים מיוחדים באולפן החדשות בשידור חי מכל רחבי הארץ והעולם כולו ועוד כותרת ארוכה מאוד מאוד שתיחתך", 0),
+          mk(N, "NBA: לוס אנג׳לס לייקרס מול גולדן סטייט ווריורס", 1),
+          mk(K, "חדשות", -1),
+          mk(S5, "אבגדהוזחטיכלמנסעפצקרשתאבגדהוזחטיכלמנסעפצקרשתאבגדהוזחטיכלמנסעפצקרשת", -1),
+        ];
+        const res = [];
+        for (const c of cases) { const b = await TVG.shareCard(c); const buf = await b.arrayBuffer(); let bin = ""; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 8192) bin += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); res.push(btoa(bin)); }
+        return res;
+      });
+      out.forEach((b64, i) => fs.writeFileSync(path.join(OUT, "card_" + (i + 1) + ".png"), Buffer.from(b64, "base64")));
+    });
+
     const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     console.log(d.name, "scrollWidth/clientWidth", overflow.sw + "/" + overflow.cw, "errors:", errs.length);
     errs.forEach((e) => { console.log("   ", e); allErrors.push(d.name + " " + e); });

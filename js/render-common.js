@@ -17,7 +17,7 @@
   }
   function inMin(d, now) { var m = Math.max(1, Math.round((d - now) / 60000)); return m < 60 ? m + " דק׳" : Math.floor(m / 60) + " שע׳" + (m % 60 ? " " + (m % 60) + " דק׳" : ""); }
   function synBtn(v) { return '<button type="button" class="synb" data-syn="' + esc(v) + '" aria-expanded="false">תקציר</button>'; }
-  function synBox(v, p, cid) { return '<div class="syn" data-synbox="' + esc(v) + '" hidden>' + TVG.synText(p, cid) + "</div>"; }
+  function synBox(v, p, cid) { return '<div class="syn" data-synbox="' + esc(v) + '" hidden>' + TVG.synText(p, cid) + (TVG.shareBtn ? TVG.shareBtn(p, cid) : "") + "</div>"; }
   function airRow(c, p, sub) {
     var v = c.id + "|" + p.s.getTime();
     return '<div class="srow k-' + TVG.kindOf(c.id, p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" + synBtn(v) +

@@ -299,8 +299,14 @@
   details.calopt summary::after { content: " ›"; color: var(--muted); }
   details.calopt[open] summary::after { content: " ‹"; }
   .lp { align-items: center; }
-  .lpsel select { min-height: 40px; padding: 4px 30px 4px 14px; border-radius: 999px; font: inherit; font-size: 0.92rem; background-color: var(--soft); border: 0; width: auto; }
-  .lpsel.on select { background-color: var(--accent); color: #fff; }
+  .chips.lp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; margin: 6px 0 4px; }
+  .chips.lp .chip { min-height: 40px; padding: 0 11px; font-size: .9rem; }
+  .lpsel { position: relative; display: inline-flex; flex: none; }
+  .lpsel select { -webkit-appearance: none; appearance: none; width: 94px; min-height: 40px; height: 40px; margin: 0; padding: 0 10px 0 22px; border: 0; border-radius: 999px;
+    font: inherit; font-size: .9rem; font-weight: 500; line-height: 40px; color: inherit; background: var(--soft); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+  .lpsel::after { content: "▾"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: .8rem; opacity: .75; pointer-events: none; }
+  .lpsel.on select { background: var(--accent); color: #fff; }
+  .lpsel.on::after { color: #fff; opacity: 1; }
   .lpcustom { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
   .lpcustom[hidden] { display: none; }
   .lpcustom .btn { flex: none; width: auto; margin: 0; padding: 0 18px; }
@@ -702,6 +708,7 @@
     if (m % 60 === 0 && m < 1440) return m / 60 + " שעות לפני";
     return "";
   }
+  function shortLead(m) { return m === 0 ? "בהתחלה" : m === 1440 ? "יום לפני" : leadName(m).replace(" לפני", ""); }
   function isStdLead(m) { return LEAD_MAIN.indexOf(m) >= 0 || LEAD_MORE.indexOf(m) >= 0; }
   function leadTxt(m, ts) { // "10 דק׳ לפני", או לשעה מסוימת: "ב־19:45" / "ב־ראשון 19:45"
     if (isStdLead(m) && leadName(m)) return leadName(m);
@@ -724,9 +731,9 @@
     if (sl > 0 && !okLead(ts, 10)) h += '<button type="button" class="chip" data-lp="' + sl + '" aria-pressed="' + (cur === sl) + '">בעוד דקה</button>';
     var more = LEAD_MORE.filter(function (m) { return okLead(ts, m); }), inMore = more.indexOf(cur) >= 0;
     h += '<label class="lpsel' + (inMore || custom ? " on" : "") + '"><select data-lpsel aria-label="עוד אפשרויות">' +
-      '<option value=""' + (!inMore && !custom ? " selected" : "") + ">עוד…</option>" +
-      more.map(function (m) { return '<option value="' + m + '"' + (cur === m ? " selected" : "") + ">" + leadName(m) + "</option>"; }).join("") +
-      (allowCustom ? '<option value="custom"' + (custom ? " selected" : "") + ">🕒 בשעה מסוימת…</option>" : "") + "</select></label></div>";
+      '<option value=""' + (!inMore && !custom ? " selected" : "") + ">עוד</option>" +
+      more.map(function (m) { return '<option value="' + m + '"' + (cur === m ? " selected" : "") + ">" + shortLead(m) + "</option>"; }).join("") +
+      (allowCustom ? '<option value="custom"' + (custom ? " selected" : "") + ">🕒 אחר…</option>" : "") + "</select></label></div>";
     if (allowCustom) {
       var now = new Date(Date.now() + 60000), max = new Date(ts - 60000), val = new Date(ts - (cur || 0) * 60000);
       if (val > max) val = max; if (val < now) val = now;
@@ -1618,7 +1625,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.27", BUILD = "2026-10-30.27", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.28", BUILD = "2026-10-30.28", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

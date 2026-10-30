@@ -500,7 +500,9 @@
   function genOf(c) { for (var i = 0; i < GEN_RX.length; i++) if (GEN_RX[i][1].test(c.name)) return GEN_RX[i][0]; return ""; }
   var GRANK = {}; GROUPS.forEach(function (g, i) { GRANK[g[0]] = i; });
   // שמות שוואלה נותנת לערוצים, והשם שמוצג במקומם. אפשר להוסיף שורות.
-  var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14", "מוסיקה 24": "ערוץ 24", "מוזיקה 24": "ערוץ 24", "SPORT 3": "ספורט 3", "SPORT 3 HD": "ספורט 3", "SPORT 4": "ספורט 4", "SPORT 4 HD": "ספורט 4", "SPORT 1": "ספורט 1", "SPORT 2": "ספורט 2" };
+  var ALIAS = { "רשת SD": "רשת 13", "HD כאן": "כאן 11", "קשת": "קשת 12", "עכשיו 14": "ערוץ 14", "מוסיקה 24": "ערוץ 24", "מוזיקה 24": "ערוץ 24", "SPORT 3": "ספורט 3", "SPORT 3 HD": "ספורט 3", "SPORT 4": "ספורט 4", "SPORT 4 HD": "ספורט 4", "SPORT 1": "ספורט 1", "SPORT 2": "ספורט 2",
+    "ערוץ הספורט": "ספורט 5", "ספורט 5 HD": "ספורט 5", "5+ LIVE": "5 LIVE", "5LIVE HD": "5 LIVE", "5+ GOLD": "5 GOLD", "5GOLD": "5 GOLD", "Sport 5 Stars": "5 STARS", "5MAX": "5 MAX",
+    "ערוץ ONE": "ONE", "ערוץ ONE HD": "ONE", "ONE 2 HD": "ONE 2" };
   // פענוח ישויות HTML בשמות (וואלה שולחת למשל &#x27; במקום גרש)
   function unent(t) {
     return String(t == null ? "" : t).replace(/&#x([0-9a-f]+);/gi, function (m, h) { return String.fromCharCode(parseInt(h, 16)); })
@@ -515,7 +517,8 @@
     return n.toLowerCase().replace(/\(copy\)|משוכפל|חדש/g, "").replace(/(^|[^a-z])f?hd(?![a-z])|(^|[^a-z])sd(?![a-z])/g, "$1$2").replace(/^ערוץ\s+/, "").replace(/(\d)\+\s+/g, "$1").replace(/[^\p{L}\p{N}+]/gu, "");
   }
   // קבוצות שבדקתי ידנית שהן אותו ערוץ בעל לוח זהה אבל השם שונה (אפשר להוסיף שורות)
-  var MERGE = [["301", "3630", "3785", "3786"], ["3547", "3727"], ["205", "149"], ["353", "3179"]];
+  var MERGE = [["301", "3630", "3785", "3786"], ["3547", "3727"], ["205", "149"], ["353", "3179"],
+    ["289", "521"], ["322", "3600"], ["66", "321"], ["3550", "3551"]]; // ספורט 5 = ערוץ הספורט; 5 LIVE; 5 GOLD; ONE
   function cleanName(n) { return n.replace(/\s*[-–]?\s*(\(copy\)|משוכפל)/ig, "").replace(/\s+f?hd(?=\s|$)/ig, "").replace(/^hd\s+/i, "").replace(/\s+חדש$/, "").replace(/\s+/g, " ").trim() || n; }
   var IDMAP = {};
   function classify() {
@@ -545,9 +548,18 @@
     // ערוצי ספורט לפי המספר: ספורט 1, 2, 3, 4, 5, 5+, ... ואחריהם השאר
     var sk = function (c) {
       if (c._g !== "sport") return 0;
-      var n = c.name, m = n.match(/(?:^|\s)(?:ספורט|sport)\s*(\d)/i) || n.match(/^(5)\s*(?=gold|max)/i);
-      if (!m) return /^ערוץ הספורט$/.test(n) ? 50 : 100;
-      return +m[1] * 10 + (/\+|פלוס/.test(n) ? 1 : /stars/i.test(n) ? 2 : /gold|גולד/i.test(n) ? 3 : /max/i.test(n) ? 4 : /live/i.test(n) ? 5 : 0);
+      var n = c.name, m;
+      if ((m = n.match(/^ספורט\s*([1-46-9])$/))) return +m[1] * 10;           // ספורט 1-4, 6
+      if (/^ספורט 5$/.test(n)) return 50;
+      if (/^(ספורט )?5\s*(\+|פלוס)$/.test(n)) return 51;
+      if (/^5 LIVE$/i.test(n)) return 52;
+      if (/^5 GOLD$/i.test(n)) return 53;
+      if (/^5 STARS$/i.test(n)) return 54;
+      if (/^5 MAX$/i.test(n)) return 55;
+      if (/^ONE$/i.test(n)) return 70;
+      if (/^ONE 2$/i.test(n)) return 71;
+      if (/eurosport/i.test(n)) return 80;
+      return 100;
     };
     // ערוצי החינם לפי מספר הערוץ: כאן 11, קשת 12, רשת 13, ערוץ 14 ... ערוץ 24, ואחריהם ערוצים בלי מספר
     var bk = function (c) { if (c._g !== "broad") return 0; var n = chNum(c); return n == null ? 500 : n; };
@@ -1438,7 +1450,7 @@
   function provOk(c, p) { return p === "all" || c._g === "broad" || c.prov === "both" || !c.prov || c.prov === p; }
   // חיפוש ערוץ: "sport" ו"ספורט" שקולים
   // מספר הערוץ כמו בשלט (11 כאן, 12 קשת, 13 רשת, 14...), לפי המספר שבסוף השם בערוצי החינם
-  var CHNUM = { "ערוץ 14": 14, "כאן חינוכית": 23, "ערוץ 9": 9, "ערוץ 24": 24, "מכאן": 33, "ערוץ 33": 33, "כנסת": 99, "ערוץ הכנסת": 99 };
+  var CHNUM = { "ONE": 50, "5 LIVE": 56, "ערוץ 14": 14, "כאן חינוכית": 23, "ערוץ 9": 9, "ערוץ 24": 24, "מכאן": 33, "ערוץ 33": 33, "כנסת": 99, "ערוץ הכנסת": 99 };
   function chNum(c) { if (CHNUM[c.name] != null) return CHNUM[c.name]; if (c._g === "broad") { var m = c.name.match(/(\d{1,3})\s*$/); if (m) return +m[1]; } return null; }
   function hay(c) { return (c.name + " " + (chNum(c) != null ? chNum(c) : "")).toLowerCase().replace(/sport/g, "ספורט").replace(/מוזיקה/g, "מוסיקה"); }
   // אותו ערוץ אצל הספק השני: אם כבר נבחר, לא מציגים אותו שוב
@@ -1652,7 +1664,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.30", BUILD = "2026-10-30.30", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.31", BUILD = "2026-10-30.31", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

@@ -1,0 +1,10 @@
+{
+  "name": "tvg-qa",
+  "private": true,
+  "description": "Playwright screenshot harness for the TV guide PWA (node shoot.cjs <outDir> [baseUrl]; node diff.cjs <A> <B>)",
+  "devDependencies": {
+    "playwright-core": "^1.48.0",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
+  }
+}

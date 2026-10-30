@@ -28,7 +28,16 @@
 
 | קובץ | תפקיד |
 |---|---|
-| `index.html` | כל האפליקציה: HTML+CSS+JS בקובץ אחד (IIFE, ES5). |
+| `index.html` | שלד HTML + **מקור יחיד** ל-`VERSION`/`BUILD` + רשימת סדר הטעינה של `js/*.js`. בלי לוגיקה. |
+| `css/app.css` | כל העיצוב. |
+| `js/*.js` | ES5, בלי build, `<script>` רגילים בסדר קבוע (הרשימה ב-`index.html`). כל קובץ עטוף ב-`(function (TVG) {…})(window.TVG)`. מה שקובץ אחר צריך – נחשף כ-`TVG.name` (פונקציות), או `TVG.name` בכל שימוש (משתנים משתנים כמו `tab`, `day`, `G`). קבועים שלא משתנים מועתקים בראש הקובץ (`var $ = TVG.$`). קובץ יכול להשתמש רק במה שנטען לפניו בזמן טעינה; בזמן ריצה הכול זמין. |
+| &nbsp;&nbsp;`core` · `data` | עזרים+אחסון+מצב משותף · טעינת הלוח, סיווג, איחוד ערוצים, אינדקס |
+| &nbsp;&nbsp;`reminders` · `reminder-sheet` · `push` | מצב תזכורות/מועדפים, סנכרון, ICS · חלון התזכורת והיומן · פוש והגדרות אישיות |
+| &nbsp;&nbsp;`ui` · `render` · `events` | pill/scrim · render() ראשי · כל מאזיני המסמך (הקשה/גרירה/מקלדת) |
+| &nbsp;&nbsp;`render-now/-grid/-dial/-rems/-common` · `netflix` · `swipe` | מסכים |
+| &nbsp;&nbsp;`search` · `favs` · `channels` · `settings` · `backup` | חיפוש+נושאים · מועדפים · בחירת ערוצים · הגדרות/ערכה/התקנה · גיבוי וקישור אישי |
+| &nbsp;&nbsp;`update` · `boot` | עדכון אוטומטי · עליית האפליקציה (אחרון) |
+| `tools/qa/` | `node tools/qa/shoot.cjs <outDir> [baseUrl]` – צילומי מסך בכל המסכים ב-375/393/360/412 + כשל על שגיאות קונסולה. `node tools/qa/diff.cjs <A> <B>` – השוואת פיקסלים. פעם אחת: `cd tools/qa && npm install`. |
 | `sw.js` | Service worker – **רק** התראות פוש (בלי מטמון, כדי לא לשבור עדכונים). |
 | `guide.json` | הלוח: `{updated, channels:[{id,name,prov}], programs:[{ch,start:"YYYY-MM-DDTHH:MM" שעון ישראל, title, desc?, rr?, lv?}]}` |
 | `scrape.mjs` | איסוף מוואלה (`tv-guide.walla.co.il`). |
@@ -38,7 +47,7 @@
 | `tools/audit_*.py` | בדיקות איכות על `guide.json`. |
 
 ### גרסה ועדכון אוטומטי
-`var VERSION = "1.33", BUILD = "2026-10-30.33"` ב-`index.html`. **בכל שינוי: להעלות את שניהם.** האפליקציה בודקת את BUILD ונטענת מחדש לבד. הגרסה מוצגת בהגדרות, ואחרי עדכון מופיעה הודעה "✨ עודכנת לגרסה…".
+`var VERSION = "1.33", BUILD = "2026-10-30.33"` ב-`index.html`. **בכל שינוי: להעלות את שניהם.** אותו BUILD נכנס אוטומטית כ-`?v=BUILD` לכל קובצי ה-css/js (מונע ערבוב קבצים ישנים/חדשים באייפון), ולכן אין עוד מקום לעדכן. `update.js` בודק את `BUILD = "…"` ב-`index.html` שבשרת. האפליקציה בודקת את BUILD ונטענת מחדש לבד. הגרסה מוצגת בהגדרות, ואחרי עדכון מופיעה הודעה "✨ עודכנת לגרסה…".
 
 ### localStorage
 `tvg.sel` ערוצים · `tvg.fav` מועדפים · `tvg.topics` נושאים · `tvg.rem` תזכורות · `tvg.lead` ברירת מחדל להתראה · `tvg.calmode` (`sub`/`ics`) · `tvg.calTok` המפתח האישי · `tvg.push` · `tvg.recent` · `tvg.theme` · `tvg.tab` · `tvg.bkAt`.

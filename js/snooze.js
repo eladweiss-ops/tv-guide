@@ -10,7 +10,7 @@
   var R = 19, CIRC = 2 * Math.PI * R;
   var SZ = null; // {k, ts, end, title, ch, pick, timer, busy}
 
-  function bd(s) { return "<bdi>" + esc(s) + "</bdi>"; }
+  function bd(s) { return "<bdi>" + esc(TVG.bidi(s)) + "</bdi>"; }
   function dur(min) { // "5 דק׳" / "שעה" / "שעה ו-5 דק׳" / "3 שע׳"
     if (min < 60) return min + " דק׳";
     var h = Math.floor(min / 60), m = min % 60;

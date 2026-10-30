@@ -13,7 +13,12 @@
 <meta property="og:site_name" content="לוח שידורים">
 <meta property="og:title" content="לוח שידורים 📺">
 <meta property="og:description" content="פרטי התוכנית ותזכורת בלחיצה">
-<meta property="og:image" content="https://eladweiss-ops.github.io/tv-guide/icon-512.png">
+<meta property="og:url" content="https://eladweiss-ops.github.io/tv-guide/">
+<meta property="og:image" content="https://eladweiss-ops.github.io/tv-guide/og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta property="og:locale" content="he_IL">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="לוח שידורים">
@@ -94,13 +99,14 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <div class="pill" id="pill" hidden role="status"></div>
 <div class="scrim" id="scrim2" hidden></div>
 <section class="sheet" id="favs" hidden aria-label="מועדפים"><div class="sheet-in" id="favBody"></div></section>
+<section class="sheet land" id="land" hidden role="dialog" aria-label="פרטי התוכנית"><div class="lnd-scroll" id="landBody"></div><div class="lnd-bar" id="landBar"></div></section>
 <section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
 <section class="sheet nfs" id="nfsheet" hidden role="dialog" aria-labelledby="nfsT"><div class="nfs-scroll" id="nfsBody"></div><div class="nfs-bar" id="nfsBar"></div></section>
 
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","qr","share","landing","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

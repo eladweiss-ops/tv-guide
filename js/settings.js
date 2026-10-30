@@ -9,13 +9,16 @@
 
   // ---- התקנה כאפליקציה ----
   TVG.dip = null;
+  TVG.install = install;
   window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); TVG.dip = e; setInst(); });
+  window.addEventListener("appinstalled", function () { TVG.dip = null; TVG.installed = true; TVG.store("tvg.instOffered", "1"); setInst(); });
+  function install() { if (TVG.dip) { TVG.dip.prompt(); TVG.dip = null; setInst(); } }
   function setInst() {
     var box = $("#instBox"); if (!box) return;
-    var sa = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
-    if (sa) { box.hidden = true; return; }
+    if (TVG.isStandalone || TVG.installed) { box.hidden = true; return; }
     box.hidden = false; $("#instBtn").hidden = !TVG.dip;
-    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var ios = TVG.isIOS;
+    $("#instBtn").textContent = TVG.isAndroid ? "התקנת האפליקציה" : "הוסף למסך הבית";
     $("#instTxt").textContent = TVG.dip ? "אפשר להתקין את הלוח כאפליקציה, והוא ייפתח במסך מלא." : ios ? "בספארי: לוחצים על כפתור השיתוף ואז על ״הוסף למסך הבית״." : "בתפריט הדפדפן: ״הוסף למסך הבית״ או ״התקן אפליקציה״.";
   }
   function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); }

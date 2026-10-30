@@ -20,6 +20,13 @@
   function parse(s) { var m = s.match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]); }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); if (window.__tvgBk) window.__tvgBk(k); } catch (e) { return null; } }
 
+  // זיהוי פלטפורמה במקום אחד (לפי User-Agent). אין לשכפל בדיקות כאלה בקבצים אחרים.
+  var UA = navigator.userAgent || "";
+  TVG.isIOS = /iPhone|iPad|iPod/.test(UA);
+  TVG.isAndroid = !TVG.isIOS && /Android/i.test(UA);
+  TVG.isStandalone = !!((window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone);
+  if (TVG.isAndroid) document.documentElement.className += " android";
+
   TVG.G = null;
   TVG.by = new Map();
   var sel = new Set();

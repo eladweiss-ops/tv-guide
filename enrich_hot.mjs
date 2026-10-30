@@ -53,15 +53,38 @@ export function enrich(guide, hot) {
   return { matched, n };
 }
 
+// מטמון: התקצירים שנמצאו נשמרים ב-hot-cache.json לפי ערוץ+שעה, כדי שהעדכון הלילי ב-GitHub
+// (שלא יכול לפנות ל-HOT מחו"ל) יוכל להחיל אותם בכל ריצה, גם בימים שהמחשב בבית כבוי.
+const CACHE = "hot-cache.json";
+async function readCache() { try { return JSON.parse(await readFile(CACHE, "utf8")); } catch { return {}; } }
+export function applyCache(guide, cache) {
+  let n = 0;
+  for (const p of guide.programs) { if (p.desc) continue; const d = cache[p.ch + "|" + p.start]; if (d) { p.desc = d; n++; } }
+  return n;
+}
+
 async function main() {
+  const guide = JSON.parse(await readFile("guide.json", "utf8"));
+  const cache = await readCache();
+  if (process.argv.includes("--apply-cache")) { // רץ ב-GitHub: בלי רשת, רק מהמטמון
+    const n = applyCache(guide, cache);
+    console.log(`HOT (מטמון): ${Object.keys(cache).length} תקצירים שמורים, ${n} תוכניות עודכנו`);
+    if (n) await writeFile("guide.json", JSON.stringify(guide));
+    return;
+  }
+  // רץ על מחשב בישראל: מושך מ-HOT, מעדכן את הלוח ושומר מטמון
   const now = new Date(), end = new Date(now.getTime() + 7 * 864e5), iso = (d) => d.toISOString().slice(0, 10);
   const res = await fetch(API, { method: "POST", headers: HEADERS, body: JSON.stringify({ ProgramsStartDateTime: iso(now) + "T00:00:00", ProgramsEndDateTime: iso(end) + "T23:59:59" }) });
   if (!res.ok) throw new Error(`hot → ${res.status}`);
   const hot = parseHot(await res.json()).sort((a, b) => (a.start < b.start ? -1 : 1));
-  const guide = JSON.parse(await readFile("guide.json", "utf8"));
+  const before = new Set(guide.programs.filter((p) => p.desc).map((p) => p.ch + "|" + p.start));
   const r = enrich(guide, hot);
-  console.log(`HOT: ${hot.length} תוכניות באתר, ${r.matched} ערוצים הותאמו, ${r.n} תוכניות קיבלו תקציר`);
-  if (r.n) await writeFile("guide.json", JSON.stringify(guide));
+  const keep = new Date(now.getTime() - 864e5).toISOString().slice(0, 10), out = {};
+  for (const [k, v] of Object.entries(cache)) if (k.split("|")[1] >= keep) out[k] = v;
+  for (const p of guide.programs) { const k = p.ch + "|" + p.start; if (p.desc && !before.has(k)) out[k] = p.desc; }
+  await writeFile(CACHE, JSON.stringify(out));
+  console.log(`HOT: ${hot.length} תוכניות באתר, ${r.matched} ערוצים הותאמו, ${r.n} תוכניות קיבלו תקציר, ${Object.keys(out).length} במטמון`);
+  await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich_hot.mjs")) {

@@ -37,9 +37,9 @@ jobs:
       - name: Add Keshet 12 summaries
         continue-on-error: true
         run: node enrich_keshet.mjs
-      - name: Add HOT summaries (all channels, fills the gaps)
+      - name: Add HOT summaries from cache (filled by the home computer)
         continue-on-error: true
-        run: node enrich_hot.mjs
+        run: node enrich_hot.mjs --apply-cache
       - name: Fetch Netflix list from TMDB
         continue-on-error: true
         env:

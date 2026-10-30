@@ -229,7 +229,10 @@ export async function fillRatings(ids, cache, omdbKey, { cap = OMDB_CAP, now = D
     try {
       const res = await fetchRetry(`https://www.omdbapi.com/?apikey=${encodeURIComponent(omdbKey)}&i=${encodeURIComponent(id)}`, {}, { retry: false });
       if (res.status === 401 || res.status === 429) {
-        console.error(`אזהרה: OMDb החזיר ${res.status} (מפתח לא תקין או חריגה ממכסה). מפסיק לשלוף ציונים.`);
+        let msg = ""; try { msg = String((await res.json()).Error || ""); } catch (e) {}
+        // אבחון בלי לחשוף את המפתח: רק אורך וצורה
+        const shape = `אורך ${omdbKey.length}, ${/^[a-z0-9]+$/i.test(omdbKey) ? "אותיות/ספרות בלבד" : "מכיל תווים אחרים"}`;
+        console.error(`אזהרה: OMDb החזיר ${res.status} "${msg}" (מפתח: ${shape}). מפסיק לשלוף ציונים.`);
         break;
       }
       if (!res.ok) continue;

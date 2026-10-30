@@ -44,6 +44,53 @@
       return true;
     }).catch(function (e) { TVG.restoring = false; TVG.pill(e === 404 ? "לא מצאתי גיבוי לקישור הזה" : "השחזור נכשל, נסו שוב", 2200); return false; });
   }
+  // ---- אישור לפני שחזור מקישור אישי: אף פעם לא משחזרים בשקט ----
+  function hasOwnData() {
+    var sel = TVG.store("tvg.sel"), rem = TVG.store("tvg.rem");
+    return !!(sel && sel !== "[]") || !!(rem && rem !== "[]" && rem !== "{}");
+  }
+  var cfmEl = null;
+  function askRestore(hasData) { // מחזיר Promise<boolean>; ברירת המחדל (מיקוד, Esc, לחיצה על הרקע) היא ביטול
+    return new Promise(function (resolve) {
+      if (!cfmEl) {
+        cfmEl = document.createElement("div");
+        cfmEl.innerHTML = '<div class="scrim" style="z-index:90"></div>' +
+          '<section class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="bkCfmT" style="z-index:91"><div class="sheet-in">' +
+          '<h2 id="bkCfmT">לשחזר מקישור אישי?</h2>' +
+          '<p id="bkCfmP1"></p><p id="bkCfmP2" style="font-weight:700"></p>' +
+          '<button class="btn" type="button" id="bkCfmYes"></button><button class="ghost" type="button" id="bkCfmNo"></button>' +
+          '</div></section>';
+        document.body.appendChild(cfmEl);
+      }
+      var scrim = cfmEl.firstChild, sheet = cfmEl.lastChild, yes = sheet.querySelector("#bkCfmYes"), no = sheet.querySelector("#bkCfmNo"), prev = document.activeElement;
+      sheet.querySelector("#bkCfmP1").textContent = "הקישור הזה משחזר הגדרות, ערוצים ותזכורות מגיבוי אישי. מרגע השחזור המכשיר הזה ישמור ויסנכרן תזכורות תחת הזהות של הקישור הזה. אם הקישור לא שלכם, אל תמשיכו.";
+      sheet.querySelector("#bkCfmP2").textContent = hasData ? "במכשיר הזה כבר יש הגדרות ותזכורות משלכם. שחזור יחליף אותן ויעביר את המכשיר לזהות של הקישור." : "";
+      sheet.querySelector("#bkCfmP2").hidden = !hasData;
+      yes.textContent = hasData ? "כן, להחליף ולשחזר" : "שחזור"; yes.className = hasData ? "btn danger" : "btn";
+      no.textContent = hasData ? "לא, להשאיר את מה שיש" : "ביטול";
+      function done(v) {
+        document.removeEventListener("keydown", onKey, true);
+        scrim.hidden = true; sheet.hidden = true;
+        yes.onclick = no.onclick = scrim.onclick = null;
+        try { if (prev && prev.focus) prev.focus(); } catch (e) {}
+        resolve(v);
+      }
+      function onKey(e) { if (e.key === "Escape") { e.preventDefault(); done(false); } }
+      document.addEventListener("keydown", onKey, true);
+      yes.onclick = function () { done(true); };
+      no.onclick = scrim.onclick = function () { done(false); };
+      scrim.hidden = false; sheet.hidden = false;
+      no.focus();
+    });
+  }
+  // מבקש אישור מפורש ואז משחזר. onNo נקרא כשהמשתמש מסרב
+  function confirmRestore(t, onNo) {
+    if (t === TVG.calTok) { TVG.pill("זה כבר הקישור של המכשיר הזה", 1800); if (onNo) onNo(); return Promise.resolve(false); }
+    return askRestore(hasOwnData()).then(function (ok) {
+      if (!ok) { if (onNo) onNo(); return false; }
+      return restoreTok(t);
+    });
+  }
   function restoreOld(c) { // קוד גיבוי ישן TVG1:
     var o = JSON.parse(decodeURIComponent(escape(atob(c.slice(5)))));
     BK.forEach(function (k) { if (typeof o[k] === "string") localStorage.setItem(k, o[k]); });
@@ -53,7 +100,7 @@
     var c = String(txt || "").trim();
     if (c.replace(/\s+/g, "").indexOf("TVG1:") === 0) { try { restoreOld(c.replace(/\s+/g, "")); } catch (e) { TVG.pill("הקוד לא תקין", 1600); } return; }
     var t = tokFrom(c); if (!t) { TVG.pill("זה לא נראה כמו קישור אישי", 1800); return; }
-    restoreTok(t);
+    confirmRestore(t);
   }
   $("#bkShare").addEventListener("click", function () {
     var link = myLink(); bkPush();
@@ -73,8 +120,6 @@
     var t = tokFrom(location.search);
     if (!t) { if (TVG.store("tvg.sel") && !TVG.store("tvg.bkAt")) setTimeout(bkPush, 4000); return; }
     if (t === TVG.calTok) { history.replaceState(null, "", APP_URL); return; }
-    var has = TVG.store("tvg.sel") && TVG.store("tvg.sel") !== "[]";
-    if (!has || window.confirm("לשחזר את ההגדרות מהקישור האישי? מה שבחרתם במכשיר הזה יוחלף.")) restoreTok(t);
-    else history.replaceState(null, "", APP_URL);
+    confirmRestore(t, function () { history.replaceState(null, "", APP_URL); }); // תמיד עם אישור מפורש, גם במכשיר חדש
   })();
 })(window.TVG);

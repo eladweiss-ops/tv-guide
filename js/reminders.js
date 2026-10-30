@@ -54,9 +54,20 @@
   function syncRems() {
     if (!srv() || !TVG.calTok) return Promise.resolve(true);
     return fetch(CAL_API + "/api/rems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.calTok, rems: TVG.REMS }) })
-      .then(function (r) { if (!r.ok) throw 0; TVG.syncBad = false; TVG.store("tvg.remDirty", "0"); return true; })
-      .catch(function () { TVG.syncBad = true; TVG.store("tvg.remDirty", "1"); return false; });
+      .then(function (r) {
+        if (r.status === 429) { var e = new Error("rate"); e.retry = Math.min(120, Math.max(5, +r.headers.get("retry-after") || 60)); throw e; } // קצב: ניסיון חוזר שקט
+        if (r.status === 413) { var e2 = new Error("big"); e2.big = true; throw e2; } // הרשימה גדולה מדי: ניסיון חוזר לא יעזור
+        if (!r.ok) throw 0;
+        TVG.syncBad = false; TVG.store("tvg.remDirty", "0"); return true;
+      })
+      .catch(function (e) {
+        TVG.syncBad = true; TVG.store("tvg.remDirty", "1");
+        if (e && e.retry && !syncRetry) { syncRetry = setTimeout(function () { syncRetry = 0; syncRems(); }, e.retry * 1000); }
+        else if (e && e.big && TVG.pill) TVG.pill("רשימת התזכורות גדולה מדי לסנכרון עם השרת. מחקו תזכורות ישנות", 4000);
+        return false;
+      });
   }
+  var syncRetry = 0;
   function pullRems() { // שחזור הרשימה מהשרת (למשל אחרי התקנה מחדש וקוד גיבוי)
     if (!srv() || !TVG.calTok || TVG.REMS.length) return;
     fetch(CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {

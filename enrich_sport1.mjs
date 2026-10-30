@@ -2,7 +2,7 @@
 // וואלה כותבת למשל "ליגת ווינר 26/27", והאתר כותב "מכבי ת"א - הפועל חיפה · ליגת ווינר 2026/27".
 // הרצה: node enrich_sport1.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
-import { fits, agreement } from "./sportfit.mjs";
+import { fits, agreement, betterTitle } from "./sportfit.mjs";
 import { fillGaps } from "./fill.mjs";
 
 const BASE = "https://sport1.maariv.co.il/broadcast-schedule/";
@@ -60,8 +60,9 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     if (ag < 0.4) { console.log("ספורט 1: דילגתי על", g, Math.round(ag * 100) + "%"); continue; }
     for (const [p, { it: best }] of pick) {
       const text = [best.name, best.desc].filter(Boolean).join(" · ");
-      if (!fits(p.title, text, ag >= 0.6)) continue;
+      if (!fits(p.title, text, ag >= 0.6 || pick.get(p).d <= 2)) continue;
       p.lv = best.live ? 1 : 0; // ישיר או מוקלט, לפי האתר
+      const bt = betterTitle(p.title, best.name); if (bt) p.title = bt;
       if (p.desc) continue;
       if (!text || key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) continue;
       p.desc = text; n++;

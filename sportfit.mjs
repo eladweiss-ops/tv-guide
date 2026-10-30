@@ -17,6 +17,9 @@ export function words(t) {
   }
   return out;
 }
+// שמות קבוצות מוכרים, כדי לזהות ענף גם כשהתיאור הוא רק "קבוצה - קבוצה"
+const BB_TEAMS = /ג'?אז|טריילבלייזרס|נאגטס|מבריקס|רוקטס|נטס|פיסטונס|קאבלירס|הוקס|לייקרס|סלטיקס|ווריורס|ניקס|בולס|היט|באקס|סאנס|ספרס|קליפרס|גריזליס|פליקנס|טימברוולבס|ת'אנדר|קינגס|הורנטס|מג'יק|ראפטורס|סיקסרס|וויזארדס|פייסרס|פנאתינ(א)?יקוס|אולימפיאקוס|פנרבחצה|אנאדולו|פרטיזן|צרבנה|זבזדה|באסקוניה|ז'לגיריס|וירטוס|פאריז באסקט|פריז באסקט|ליון וילרבאן|ולנסיה באסקט|אלבה ברלין|באיירן מינכן סל|ארמני|אולימפיה מילאנו|דובאי/;
+const FB_TEAMS = /פ\.?ס\.?ז|לאנס|ליל|מרסיי|מארסיי|ליון(?! וילרבאן)|מונפלייה|אנסי|גנגאן|סנט אטיין|לה האבר|ניס|רן|נאנט|סטרסבורג|טולוז|ריימס|סושו|ליברפול|ארסנל|צ'לסי|טוטנהאם|מנצ'סטר|יובנטוס|אינטר|מילאן(?!ו)|נאפולי|רומא|לאציו|אתלטיקו|ריאל מדריד|ברצלונה|בטיס|סביליה|דורטמונד|לברקוזן|פולהאם|קריסטל פאלאס|אסטון וילה|ניוקאסל|אברטון|ווסטהאם|ברייטון/;
 export function kind(t) {
   t = String(t || "");
   if (/כדורגל/.test(t)) return "fb";
@@ -26,12 +29,14 @@ export function kind(t) {
   if (/טניס|\bATP\b|\bWTA\b|טורניר (באזל|וינה|פריז)/i.test(t)) return "tn";
   if (/פורמולה|\bF1\b|מוטו ?GP|נאסקר|\bGT\b|מירוץ/i.test(t)) return "mt";
   if (/פרמייר ליג|לה ליגה|סרייה|בונדסליגה|ליגת האלופות|ליגה (צרפתית|ספרדית|איטלקית|אנגלית|גרמנית)|ל\. (צרפתית|ספרדית|איטלקית|אנגלית|גרמנית|ברזילאית)|גביע הטוטו|ליגת ווינר(?! סל)|גביע הליגה/.test(t)) return "fb";
+  if (BB_TEAMS.test(t)) return "bb";
+  if (FB_TEAMS.test(t)) return "fb";
   return "";
 }
 // כותרות כלליות בוואלה ("ל. צרפתית", "יורוליג", "NBA") – מתאימות לתיאור משחק מאותו ענף
 const GENERIC = /^(ישיר!?\s*)?(ל\.\s|ליגת|ליגה|גביע|יורוליג|יורוקאפ|NBA|NFL|NHL|ATP|WTA|טניס|כדורגל|כדורסל|המיטב|תקצירי|פרמייר|לה ליגה|סרייה|בונדסליגה|ליגת האלופות)/i;
 const MATCHLIKE = /[\p{L}"'.]\s?[-–]\s?[\p{L}]/u;
-export function fits(title, desc, lenient) {
+export function fits(title, desc, lenient) { // lenient: ערוץ שמסכים עם האתר, או משבצת באותה דקה בדיוק
   const kt = kind(title), kd = kind(desc);
   if (kt && kd && kt !== kd) return false;
   const tw = words(title), dw = words(desc);
@@ -45,4 +50,15 @@ export function fits(title, desc, lenient) {
 export function agreement(pairs) { // [{title, text}] – לפי ההתאמה המחמירה
   if (!pairs.length) return 1;
   return pairs.filter((x) => fits(x.title, x.text, false)).length / pairs.length;
+}
+
+// כותרת כללית ("יורוליג") + משחק מהאתר ("דובאי-הפועל ת"א מח.9") => "יורוליג: דובאי - הפועל ת"א"
+export function betterTitle(title, text) {
+  const t = String(title || "").trim(), x = String(text || "").trim();
+  if (!GENERIC.test(t) || !MATCHLIKE.test(x) || x.length > 70 || /תוכנית|מגזין|פרק|חדשות/.test(x)) return null;
+  const live = /^ישיר!?\s*/.test(t) ? "ישיר! " : "";
+  const league = t.replace(/^ישיר!?\s*/, "").replace(/\s+\d{2}\/\d{2}$/, "");
+  const game = x.replace(/\s*(מח\.|מחזור)\s*\d+.*$/, "").replace(/\s*;\s*/, " · ").replace(/\s*[-–]\s*/, " - ").trim();
+  if (!game || game.length < 5) return null;
+  return live + league + ": " + game;
 }

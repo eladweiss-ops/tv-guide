@@ -1,7 +1,7 @@
 // מוסיף לתוכניות של ערוצי ספורט 5 את שם המשחק והמסגרת, מהלוח באתר ערוץ הספורט.
 // הרצה: node enrich_sport5.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
-import { fits, agreement } from "./sportfit.mjs";
+import { fits, agreement, betterTitle } from "./sportfit.mjs";
 
 const API = "https://www.sport5.co.il/Ajax/GetBroadcastSheetData.aspx";
 const TYPES = ["5", "5P", "LIVE", "5STARS", "5MAX", "GOLD"];
@@ -62,7 +62,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     const c = chOf.get(String(p.ch)); if (!c) continue;
     const g = p.ch + "|" + c + "|" + p.start.slice(0, 10); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p);
   }
-  let n = 0; const skipped = [];
+  let n = 0, retitled = 0; const skipped = [];
   for (const [g, progs] of groups) {
     const items = sched.get(g.slice(g.indexOf("|") + 1)); if (!items || !items.length) continue; // כל ערוץ (SD/HD) מותאם בנפרד
     const pick = new Map();
@@ -76,13 +76,15 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
     if (ag < 0.4) { skipped.push(g + " (" + Math.round(ag * 100) + "%)"); continue; }
     for (const [p, { it: best }] of pick) {
       const text = best.rich || best.text;
-      if (!fits(p.title, text, ag >= 0.6)) continue; // התיאור לא שייך לתוכנית הזו
+      if (!fits(p.title, text, ag >= 0.6 || pick.get(p).d <= 2)) continue; // התיאור לא שייך לתוכנית הזו
       p.lv = best.rich ? 1 : 0; // מופיע ברשימת השידורים הישירים של האתר = ישיר
+      const bt = betterTitle(p.title, best.text); if (bt) { p.title = bt; retitled++; }
       if (p.desc) continue;
       if (!text || key(best.rich || best.text).startsWith(key(p.title)) || key(p.title).startsWith(key(best.rich || best.text))) continue;
       p.desc = text; n++;
     }
   }
+  console.log("ספורט 5: כותרות שקיבלו שמות קבוצות:", retitled);
   if (skipped.length) console.log("ספורט 5: דילגתי על לוחות שלא תואמים לאתר:", skipped.join(", "));
   return n;
 }

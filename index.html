@@ -347,6 +347,11 @@
   .island { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px auto 8px; width: min(100%, 300px); height: 40px; padding: 0 16px; box-sizing: border-box; border-radius: 20px; background: #000; color: #fff; font-weight: 700; font-size: .9rem; border: 0; }
   .island b { color: #FF9F0A; white-space: nowrap; }
   .island span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rech { display: flex; align-items: center; justify-content: space-between; }
+  .recent { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+  .rchip { display: inline-flex; align-items: center; border-radius: 999px; background: var(--soft); overflow: hidden; }
+  .rchip button { border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; min-height: 40px; padding: 0 12px; }
+  .rchip .rx { padding: 0 10px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -1037,6 +1042,18 @@
     var on = FAV.has(title);
     return '<button type="button" class="rbt star" data-fav="' + esc(title) + '" aria-pressed="' + on + '" aria-label="מועדף: ' + esc(title) + '">' + (on ? "★" : "☆") + "</button>";
   }
+  // ---- חיפושים אחרונים ----
+  var RECENT = []; try { RECENT = JSON.parse(store("tvg.recent") || "[]") || []; } catch (e) { RECENT = []; }
+  function addRecent(text, exact) {
+    text = String(text || "").trim(); if (text.length < 2) return;
+    RECENT = RECENT.filter(function (r) { return r.t !== text; }); RECENT.unshift({ t: text, x: !!exact }); RECENT = RECENT.slice(0, 8);
+    store("tvg.recent", JSON.stringify(RECENT));
+  }
+  function recentHtml() {
+    if (!RECENT.length) return '<p class="none">מקלידים שם של תוכנית, קבוצה או ערוץ. החיפושים האחרונים שלך יופיעו כאן.</p>';
+    return '<div class="rech"><h2 class="sech">חיפושים אחרונים</h2><button type="button" class="ghost sm" data-recclear>ניקוי</button></div><div class="recent">' +
+      RECENT.map(function (r, i) { return '<span class="rchip"><button type="button" data-recent="' + i + '">🕘 ' + esc(r.t) + '</button><button type="button" class="rx" data-recdel="' + i + '" aria-label="הסרה: ' + esc(r.t) + '">✕</button></span>'; }).join("") + "</div>";
+  }
   function vSearch() {
     var now = new Date(), term = q.trim().toLowerCase(), toks = term.split(/\s+/).filter(Boolean), hits = [];
     var list = scope === "mine" ? chans() : G.channels;
@@ -1050,6 +1067,8 @@
     var h = '<div class="chips" role="group" aria-label="היקף חיפוש"><button type="button" class="chip" data-scope="all" aria-pressed="' + (scope === "all") + '">כל הלוח</button><button type="button" class="chip" data-scope="mine" aria-pressed="' + (scope === "mine") + '">הערוצים שלי</button>' +
       (qExact ? '<button type="button" class="chip xchip" data-clearx="1" aria-label="ביטול הבחירה">' + esc(qExact) + " ✕</button>" : "") + "</div>";
     if (!qExact) {
+      var rmatch = RECENT.filter(function (r) { return r.t.toLowerCase().indexOf(term) === 0 && r.t.toLowerCase() !== term; }).slice(0, 3);
+      if (rmatch.length) h += '<div class="recent">' + rmatch.map(function (r) { return '<span class="rchip"><button type="button" data-recent="' + RECENT.indexOf(r) + '">🕘 ' + esc(r.t) + "</button></span>"; }).join("") + "</div>";
       var sg = suggestions(term);
       if (sg.length) h += '<h2 class="sech">הצעות</h2>' + sg.map(function (x) {
         return '<div class="srow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
@@ -1096,20 +1115,20 @@
   function render() {
     var note = isSample ? '<div class="note"><b>מוצגים נתוני דוגמה.</b> הדף לא מצא את <code>guide.json</code>. פתח אותו דרך שרת (<code>npx serve</code>) ולא ישירות מהקובץ.</div>' : "";
     var nf = tab === "nf" && NF, rems = tab === "rems";
-    var picking = !nf && !rems && needsPick(), searching = !nf && !!q.trim();
-    var chips = (!picking && !searching && !nf && !rems && tab !== "dial") ? chipsHtml() : "";
-    var body = nf ? vNf() : (searching ? vSearch() : rems ? vRems() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
+    var picking = !nf && !rems && needsPick(), searching = !nf && !!q.trim(), srchOpen = !$("#qwrap").hidden && !q.trim();
+    var chips = (!picking && !searching && !srchOpen && !nf && !rems && tab !== "dial") ? chipsHtml() : "";
+    var body = srchOpen ? recentHtml() : nf ? vNf() : (searching ? vSearch() : rems ? vRems() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
     var isl = "";
-    if (!nf && !searching && !picking) {
+    if (!nf && !searching && !picking && !srchOpen) {
       var nowMs = Date.now(), nx = REMS.filter(function (x) { return x.ts > nowMs && x.ts < tonightEnd(); })[0];
       if (nx) { var mm = Math.max(1, Math.round((nx.ts - nowMs) / 60000)); isl = '<button type="button" class="island" data-jump="' + esc(nx.k) + '"><span>⏰ ' + esc(nx.title) + "</span><b>" + (mm < 60 ? "בעוד " + mm + " דק׳" : "ב-" + hhmm(new Date(nx.ts))) + "</b></button>"; }
     }
     $("#main").innerHTML = isl + (nf ? "" : note) + chips + body;
-    document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
+    document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching && !srchOpen);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = ""; // מספר הערוצים הוא לא התראה - לא מציגים
     updFav();
-    $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס", rems: "התזכורות שלי" }[nf ? "nf" : tab] || "לוח שידורים");
+    $("#ttl").textContent = (searching || srchOpen) ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס", rems: "התזכורות שלי" }[nf ? "nf" : tab] || "לוח שידורים");
     if (searching) $("#qwrap").hidden = false;
     $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));
     $("#tabNow").setAttribute("aria-selected", String(tab === "now"));
@@ -1121,7 +1140,7 @@
       var el = document.querySelector(".row.now"); if (el) el.scrollIntoView({ block: "center" });
     }
     scrollNext = false;
-    if (D && tab === "dial" && !nf && !picking && !searching && $("#dial")) updateDial(dialT());
+    if (D && tab === "dial" && !nf && !picking && !searching && !srchOpen && $("#dial")) updateDial(dialT());
   }
 
   var themeSel = "light";
@@ -1134,7 +1153,7 @@
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }
-  function setSearch(on) { $("#qwrap").hidden = !on; if (on) $("#q").focus(); else if (q) { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; render(); } }
+  function setSearch(on) { $("#qwrap").hidden = !on; if (on) { $("#q").focus(); render(); } else { if (q) { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; } render(); } }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
   function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
@@ -1225,11 +1244,16 @@
     if (t.closest("[data-favadd]")) { startSearch("", false); return; }
     if (t.closest("[data-favclear]")) { if (!delArm) { delArm = true; } else { FAV.clear(); saveFav(); updFav(); delArm = false; if (tab === "dial" && !q.trim()) render(); } $("#favBody").innerHTML = favHtml(); return; }
     if (t.closest("[data-favclose]")) { closeFavs(); return; }
-    var sgb = t.closest("[data-sug]"); if (sgb) { var st2 = sgb.getAttribute("data-sug"); $("#q").value = st2; q = st2; qExact = st2; $("#qx").hidden = false; render(); window.scrollTo({ top: 0 }); return; }
+    var rcb = t.closest("[data-recent]");
+    if (rcb) { var rr0 = RECENT[+rcb.getAttribute("data-recent")]; if (rr0) { addRecent(rr0.t, rr0.x); $("#q").value = rr0.t; q = rr0.t; qExact = rr0.x ? rr0.t : null; $("#qx").hidden = false; render(); window.scrollTo({ top: 0 }); } return; }
+    var rdl = t.closest("[data-recdel]"); if (rdl) { RECENT.splice(+rdl.getAttribute("data-recdel"), 1); store("tvg.recent", JSON.stringify(RECENT)); render(); return; }
+    if (t.closest("[data-recclear]")) { var old = RECENT.slice(); RECENT = []; store("tvg.recent", "[]"); render(); pill("החיפושים נוקו", 3000, "ביטול", function () { RECENT = old; store("tvg.recent", JSON.stringify(RECENT)); render(); }); return; }
+    var sgb = t.closest("[data-sug]"); if (sgb) { addRecent(sgb.getAttribute("data-sug"), true); var st2 = sgb.getAttribute("data-sug"); $("#q").value = st2; q = st2; qExact = st2; $("#qx").hidden = false; render(); window.scrollTo({ top: 0 }); return; }
     var sc2 = t.closest("[data-scope]"); if (sc2) { scope = sc2.getAttribute("data-scope"); render(); return; }
     if (t.closest("[data-clearx]")) { qExact = null; render(); return; }
     var jp = t.closest("[data-jump]");
     if (jp) {
+      if (q.trim()) addRecent(qExact || q, !!qExact);
       var jr = findProg(jp.getAttribute("data-jump"));
       if (jr) { if (!chans().some(function (c) { return c.id === jr.id; })) { sel.add(jr.id); saveSel(); pill("הערוץ נוסף לערוצים שלך", 1600); } setSearch(false); chId = jr.id; day = dstr(jr.p.s); scrub = Math.round((jr.p.s - dObj(day)) / 60000); tab = "dial"; store("tvg.tab", "dial"); render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
       return;
@@ -1298,12 +1322,13 @@
     var sc = document.querySelector('[data-cchip="sel"]'); if (sc) sc.textContent = "נבחרו (" + sel.size + ")";
   });
   $("#q").addEventListener("input", function (e) { q = e.target.value; qExact = null; $("#qx").hidden = !q; render(); });
+  $("#q").addEventListener("keydown", function (e) { if (e.key === "Enter") { addRecent(q, false); e.target.blur(); } });
   $("#qx").addEventListener("click", function () { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; render(); $("#q").focus(); });
   $("#chFind").addEventListener("input", function (e) { find = e.target.value; buildSheet(); });
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.7", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.8", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
@@ -1325,7 +1350,7 @@
   if (store("tvg.calJust") === "1") { store("tvg.calJust", "0"); setTimeout(calWelcome, 800); }
 
   // ---- גיבוי ושחזור הבחירות ----
-  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok"];
+  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok", "tvg.recent"];
   function bkCode() { var o = {}; BK.forEach(function (k) { var v = store(k); if (v != null) o[k] = v; }); return "TVG1:" + btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
   $("#bkCopy").addEventListener("click", function () {
     var c = bkCode(); $("#bkCode").value = c;

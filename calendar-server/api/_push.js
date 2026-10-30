@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { put, list } from "@vercel/blob";
 import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
+import { wantedSchedule, START_SUFFIX } from "./_rems.js";
 export { remPayload };
 
 export async function readJson(p, dflt) {
@@ -48,9 +49,8 @@ export async function reschedule(t, rems, d = {}) {
   const day = Math.floor(now / 86400000);
   let q = sched.__q; delete sched.__q;
   if (!q || q.d !== day) q = { d: day, n: 0 };
-  let want = {};
-  if (subs.length) for (const r of rems) { const at = r.ts - (r.lead || 0) * 60000; if (at > now - 30000 && r.ts > now) want[r.k] = Math.max(at, now + 5000); }
-  // תקרה: רק ה-MAX_SCHED הקרובות ביותר
+  let want = subs.length ? wantedSchedule(rems, now) : {}; // כולל הודעות k#s (תחילת שידור)
+  // תקרה: רק ה-MAX_SCHED הקרובות ביותר (כל הודעה מתוזמנת נספרת, כולל k#s)
   let capped = 0;
   const ks = Object.keys(want);
   if (ks.length > MAX_SCHED) {
@@ -70,7 +70,7 @@ export async function reschedule(t, rems, d = {}) {
     const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2" },
-      body: JSON.stringify({ t, k, at }),
+      body: JSON.stringify(k.endsWith(START_SUFFIX) ? { t, k: k.slice(0, -START_SUFFIX.length), at, st: 1 } : { t, k, at }), // st: התראת תחילת שידור
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j.messageId) { sched[k] = { at, id: j.messageId }; added++; } else console.log("qstash publish failed", r.status, JSON.stringify(j).slice(0, 200));

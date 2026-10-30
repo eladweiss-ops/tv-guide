@@ -64,13 +64,17 @@
         '<button type="button" class="btn sm" data-lpset>קביעה</button></div>';
     }
     if (TVG.calMode === "sub" && !TVG.pushOn && ts - Date.now() < 25 * 60000) h += '<p class="credit">⚠️ היומן המנוי מתעדכן בערך כל רבע שעה, אז התראה לתוכנית שמתחילה בקרוב עלולה להגיע באיחור.</p>';
+    if (cur > 0) { // "וגם בתחילת השידור" (snooze.js מטפל בהקשה): נשמר ברשומה כ-dbl
+      var dbl = TVG.LP ? TVG.REMS.some(function (x) { return TVG.LP.keys.indexOf(x.k) >= 0 && x.dbl; }) : !!(TVG.rem && TVG.rem.dbl);
+      h += '<div class="chips lp"><button type="button" class="chip" data-dbl aria-pressed="' + dbl + '">🔔 וגם בתחילת השידור</button></div>';
+    }
     h += '<p class="credit lpnow">⏰ ההתראה: ' + esc(leadTxt(cur, ts)) + " · " + (function () { var a = new Date(ts - cur * 60000); return TVG.dayLabel(dstr(a)) + " " + hhmm(a); })() + "</p>";
     return h;
   }
   function setLead(m) {
     if (TVG.LP) {
       var n = 0;
-      TVG.REMS.forEach(function (x) { if (TVG.LP.keys.indexOf(x.k) >= 0 && x.ts > Date.now()) { x.lead = TVG.LP.keys.length > 1 ? fitLead(x.ts, m) : m; n++; } });
+      TVG.REMS.forEach(function (x) { if (TVG.LP.keys.indexOf(x.k) >= 0 && x.ts > Date.now()) { x.lead = TVG.LP.keys.length > 1 ? fitLead(x.ts, m) : m; if (!(x.lead > 0)) delete x.dbl; n++; } });
       if (!n) { TVG.pill("השעה הזו כבר עברה", 1600); return; }
       TVG.saveRems(); TVG.syncRems(); openLead(TVG.LP.keys); TVG.render();
       TVG.pill("⏰ ההתראה עודכנה", 1300);
@@ -99,7 +103,7 @@
     var ex = TVG.hasRem(TVG.remKey(r.id, r.p.s));
     if (ex) {
       $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(TVG.chName(r.id)) + "</span><span>" + TVG.dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
-        '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + esc(leadTxt(ex.lead, ex.ts)) + ".</p>" +
+        '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + esc(leadTxt(ex.lead, ex.ts)) + (ex.dbl ? " וגם בתחילת השידור" : "") + ".</p>" +
         (TVG.srv() ? '<button type="button" class="ghost" data-ledit="' + esc(ex.k) + '">🔔 שינוי מועד ההתראה</button>' : "") +
         '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
         '<p class="credit">' + (TVG.srv() ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : TVG.isAndroid ? "הביטול מוריד את התזכורת מהרשימה. אם האירוע נוסף ל-Google Calendar, מוחקים אותו שם." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
@@ -142,7 +146,7 @@
     else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(TVG.icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); TVG.pill("התזכורת בוטלה", 1800); }
     closeRem(); TVG.render();
   }
-  function recOf(r) { var ts = r.p.s.getTime(), m = fitLead(ts, r.lead != null ? r.lead : TVG.lead); return { k: TVG.remKey(r.id, r.p.s), id: r.id, ts: ts, end: r.p.e.getTime(), title: r.p.title, ch: TVG.chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: m, at: Date.now() }; }
+  function recOf(r) { var ts = r.p.s.getTime(), m = fitLead(ts, r.lead != null ? r.lead : TVG.lead); return { k: TVG.remKey(r.id, r.p.s), id: r.id, ts: ts, end: r.p.e.getTime(), title: r.p.title, ch: TVG.chName(r.id), desc: (r.p.desc || "").slice(0, 300), lead: m, at: Date.now(), dbl: r.dbl && m > 0 ? 1 : undefined }; }
   // הוספה בלחיצה אחת כשיש יומן ייעודי, עם "ביטול" בהודעה למקרה של טעות
   function quickAdd(list) {
     var add = list.filter(function (r) { return r.p.s > new Date() && !TVG.hasRem(TVG.remKey(r.id, r.p.s)); }).map(recOf);

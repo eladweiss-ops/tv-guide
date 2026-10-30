@@ -129,3 +129,11 @@ test("runHealth: 404 על קובץ js וה-scheduler כבוי", async () => {
   assert.ok(r.problems.some((p) => p.includes("scheduler")));
   assert.equal(r.ok, false);
 });
+
+test("המחשב בבית מחכה לאישור קוד", async () => {
+  const { evaluateHome } = await import("./health.mjs");
+  assert.deepEqual(evaluateHome({ status: "ok" }).problems, []);
+  assert.deepEqual(evaluateHome(null).problems, []);
+  const p = evaluateHome({ status: "needs-approval", files: ["enrich_hot.mjs"] }).problems;
+  assert.equal(p.length, 1); assert.ok(p[0].includes("enrich_hot.mjs") && p[0].includes("trust.ps1"));
+});

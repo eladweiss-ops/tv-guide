@@ -122,6 +122,16 @@ export function evaluateCaches(hot, extra, now = new Date()) {
   return { problems, info };
 }
 
+// home-status.json: המחשב בבית דוחף אותו כשהמשימה עצרה כי קוד חדש מחכה לאישור (tools/home/runner.ps1)
+export const TRUST_CMD = String.raw`powershell -ExecutionPolicy Bypass -File C:\Users\eladw\tv-guide\tools\home\trust.ps1`;
+export function evaluateHome(st) {
+  const problems = [], info = { status: (st && st.status) || "unknown" };
+  if (st && st.status === "needs-approval") {
+    problems.push("המחשב בבית מחכה לאישור קוד חדש (" + (st.files || []).join(", ") + "). להריץ ב-PowerShell: " + TRUST_CMD);
+  }
+  return { problems, info };
+}
+
 export function parseSiteFiles(indexHtml) {
   const build = (indexHtml.match(/BUILD\s*=\s*"([^"]+)"/) || [])[1] || null;
   const m = indexHtml.match(/TVG\.list\s*=\s*\[([^\]]*)\]/);
@@ -172,6 +182,10 @@ export async function runHealth({ base = SITE, server = SERVER, fetchFn = fetch,
   const hot = await json("hot-cache.json", base + "hot-cache.json?" + nb);
   const extra = await json("extra-cache.json", base + "extra-cache.json?" + nb);
   if (hot && extra) { const c = evaluateCaches(hot, extra, now); problems.push(...c.problems); info.caches = c.info; }
+  try { // לא חובה: הקובץ קיים רק אחרי שהמשימה בבית רצה פעם אחת עם runner.ps1
+    const r = await get(fetchFn, base + "home-status.json?" + nb);
+    if (r.status === 200) { const h = evaluateHome(await r.json()); problems.push(...h.problems); info.home = h.info; }
+  } catch (e) {}
   // שרת – GET בלבד
   await check("/api/push", server + "/api/push", async (r) => { const j = await r.json().catch(() => null); if (!j || j.scheduler !== true) { problems.push("/api/push: ה-scheduler אינו פעיל"); return false; } return true; });
   await check("/api/rems", server + "/api/rems?t=" + rnd(30), async (r) => { const j = await r.json().catch(() => null); if (!j || !Array.isArray(j.rems) || j.rems.length) { problems.push("/api/rems: תשובה לא צפויה"); return false; } return true; });

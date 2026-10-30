@@ -1085,15 +1085,18 @@
   var sWhen = "all", topicAdd = false, sKind = "all", LASTHITS = [];
   // שידור חוזר? סימון מפורש מהמקור (mako, HOT), סימון בשם/תקציר, או אותו פרק שכבר שודר קודם. זה ניחוש טוב, לא מידע רשמי.
   function epKey(p) { return String(p.title).replace(/\s*[-–:]\s*(עונה חדשה|פרק|ספיישל).*$/, "").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 14) + "|" + String(p.desc || "").replace(/[^\p{L}]/gu, "").slice(0, 40); }
+  function stemOf(t) { return String(t).split(/\s+[-–:]\s+/)[0].replace(/[^\p{L}\p{N}]/gu, ""); }
   function markReruns(list) { // list: [{p}] ממוין לפי זמן
-    var seen = {};
+    var seen = {}, NEWRX = /עונה חדשה|פרק חדש|בכורה|חדש!/;
+    // כשלסדרה יש שידור שמסומן במפורש כחדש (למשל "עונה חדשה: פרק 7"), כל השאר הם שידורים חוזרים
+    var hasNew = {}; list.forEach(function (x) { if (NEWRX.test(x.p.title + " " + (x.p.desc || ""))) hasNew[stemOf(x.p.title)] = 1; });
     list.forEach(function (x) {
       var p = x.p, txt = p.title + " " + (p.desc || ""), k = p.desc ? epKey(p) : null;
       var isNew = /עונה חדשה|פרק חדש|בכורה|חדש!/.test(txt);
       var night = p.s.getHours() < 6; // סדרות בין חצות לשש בבוקר הן כמעט תמיד שידור חוזר
       if (p.lv === 1 || /^ישיר/.test(p.title)) { x.rr = false; x.lv = true; if (k && !seen[k]) seen[k] = p.s.getTime(); return; }
       if (p.lv === 0 && kindOf(x.c ? x.c.id : "", p.title) === "sport") { x.rr = true; return; } // ספורט שהאתר מסמן כלא-ישיר = מוקלט
-      x.rr = !isNew && (p.rr || night || /ש\.ח|\(שח\)|שידור חוזר|מקוצר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
+      x.rr = !isNew && (p.rr || night || !!hasNew[stemOf(p.title)] || /ש\.ח|\(שח\)|שידור חוזר|מקוצר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
       if (k && !seen[k]) seen[k] = p.s.getTime();
     });
   }
@@ -1457,7 +1460,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.18", BUILD = "2026-10-30.18", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.19", BUILD = "2026-10-30.19", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

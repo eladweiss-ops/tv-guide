@@ -6,6 +6,7 @@
   TVG.calUrl = calUrl;
   TVG.chName = chName;
   TVG.favBtn = favBtn;
+  TVG.gcalUrl = gcalUrl;
   TVG.findProg = findProg;
   TVG.hasRem = hasRem;
   TVG.icsText = icsText;
@@ -45,11 +46,15 @@
   var CAL_API = "https://tv-guide-cal.vercel.app";
   TVG.CAL_API = CAL_API;
   TVG.calMode = TVG.store("tvg.calmode") || "";
+  // באנדרואיד אי אפשר להירשם ליומן מנוי (webcal). גיבוי שהגיע מאייפון מנורמל ליומן רגיל; התזכורות ממשיכות להסתנכרן כל עוד פוש פעיל
+  var calNorm = false;
+  if (TVG.isAndroid && TVG.calMode === "sub") { TVG.calMode = "ics"; TVG.store("tvg.calmode", "ics"); calNorm = true; }
   TVG.calTok = TVG.store("tvg.calTok") || "";
   TVG.syncBad = TVG.store("tvg.remDirty") === "1";
   function newTok() { var a = new Uint8Array(20); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (v, i) { a[i] = Math.random() * 256; }); return Array.from(a).map(function (b) { return (b % 36).toString(36); }).join("") + Date.now().toString(36); }
   function calUrl() { return CAL_API.replace(/^https?:/, "webcal:") + "/cal/" + TVG.calTok + ".ics"; }
   TVG.pushOn = TVG.store("tvg.push") === "1";
+  if (calNorm && TVG.pushOn) setTimeout(function () { TVG.syncRems(); }, 0);
   function srv() { return TVG.calMode === "sub" || TVG.pushOn; } // התזכורות נשמרות בשרת (יומן מנוי או התראות פוש)
   function syncRems() {
     if (!srv() || !TVG.calTok) return Promise.resolve(true);
@@ -89,6 +94,13 @@
     var k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
     var p = (TVG.by.get(id) || []).filter(function (x) { return x.s.getTime() === ts; })[0];
     return p ? { id: id, p: p } : null;
+  }
+  // קישור "הוספה ליומן Google" (באנדרואיד webcal/‏.ics לא עובדים). אי אפשר להעביר דרכו שעת התראה מדויקת
+  function gcalUrl(r) {
+    try {
+      var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : ""), desc = Array.from(p.desc || "").slice(0, 300).join("");
+      return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ttl) + "&dates=" + icsT(p.s) + "/" + icsT(p.e) + "&details=" + encodeURIComponent(desc);
+    } catch (e) { return "https://calendar.google.com/calendar"; }
   }
   function chName(id) { return (TVG.G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || ""; }
   function icsText(r, cancel) {

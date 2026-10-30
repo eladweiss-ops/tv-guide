@@ -162,6 +162,12 @@
   .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 7px; margin-inline-end: 6px; vertical-align: -2px; }
 
   html, body { overflow-x: clip; overscroll-behavior-x: none; }
+  html.android body { overscroll-behavior-y: contain; }
+  html.android * { -webkit-tap-highlight-color: transparent; }
+  html.android #bkCode { font: 13px/1.5 Heebo, system-ui, sans-serif; letter-spacing: .6px; }
+  /* מקלדת באנדרואיד: --kb (ui.js) מרים את החלונות התחתונים מעל המקלדת */
+  html.android .sheet { bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px)); max-height: calc(86vh - var(--kb, 0px)); }
+  html.android .pill { border-radius: 28px; width: max-content; max-width: calc(100vw - 32px); text-align: center; white-space: normal; }
   #main, [data-cid] { touch-action: pan-y; }
   .pill { position: fixed; top: 38%; left: 50%; transform: translateX(-50%); z-index: 30; background: var(--ink); color: var(--bg); padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 1.05rem; box-shadow: 0 6px 24px rgba(0,0,0,.28); pointer-events: none; white-space: nowrap; }
   @keyframes fromR { from { opacity: 0; transform: translateX(44px); } to { opacity: 1; transform: none; } }

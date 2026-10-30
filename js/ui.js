@@ -17,5 +17,15 @@
     var el = document.getElementById(id); if (!el) return;
     el.addEventListener("click", function (e) { e.stopPropagation(); if (id === "scrim") { TVG.openSheet(false); TVG.render(); } else { TVG.closeRem(); TVG.closeFavs(); } });
   });
+  // אנדרואיד: המקלדת לא משנה את גובה הדף, אז --kb (גובה המקלדת) מרים את החלונות התחתונים; ושדה ממוקד נגלל לתצוגה
+  if (TVG.isAndroid) {
+    var vv = window.visualViewport;
+    var setKb = function () { var kb = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0; document.documentElement.style.setProperty("--kb", (kb > 80 ? kb : 0) + "px"); };
+    if (vv) { vv.addEventListener("resize", setKb); vv.addEventListener("scroll", setKb); }
+    document.addEventListener("focusin", function (e) {
+      var t = e.target; if (!t || !t.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !t.closest(".sheet")) return;
+      setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (er) {} }, 350);
+    });
+  }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
 })(window.TVG);

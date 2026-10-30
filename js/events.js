@@ -94,7 +94,7 @@
       if (jr) { if (!TVG.chans().some(function (c) { return c.id === jr.id; })) { sel.add(jr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); } TVG.setSearch(false); TVG.chId = jr.id; TVG.day = dstr(jr.p.s); TVG.scrub = Math.round((jr.p.s - TVG.dObj(TVG.day)) / 60000); TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
       return;
     }
-    if (t.closest("[data-install]")) { if (TVG.dip) { TVG.dip.prompt(); TVG.dip = null; TVG.setInst(); } return; }
+    if (t.closest("[data-install]")) { TVG.install(); return; }
     var tb = t.closest("[data-tab]");
     if (tb) {
       var nt = tb.getAttribute("data-tab");

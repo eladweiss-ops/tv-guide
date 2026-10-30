@@ -133,3 +133,8 @@ python tools/audit_sport.py     # תקצירי ספורט מענף אחר / בל
 python tools/audit_guide.py     # ימים חסרים, כפילויות, פערים >8 שעות, ישויות HTML
 ```
 ובנוסף, לפני כל איחוד ערוצים: להשוות את הלוחות (אחוז זמן+כותרת זהים). מתחת ל-60% – לא לאחד.
+
+### ניטור אוטומטי (`.github/workflows/monitor.yml`, התראות לטלגרם)
+- `node tools/monitor/health.mjs` – בדיקה טכנית של האתר החי (index/css/js עם `?v=BUILD`, sw, manifest), `guide.json` (גיל, כמות, ימים לערוצים מרכזיים, % תקצירים), `netflix.json`, שרת (`GET` בלבד, בלי כתיבה), ומטמוני המחשב בבית (HOT, ערוץ 14). **הספים הם קבועים בראש הקובץ** (`T`, `KEY_CHANNELS`); שבת של ערוץ 14 מוגדרת כחריג. יוצא תמיד 0.
+- `node tools/monitor/notify.mjs` – כל שעתיים שולח רק במעבר ל-🔴 או חזרה ל-🟢 (המצב ב-`actions/cache`, בלי commit); בין 08:00 ל-12:00 בישראל פעם ביום שולח סיכום בוקר ומריץ גם `tools/qa/shoot.cjs` מול האתר החי (`TVG_NO_WRITES=1` חוסם כתיבות לשרת). צילום מסך נשלח רק כשה-UX נכשל. בלי `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` – לא שולח ולא נכשל.
+- בדיקות: `node --test tools/monitor/`. הרצה ידנית של סיכום מלא: Actions → Monitor → Run workflow → `force_summary`.

@@ -1,6 +1,7 @@
 /* js/data.js - נתונים: טעינת guide.json, סיווג ערוצים/ז'אנרים, איחוד כפילויות, אינדקס, בחירת ערוצים וימים.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core. */
 (function (TVG) {
+  TVG.files["data"] = 1;
   var esc = TVG.esc, DAYS = TVG.DAYS, dstr = TVG.dstr, sel = TVG.sel;
   TVG.allDays = allDays;
   TVG.chans = chans;

@@ -1,6 +1,7 @@
 /* js/search.js - חיפוש חכם, נושאים למעקב, חיפושים אחרונים, תצוגת תוצאות.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings. */
 (function (TVG) {
+  TVG.files["search"] = 1;
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr, FAV = TVG.FAV;
   TVG.addRecent = addRecent;
   TVG.isTopic = isTopic;

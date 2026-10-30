@@ -1,6 +1,7 @@
 /* js/render-now.js - מסך 'עכשיו' + בוחרים (ספק/סוג).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common. */
 (function (TVG) {
+  TVG.files["render-now"] = 1;
   var esc = TVG.esc, DAYS = TVG.DAYS, hhmm = TVG.hhmm, dstr = TVG.dstr;
   TVG.pickers = pickers;
   TVG.stepCard = stepCard;

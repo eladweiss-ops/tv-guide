@@ -14,8 +14,11 @@
 <script>
 /* גרסה ועדכון: כאן, ורק כאן, מעלים VERSION ו-BUILD בכל שינוי. BUILD משמש גם כ-?v= לקובצי css/js (cache busting). */
 var VERSION = "1.33", BUILD = "2026-10-30.33";
-window.TVG = { VERSION: VERSION, BUILD: BUILD };
-document.write('<link rel="stylesheet" href="css/app.css?v=' + BUILD + '">');
+window.TVG = { VERSION: VERSION, BUILD: BUILD, files: {}, failed: [], list: [] };
+/* ?r2=<זמן> מופיע רק אחרי כשל טעינה (ראו הסקריפט האחרון); הוא עוקף מטמון של css/js */
+var BUST = (location.search.match(/[?&]r2=(\d+)/) || [])[1];
+TVG.v = BUILD + (BUST ? "&r2=" + BUST : "");
+document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 </script>
 </head>
 <body>
@@ -87,8 +90,24 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + BUILD + '">');
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","events","update","backup","boot"];
-  for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + BUILD + '"><\/script>');
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","events","update","backup","boot"];
+  for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
+})();
+</script>
+<script>
+/* התאוששות מכשל טעינה: קובץ שלא נטען / נטען חלקית (404, רשת, מטמון) = רענון חד-פעמי עם ?r2=, ואם גם זה נכשל, מסך "נסו שוב". */
+(function () {
+  var miss = [];
+  for (var i = 0; i < TVG.list.length; i++) if (!TVG.files[TVG.list[i]]) miss.push(TVG.list[i]);
+  if (TVG.booted && !TVG.failed.length && !miss.length) { try { sessionStorage.removeItem("tvg.r2"); } catch (e) {} return; }
+  var tried = true;
+  try { tried = !!sessionStorage.getItem("tvg.r2"); if (!tried) sessionStorage.setItem("tvg.r2", "1"); } catch (e) {}
+  if (!tried) { location.replace("./?r2=" + Date.now()); return; }
+  var d = document.createElement("div");
+  d.setAttribute("style", "position:fixed;left:0;top:0;right:0;bottom:0;z-index:99999;background:#f2f2f7;color:#1c1c1e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:Heebo,system-ui,sans-serif;text-align:center;padding:24px");
+  d.innerHTML = '<div style="font-size:22px;font-weight:800">משהו לא נטען 😕</div><button type="button" id="tvgRetry" style="background:#ff9500;color:#fff;border:0;border-radius:14px;padding:14px 28px;font:inherit;font-size:18px;font-weight:700;min-height:48px">נסו שוב</button>';
+  document.body.appendChild(d);
+  document.getElementById("tvgRetry").onclick = function () { try { sessionStorage.removeItem("tvg.r2"); } catch (e) {} location.replace("./?r2=" + Date.now()); };
 })();
 </script>
 </body>

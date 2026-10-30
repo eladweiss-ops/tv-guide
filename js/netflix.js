@@ -1,6 +1,7 @@
 /* js/netflix.js - מסך 'נטפליקס'.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid. */
 (function (TVG) {
+  TVG.files["netflix"] = 1;
   var esc = TVG.esc;
   TVG.vNf = vNf;
 

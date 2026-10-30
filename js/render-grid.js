@@ -1,6 +1,7 @@
 /* js/render-grid.js - מסך 'לוח'.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now. */
 (function (TVG) {
+  TVG.files["render-grid"] = 1;
   var esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr, descHtml = TVG.descHtml;
   TVG.vGrid = vGrid;
 

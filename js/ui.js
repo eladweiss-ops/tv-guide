@@ -1,6 +1,7 @@
 /* js/ui.js - UI משותף: הודעה קופצת (pill), רקע כהה (scrim), מחלקת גלילה.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders. */
 (function (TVG) {
+  TVG.files["ui"] = 1;
   var $ = TVG.$, esc = TVG.esc;
   TVG.pill = pill;
 

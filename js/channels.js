@@ -1,6 +1,7 @@
 /* js/channels.js - בחירת ערוצים (חלון 'הערוצים שלי').
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search, favs, render. */
 (function (TVG) {
+  TVG.files["channels"] = 1;
   var $ = TVG.$, esc = TVG.esc, sel = TVG.sel, GROUPS = TVG.GROUPS, GENRES = TVG.GENRES, GNAME = TVG.GNAME;
   TVG.buildSheet = buildSheet;
   TVG.chNum = chNum;

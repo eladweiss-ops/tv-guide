@@ -1,6 +1,7 @@
 /* js/render-dial.js - מסך 'היום' (החוגה).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix. */
 (function (TVG) {
+  TVG.files["render-dial"] = 1;
   var $ = TVG.$, esc = TVG.esc, p2 = TVG.p2, hhmm = TVG.hhmm, dstr = TVG.dstr, descHtml = TVG.descHtml, FAV = TVG.FAV;
   TVG.dialMin = dialMin;
   TVG.dialSet = dialSet;

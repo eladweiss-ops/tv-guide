@@ -1,6 +1,7 @@
 /* js/core.js - ליבה: עזרי DOM/טקסט/זמן, אחסון (store), ומצב האפליקציה המשותף (G, sel, tab, day...).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: -. */
 (function (TVG) {
+  TVG.files["core"] = 1;
   TVG.parse = parse;
   TVG.store = store;
 

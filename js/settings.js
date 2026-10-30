@@ -1,6 +1,7 @@
 /* js/settings.js - הגדרות: התקנה כאפליקציה, ערכת נושא, חלון ההגדרות.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe. */
 (function (TVG) {
+  TVG.files["settings"] = 1;
   var $ = TVG.$;
   TVG.openSet = openSet;
   TVG.setInst = setInst;

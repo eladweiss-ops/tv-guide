@@ -1,6 +1,7 @@
 /* js/update.js - עדכון אוטומטי (checkUpdate) ומשימות רקע בעליה.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search, favs, render, channels, events. */
 (function (TVG) {
+  TVG.files["update"] = 1;
   // ---- עדכון אוטומטי של האפליקציה ----
   // VERSION ו-BUILD מוגדרים ב-index.html בלבד (מקור יחיד). בכל שינוי מעלים אותם שם.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). BUILD נבדק מול index.html בשרת, וגם משמש כ-?v= לקובצי css/js.

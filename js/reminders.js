@@ -1,6 +1,7 @@
 /* js/reminders.js - תזכורות: מצב (מועדפים, REMS), סנכרון לשרת, יומן ICS, בניית כפתורי תזכורת/מועדף.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data. */
 (function (TVG) {
+  TVG.files["reminders"] = 1;
   var esc = TVG.esc;
   TVG.calUrl = calUrl;
   TVG.chName = chName;

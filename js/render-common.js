@@ -1,6 +1,7 @@
 /* js/render-common.js - רכיבי תצוגה משותפים: תקציר, שורת שידור, 'עוד מעט'.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems. */
 (function (TVG) {
+  TVG.files["render-common"] = 1;
   var esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr, FAV = TVG.FAV;
   TVG.inMin = inMin;
   TVG.soonHtml = soonHtml;

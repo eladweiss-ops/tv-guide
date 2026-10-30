@@ -1,6 +1,7 @@
 /* js/favs.js - חלון המועדפים.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search. */
 (function (TVG) {
+  TVG.files["favs"] = 1;
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr, FAV = TVG.FAV;
   TVG.closeFavs = closeFavs;
   TVG.favHtml = favHtml;

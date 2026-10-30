@@ -1,6 +1,7 @@
 /* js/reminder-sheet.js - חלון התזכורת: בורר זמן התראה, פתיחה/ביטול/הוספה מהירה, הרשמה ליומן.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui. */
 (function (TVG) {
+  TVG.files["reminder-sheet"] = 1;
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr;
   TVG.askCal = askCal;
   TVG.calWelcome = calWelcome;

@@ -1,6 +1,9 @@
 /* js/boot.js - עליית האפליקציה: תוויות גרסה, רענון, טעינת הנתונים ו-render ראשון.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search, favs, render, channels, events, update, backup. */
 (function (TVG) {
+  TVG.files["boot"] = 1;
+  // כל הקבצים ברשימה חייבים להיות נטענו; אחרת לא עולים, וההתאוששות ב-index.html תרענן.
+  for (var fi = 0; fi < TVG.list.length; fi++) if (!TVG.files[TVG.list[fi]]) { TVG.failed.push(TVG.list[fi]); return; }
   var $ = TVG.$, sel = TVG.sel, VERSION = TVG.VERSION, BUILD = TVG.BUILD;
 
   $("#bkVer").textContent = "גרסה " + VERSION + " · " + BUILD;
@@ -32,4 +35,5 @@
         TVG.render();
       }).catch(function () {});
   });
+  TVG.booted = true;
 })(window.TVG);

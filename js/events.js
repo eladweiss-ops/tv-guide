@@ -1,6 +1,7 @@
 /* js/events.js - כל מאזיני האירועים של המסמך (הקשה, גרירה, מקלדת, שינוי).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search, favs, render, channels. */
 (function (TVG) {
+  TVG.files["events"] = 1;
   var $ = TVG.$, dstr = TVG.dstr, sel = TVG.sel, SCR = TVG.SCR, FAV = TVG.FAV, CAL_API = TVG.CAL_API, CX = TVG.CX, RO = TVG.RO;
 
   document.addEventListener("click", function (e) {

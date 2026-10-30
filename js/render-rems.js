@@ -1,6 +1,7 @@
 /* js/render-rems.js - מסך 'תזכורות'.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push. */
 (function (TVG) {
+  TVG.files["render-rems"] = 1;
   var esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr;
   TVG.vRems = vRems;
 

@@ -1,6 +1,7 @@
 /* js/backup.js - גיבוי בענן וקישור אישי לשחזור.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial, swipe, settings, search, favs, render, channels, events, update. */
 (function (TVG) {
+  TVG.files["backup"] = 1;
   var $ = TVG.$, CAL_API = TVG.CAL_API;
   TVG.myTok = myTok;
 

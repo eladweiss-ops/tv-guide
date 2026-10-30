@@ -1,6 +1,7 @@
 /* js/push.js - התראות פוש (Web Push), הגדרות אישיות (openPersonal), כרטיסי פוש/יומן.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet. */
 (function (TVG) {
+  TVG.files["push"] = 1;
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, CAL_API = TVG.CAL_API;
   TVG.calCard = calCard;
   TVG.enablePush = enablePush;

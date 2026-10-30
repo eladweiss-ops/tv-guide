@@ -1,6 +1,7 @@
 /* js/swipe.js - החלקה בין ימים.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix, render-dial. */
 (function (TVG) {
+  TVG.files["swipe"] = 1;
   var $ = TVG.$;
 
   // ---- החלקה בין ימים ----

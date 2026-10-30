@@ -11,6 +11,7 @@
   TVG.handleUrl = handleUrl;
   TVG.afterBoot = afterBoot;
 
+  var URL_PARAMS = ["tab", "rem", "p", "q"];
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -100,20 +101,22 @@
     var p;
     try { p = new URL(u || location.href, location.href).searchParams; } catch (e) { return; }
     if (!TVG.G) { TVG.pendingUrl = u || location.href; return; }
-    var tab = p.get("tab"), rem = p.get("rem"), hasQ = p.has("q"), q = p.get("q") || "";
-    if (tab && !isBoot) switchTab(tab);
+    // קדימות (מקום אחד): rem > p > q > tab. rem: נודניק; p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
+    var tab = p.get("tab"), rem = p.get("rem"), pp = p.get("p"), hasQ = p.has("q"), q = p.get("q") || "";
+    if (tab && !isBoot && !rem && pp == null) switchTab(tab);
     if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
+    else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);
-    if (isBoot) cleanUrl(["tab", "rem", "q"]);
+    if (isBoot) cleanUrl(URL_PARAMS);
   }
   function afterBoot() {
     var pend = TVG.pendingUrl; TVG.pendingUrl = null;
     handleUrl(pend || null, !pend);
-    if (pend) cleanUrl(["tab", "rem", "q"]);
+    if (pend) cleanUrl(URL_PARAMS);
   }
   try {
     if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (e) {
-      var d = e.data; if (d && d.type === "open" && typeof d.url === "string") { handleUrl(d.url, false); cleanUrl(["tab", "rem", "q"]); }
+      var d = e.data; if (d && d.type === "open" && typeof d.url === "string") { handleUrl(d.url, false); cleanUrl(URL_PARAMS); }
     });
   } catch (e) {}
 })(window.TVG);

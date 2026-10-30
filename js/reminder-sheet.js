@@ -105,13 +105,13 @@
       $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(TVG.chName(r.id)) + "</span><span>" + TVG.dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
         '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + esc(leadTxt(ex.lead, ex.ts)) + (ex.dbl ? " וגם בתחילת השידור" : "") + ".</p>" +
         (TVG.srv() ? '<button type="button" class="ghost" data-ledit="' + esc(ex.k) + '">🔔 שינוי מועד ההתראה</button>' : "") +
-        '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
+        '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button>' + TVG.shareBtn(r.p, r.id) + '<button type="button" class="ghost" data-remclose>סגירה</button>' +
         '<p class="credit">' + (TVG.srv() ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : TVG.isAndroid ? "הביטול מוריד את התזכורת מהרשימה. אם האירוע נוסף ל-Google Calendar, מוחקים אותו שם." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
       $("#rem").hidden = false; $("#scrim2").hidden = false; return;
     }
     $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(TVG.chName(r.id)) + "</span><span>" + TVG.dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
       leadPicker(r.p.s.getTime(), r.lead, true) +
-      '<button type="button" class="btn" data-ics>' + (TVG.pushOn ? "⏰ הוספת תזכורת" : TVG.isAndroid ? "📅 הוספה ליומן Google" : "הוספה ליומן עם תזכורת") + '</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
+      '<button type="button" class="btn" data-ics>' + (TVG.pushOn ? "⏰ הוספת תזכורת" : TVG.isAndroid ? "📅 הוספה ליומן Google" : "הוספה ליומן עם תזכורת") + '</button>' + TVG.shareBtn(r.p, r.id) + '<button type="button" class="ghost" data-remclose>סגירה</button>' +
       (TVG.srv() ? "" : TVG.isAndroid ? '<p class="credit">ייפתח יומן Google עם האירוע מוכן לשמירה. ההתראה שם לפי ברירת המחדל של היומן, לא בדיוק למועד שבחרת.</p>' : '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>');
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }

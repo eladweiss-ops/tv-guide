@@ -32,7 +32,7 @@
       (live ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' : "") +
       '<div class="acts">' + (live ? "" : TVG.remBtn(p, c.id, false)) + '<button type="button" class="ghost synt" data-opentog>📖 תקציר</button></div>' +
       (nav ? '<div class="nav' + (k > i && n ? " two" : "") + '">' + nav + "</div>" : "") +
-      '<div class="more">' + TVG.synText(p, c.id) + TVG.favBtn(p) + "</div></article>";
+      '<div class="more">' + TVG.synText(p, c.id) + TVG.favBtn(p) + TVG.shareBtn(p, c.id) + "</div></article>";
   }
   var RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   function stepCard(cid, dir) {

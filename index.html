@@ -365,6 +365,10 @@
   .dcard p { font-size: .98rem; line-height: 1.5; }
   .chnum { display: inline-block; min-width: 30px; margin-inline-end: 8px; padding: 1px 6px; border-radius: 8px; background: var(--soft); color: var(--accent); font-size: .85rem; text-align: center; }
   .hb { display: flex; gap: 8px; }
+  /* שורת ימים: כל ימי הלוח, גלילה אופקית בתוך השורה בלבד */
+  .days { display: flex; overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x; }
+  .days::-webkit-scrollbar { display: none; }
+  .days .day { flex: 0 0 auto; min-width: 70px; scroll-snap-align: start; }
 </style>
 </head>
 <body>
@@ -589,7 +593,7 @@
   function allDays() {
     var s = new Set(); by.forEach(function (a) { a.forEach(function (p) { s.add(dstr(p.s)); }); });
     var all = Array.from(s).sort(), td = dstr(new Date()), fut = all.filter(function (d) { return d >= td; });
-    return (fut.length ? fut : all).slice(0, 5);
+    return (fut.length ? fut : all).slice(0, 8); // כל מה שיש בלוח (בדרך כלל שבוע)
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }
@@ -992,7 +996,7 @@
     pill(dayLabel(day), 1100);
   }
   document.addEventListener("touchstart", function (e) {
-    if ((tab !== "dial" && tab !== "grid" && tab !== "now") || q.trim() || e.touches.length !== 1 || e.target.closest("#dial,.sheet,select")) { sw = null; return; }
+    if ((tab !== "dial" && tab !== "grid" && tab !== "now") || q.trim() || e.touches.length !== 1 || e.target.closest("#dial,.sheet,select,.days")) { sw = null; return; }
     var t = e.touches[0], cd = tab === "now" ? e.target.closest("[data-cid]") : null;
     if (tab === "now" && !cd) { sw = null; return; }
     sw = { x: t.clientX, y: t.clientY, dx: 0, lock: null, card: cd };
@@ -1251,6 +1255,7 @@
     }
     scrollNext = false;
     if (D && tab === "dial" && !nf && !picking && !searching && !srchOpen && $("#dial")) updateDial(dialT());
+    var dsel = document.querySelector('.days .day[aria-pressed="true"]'); if (dsel && dsel.scrollIntoView) dsel.scrollIntoView({ block: "nearest", inline: "center" });
   }
 
   var themeSel = "light";
@@ -1460,7 +1465,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.19", BUILD = "2026-10-30.19", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.20", BUILD = "2026-10-30.20", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

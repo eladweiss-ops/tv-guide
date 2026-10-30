@@ -10,9 +10,12 @@ export default async function handler(req, res) {
     const rems = await load(b.t);
     const r = rems.find((x) => x.k === b.k);
     if (!r) return res.status(200).json({ skipped: "cancelled" });
+    if (b.snooze) { // נודניק: הודעה נפרדת, לא נוגעים בתזמון הרגיל (sched)
+      return res.status(200).json(await sendTo(b.t, remPayload(r, { t: b.t, at: Date.now(), snooze: true })));
+    }
     const at = r.ts - (r.lead || 0) * 60000;
     if (Math.abs(Math.max(at, 0) - b.at) > 120000 && at > Date.now() + 60000) return res.status(200).json({ skipped: "changed" });
-    const out = await sendTo(b.t, remPayload(r));
+    const out = await sendTo(b.t, remPayload(r, { t: b.t, at: Date.now() }));
     await dropSched(b.t, b.k);
     return res.status(200).json(out);
   } catch (e) {

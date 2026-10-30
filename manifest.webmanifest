@@ -1,15 +1,24 @@
 {
+  "id": "/tv-guide/",
   "name": "לוח שידורים אישי",
   "short_name": "לוח שידורים",
+  "description": "לוח שידורים אישי של הטלוויזיה בישראל: מה משודר עכשיו, מה בהמשך, חיפוש ותזכורות להתחלת תוכניות.",
   "lang": "he",
   "dir": "rtl",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "theme_color": "#E8EEFF",
-  "background_color": "#f7f5fb",
+  "orientation": "portrait",
+  "theme_color": "#0E0F14",
+  "background_color": "#0E0F14",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "עכשיו", "short_name": "עכשיו", "description": "מה משודר עכשיו", "url": "./?tab=now", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "תזכורות", "short_name": "תזכורות", "description": "התזכורות שלי", "url": "./?tab=rems", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "חיפוש", "short_name": "חיפוש", "description": "חיפוש תוכנית", "url": "./?q=", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

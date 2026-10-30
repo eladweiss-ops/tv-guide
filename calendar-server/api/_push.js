@@ -1,14 +1,16 @@
 // התראות פוש: מנויים לכל משתמש, שליחה, ותזמון מדויק דרך Upstash QStash (אם הוגדר QSTASH_TOKEN)
 import webpush from "web-push";
 import { put, list } from "@vercel/blob";
+import { SELF, QBASE, remPayload } from "./_snz.js";
+export { remPayload };
 
-async function readJson(p, dflt) {
+export async function readJson(p, dflt) {
   const { blobs } = await list({ prefix: p, limit: 1 });
   if (!blobs.length) return dflt;
   const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
   return r.ok ? await r.json().catch(() => dflt) : dflt;
 }
-async function writeJson(p, o) {
+export async function writeJson(p, o) {
   await put(p, JSON.stringify(o), { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 });
 }
 export const getSubs = (t) => readJson(`push/${t}.json`, []);
@@ -25,16 +27,6 @@ export async function sendTo(t, payload) {
   if (keep.length !== subs.length) await setSubs(t, keep);
   return { ok, total: subs.length };
 }
-
-const fmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
-export function remPayload(r) {
-  const mins = Math.round((r.ts - Date.now()) / 60000);
-  const when = mins <= 0 ? "מתחיל עכשיו" : mins < 60 ? `מתחיל בעוד ${mins} דק׳ (${fmt.format(r.ts)})` : `מתחיל ב-${fmt.format(r.ts)}`;
-  return { title: "⏰ " + r.title, body: (r.ch ? r.ch + " · " : "") + when, tag: r.k, url: "./?rem=" + encodeURIComponent(r.k) };
-}
-
-const QBASE = () => (process.env.QSTASH_URL || "https://qstash.upstash.io").replace(/\/$/, "");
-const SELF = "https://tv-guide-cal.vercel.app";
 
 // מסנכרן את התזמונים מול רשימת התזכורות: מוסיף חדשות, מבטל שבוטלו או ששונו
 export async function reschedule(t, rems) {

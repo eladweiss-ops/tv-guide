@@ -358,6 +358,7 @@
   .vertag { float: left; margin-top: 4px; padding: 3px 10px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: .8rem; font-weight: 700; }
   .tagk { display: inline-block; font-size: .72rem; font-weight: 800; padding: 1px 7px; border-radius: 999px; vertical-align: 2px; }
   .tagk.nw { background: rgba(48,209,88,.2); color: #30D158; } .tagk.rr { background: var(--soft); color: var(--muted); }
+  .tagk.now { background: rgba(255,59,48,.2); color: #FF453A; } .tagk.live { background: rgba(255,159,10,.2); color: #FF9F0A; }
 </style>
 </head>
 <body>
@@ -1077,7 +1078,7 @@
       var p = x.p, txt = p.title + " " + (p.desc || ""), k = p.desc ? epKey(p) : null;
       var isNew = /עונה חדשה|פרק חדש|בכורה|חדש!/.test(txt);
       var night = p.s.getHours() < 6; // סדרות בין חצות לשש בבוקר הן כמעט תמיד שידור חוזר
-      x.rr = !isNew && (p.rr || night || /ש\.ח|\(שח\)|שידור חוזר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
+      x.rr = !isNew && (p.rr || night || /ש\.ח|\(שח\)|שידור חוזר|מקוצר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
       if (k && !seen[k]) seen[k] = p.s.getTime();
     });
   }
@@ -1122,7 +1123,8 @@
     // אותו שידור בשני ערוצים תאומים (SD/HD, או כאן וערוץ 1) - מציגים פעם אחת
     var twin = {}; hits = hits.filter(function (x) { var k = x.p.s.getTime() + "|" + String(x.p.title).replace(/[^\p{L}]/gu, "").slice(0, 8); if (twin[k]) return false; twin[k] = 1; return true; });
     var series = qExact || isTopic(q.trim());
-    if (series) { markReruns(hits); var nNew = hits.filter(function (x) { return !x.rr; }).length, nRr = hits.length - nNew; if (sKind === "new") hits = hits.filter(function (x) { return !x.rr; }); else if (sKind === "rerun") hits = hits.filter(function (x) { return x.rr; }); }
+    markReruns(hits);
+    if (series) { var nNew = hits.filter(function (x) { return !x.rr; }).length, nRr = hits.length - nNew; if (sKind === "new") hits = hits.filter(function (x) { return !x.rr; }); else if (sKind === "rerun") hits = hits.filter(function (x) { return x.rr; }); }
     var h = favBanner() + '<div class="chips" role="group" aria-label="היקף חיפוש"><button type="button" class="chip" data-scope="all" aria-pressed="' + (scope === "all") + '">כל הלוח</button><button type="button" class="chip" data-scope="mine" aria-pressed="' + (scope === "mine") + '">הערוצים שלי</button>' +
       (qExact ? '<button type="button" class="chip xchip" data-clearx="1" aria-label="ביטול הבחירה">' + esc(qExact) + " ✕</button>" : "") + "</div>" +
       '<div class="chips" role="group" aria-label="מתי">' + [["all", "הכל"], ["live", "● משודר עכשיו"], ["today", "הערב"], ["week", "השבוע"]].map(function (w) { return '<button type="button" class="chip" data-when="' + w[0] + '" aria-pressed="' + (sWhen === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
@@ -1149,12 +1151,19 @@
         (todo ? '<button type="button" class="btn sm" data-remlist>' + (calMode === "sub" ? "כן, להזכיר" : "להקים תזכורות") + "</button>" : "") + "</div>";
     }
     LASTHITS = hits;
-    h += '<h2 class="sech">שידורים קרובים (' + hits.length + (hits.length > 80 ? ", מוצגים 80 הראשונים" : "") + ")</h2>";
-    h += hits.slice(0, 80).map(function (x) {
+    // סדר: קודם מה שמשודר עכשיו, אחר כך שידורים ישירים וחדשים לפי שעה, ובסוף השידורים החוזרים
+    var liveNow = function (x) { return x.p.s <= now && now < x.p.e; }, isLive = function (x) { return /ישיר|LIVE/i.test(x.p.title) || x.p.rr === 0 && /ישיר/.test(x.p.desc || ""); };
+    var g1 = hits.filter(liveNow), g2 = hits.filter(function (x) { return !liveNow(x) && !x.rr; }), g3 = hits.filter(function (x) { return !liveNow(x) && x.rr; });
+    var row = function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + (series ? (x.rr ? '<span class="tagk rr">🔁 חוזר</span> ' : '<span class="tagk nw">✨ חדש</span> ') : "") + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
+      var tag = liveNow(x) ? '<span class="tagk now">● עכשיו</span> ' : isLive(x) ? '<span class="tagk live">ישיר</span> ' : x.rr ? '<span class="tagk rr">🔁 חוזר</span> ' : (series ? '<span class="tagk nw">✨ חדש</span> ' : "");
+      return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + tag + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
         synBtn(v) + '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, x.p, x.c.id);
-    }).join("");
+    };
+    var cap = 80;
+    if (g1.length) h += '<h2 class="sech">● משודר עכשיו (' + g1.length + ")</h2>" + g1.slice(0, cap).map(row).join("");
+    if (g2.length) h += '<h2 class="sech">' + (g1.length ? "בהמשך" : "שידורים קרובים") + " (" + g2.length + ")</h2>" + g2.slice(0, cap).map(row).join("");
+    if (g3.length) h += '<h2 class="sech">🔁 שידורים חוזרים (' + g3.length + ")</h2>" + g3.slice(0, cap).map(row).join("");
     return h;
   }
   function updFav() { $("#fvCount").textContent = FAV.size ? String(FAV.size) : ""; }
@@ -1422,7 +1431,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.13", BUILD = "2026-10-30.13", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.14", BUILD = "2026-10-30.14", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

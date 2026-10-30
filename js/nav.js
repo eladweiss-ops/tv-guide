@@ -77,6 +77,7 @@
   navLayer("#sheet", function () { TVG.openSheet(false); TVG.render(); });
   navLayer("#setsheet", function () { TVG.closeFavs(); });
   navLayer("#favs", function () { TVG.closeFavs(); });
+  navLayer("#land", function () { if (TVG.closeLand) TVG.closeLand(); }); // דף נחיתה לתוכנית ששיתפו (landing.js). לפני #rem: תזכורת נפתחת מעליו
   navLayer("#rem", function () { TVG.closeRem(); });
   navLayer("#nfsheet", function () { if (TVG.closeNf) TVG.closeNf(); }); // דף תוכן נטפליקס (netflix.js)
   navLayer("#qwrap", function () { TVG.setSearch(false); });

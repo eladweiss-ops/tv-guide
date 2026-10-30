@@ -152,7 +152,7 @@
   function closeNf() {
     if (!$("#nfsheet") || $("#nfsheet").hidden) return;
     $("#nfsheet").hidden = true; TVG.nfOpen = null;
-    if ($("#rem").hidden && $("#favs").hidden && $("#setsheet").hidden) $("#scrim2").hidden = true;
+    if ($("#rem").hidden && $("#favs").hidden && $("#setsheet").hidden && $("#land").hidden) $("#scrim2").hidden = true;
   }
 
   document.addEventListener("click", function (e) {

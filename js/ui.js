@@ -15,7 +15,7 @@
   // סגירה בלחיצה על המסך שמאחורי החלון, גם בלי להסתמך על המאזין הכללי
   ["scrim", "scrim2"].forEach(function (id) {
     var el = document.getElementById(id); if (!el) return;
-    el.addEventListener("click", function (e) { e.stopPropagation(); if (id === "scrim") { TVG.openSheet(false); TVG.render(); } else { TVG.closeRem(); TVG.closeFavs(); } });
+    el.addEventListener("click", function (e) { e.stopPropagation(); if (id === "scrim") { TVG.openSheet(false); TVG.render(); } else { var remWas = !$("#rem").hidden; TVG.closeRem(); TVG.closeFavs(); if (!remWas && TVG.closeLand) TVG.closeLand(); } });
   });
   // אנדרואיד: המקלדת לא משנה את גובה הדף, אז --kb (גובה המקלדת) מרים את החלונות התחתונים; ושדה ממוקד נגלל לתצוגה
   if (TVG.isAndroid) {

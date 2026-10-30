@@ -262,23 +262,94 @@ function nfFixtureData() {
     await step("share-text", async () => { await fresh(); await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(500); await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (!b) throw new Error("no share btn; dCard=" + document.querySelector("#dCard").innerHTML.slice(-300) + " tab=" + TVG.tab + " ch=" + TVG.chId); b.click(); }); await page.waitForTimeout(700); await snap("11_share_text"); });
     await step("share-card", async () => { await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("12_share_card"); });
     await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); if (/הקישור הועתק/.test(t) && !(await page.evaluate(() => document.querySelector("#rem").hidden))) throw new Error("share sheet still open after copy"); });
-    await step("deeplink-short", async () => { // הקישור הקצר החדש: ?p=<ערוץ>.<YYMMDDHHMM>
+    await step("share-texts", async () => { // הטקסט המדויק שנשלח בכל מצב (נשמר לקובץ לעיון)
       await fresh();
-      const v = await page.evaluate(() => { const now = Date.now(); for (const id of Array.from(TVG.sel)) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000); if (a.length) { const p = a[0]; return id + "." + (TVG.dstr(p.s) + TVG.hhmm(p.s)).replace(/\D/g, "").slice(2); } } return null; });
-      if (!v) throw new Error("no program for short deep link");
-      await page.goto(base + "index.html?p=" + v, { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
-      const t = await page.textContent("#pill"); if (!/ששיתפו איתך/.test(t)) throw new Error("short link not resolved: " + v + " pill=" + t);
+      const o = await page.evaluate(() => { const now = Date.now(); const out = []; for (const id of Array.from(TVG.sel)) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 3600000 && p.desc && p.desc.length > 20); if (a.length) { const r = { id, p: a[0] }; out.push(TVG.shareText(r, false), TVG.shareText(r, true)); break; } } const lv = (TVG.by.get("3787") || []).filter(p => p.lv === 1)[0]; if (lv) out.push(TVG.shareText({ id: "3787", p: lv }, false)); return out; });
+      assert(o.length >= 2, "texts"); assert(/\n\n.*📅 להוספה ליומן ותזכורת:\n.*\?p=/.test(o[0]), "text mode format: " + o[0]); assert(o[1].split("\n").length === 2 && /^‏📅 להוספה ליומן ותזכורת:\nhttps/.test(o[1]), "card text only cta+link: " + o[1]);
+      fs.appendFileSync(path.join(OUT, "share_texts_" + d.name + ".txt"), o.map((t, i) => "--- " + i + " ---\n" + t).join("\n\n") + "\n");
     });
-    await step("deeplink", async () => {
-      await fresh();
-      const v = await page.evaluate(() => { const now = Date.now(); const ids = Array.from(TVG.sel); for (const id of ids) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000 * 1.2); if (a.length) { const p = a[Math.min(3, a.length - 1)]; return id + "%7C" + TVG.dstr(p.s) + "T" + TVG.hhmm(p.s); } } return null; });
-      if (!v) throw new Error("no program for deep link");
-      await page.goto(base + "index.html?p=" + v + "&x=1", { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
-      const u = await page.evaluate(() => location.search); if (u !== "?x=1") throw new Error("url not cleaned: " + u);
-      await snap("13_deeplink");
-      await page.goto(base + "index.html?p=208%7C2020-01-01T10:00", { waitUntil: "networkidle" }); await page.waitForTimeout(1000);
-      const t = await page.textContent("#pill"); if (!/כבר לא בלוח/.test(t)) throw new Error("gone toast: " + t);
-      await snap("13_deeplink_gone");
+    // ---- דף נחיתה ----
+    const pickLink = (kind) => page.evaluate((kind) => {
+      const now = Date.now(), lk = (id, p) => id + "." + (TVG.dstr(p.s) + TVG.hhmm(p.s)).replace(/\D/g, "").slice(2);
+      const sel = Array.from(TVG.sel);
+      if (kind === "up") { for (const id of sel) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 3 * 3600000 && p.desc && p.desc.length > 60); if (a.length) return { v: lk(id, a[0]), id, t: a[0].title }; } }
+      if (kind === "live") { for (const id of sel) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() <= now && p.e.getTime() > now && p.desc); if (a.length) return { v: lk(id, a[0]), id, t: a[0].title }; } }
+      if (kind === "rerun" || kind === "ended") {
+        for (const id of sel) for (const p of (TVG.by.get(id) || [])) {
+          if (p.e.getTime() >= now || p.e.getTime() < now - 8 * 3600000) continue;
+          let again = false; TVG.by.forEach((a) => { if (a.some(q => q.title === p.title && q.e.getTime() > now)) again = true; });
+          if ((kind === "rerun") === again) return { v: lk(id, p), id, t: p.title };
+        }
+      }
+      return null;
+    }, kind);
+    const landOpen = (v) => page.goto(base + "index.html?p=" + v, { waitUntil: "networkidle" }).then(() => page.waitForTimeout(1300));
+    for (const kind of ["up", "live", "rerun", "ended"]) {
+      await step("landing-" + kind, async () => {
+        await fresh(); const pk = await pickLink(kind); assert(pk, "no program for " + kind);
+        await landOpen(pk.v);
+        assert(await vis("#land"), "landing visible"); assert(!(await vis("#sheet")), "no channel picker"); assert(!/[?&]p=/.test(page.url()), "url cleaned " + page.url());
+        const txt = await page.textContent("#land");
+        if (kind === "up") { assert(txt.indexOf(pk.t) >= 0, "title"); assert(/מתחיל בעוד/.test(txt), "countdown: " + txt.slice(0, 200)); assert(await vis("[data-landcal]") && await vis("[data-landrem]"), "buttons"); }
+        if (kind === "live") { assert(/משודר עכשיו/.test(txt), "live text"); }
+        if (kind === "rerun") { assert(/כבר שודרה/.test(txt) && /מתחיל בעוד|משודר עכשיו/.test(txt), "rerun: " + txt.slice(0, 200)); }
+        if (kind === "ended") { assert(/התוכנית כבר שודרה/.test(txt) && /אין לה שידור נוסף/.test(txt), "ended: " + txt.slice(0, 200)); }
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), "no h-overflow");
+        await snap("14_landing_" + kind);
+      });
+    }
+    await step("landing-long", async () => { // כותרת וסינופסיס ארוכים
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
+      await page.evaluate(() => { const p = TVG.landTest && 0; document.querySelector(".lnd-ttl").textContent = "מכבי תל אביב נגד הפועל באר שבע בגמר גביע המדינה בכדורסל – משחק שלישי בסדרה"; document.querySelector(".lnd-syn") && (document.querySelector(".lnd-syn").textContent = document.querySelector(".lnd-syn").textContent.repeat(4)); });
+      await page.waitForTimeout(200); await snap("14_landing_long");
+      assert(await vis("[data-landcal]"), "action bar visible with long content");
+      const bb = await page.evaluate(() => { const r = document.querySelector("[data-landcal]").getBoundingClientRect(); return r.bottom <= innerHeight && r.top > 0; }); assert(bb, "primary button inside viewport");
+    });
+    await step("landing-missing", async () => {
+      await landOpen("208.2001011000"); assert(await vis("#land") && /לא מצאנו/.test(await page.textContent("#land")), "missing msg");
+      await snap("14_landing_missing");
+      await landOpen("208%7C2020-01-01T10:00"); assert(/לא מצאנו/.test(await page.textContent("#land")), "old format missing");
+    });
+    await step("landing-old-format", async () => {
+      await fresh(); const pk = await pickLink("up"); const id = pk.v.split(".")[0], t = pk.v.split(".")[1];
+      const old = id + "%7C20" + t.slice(0, 2) + "-" + t.slice(2, 4) + "-" + t.slice(4, 6) + "T" + t.slice(6, 8) + ":" + t.slice(8, 10);
+      await landOpen(old); assert(await page.evaluate((x) => document.querySelector(".lnd-ttl") && document.querySelector(".lnd-ttl").textContent === x, pk.t), "old format resolves");
+    });
+    await step("landing-first-visit", async () => {
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => localStorage.setItem("tvg.sel", "[]"));
+      await landOpen(pk.v);
+      assert(await vis("#land"), "landing visible for first visit"); assert(!(await vis("#sheet")), "channel picker NOT shown over landing");
+      assert(await page.evaluate(() => JSON.parse(localStorage.getItem("tvg.sel")).length === 0), "channel not auto-added");
+      await snap("14_landing_firstvisit");
+      await page.click("[data-landguide]"); await page.waitForTimeout(600);
+      assert(!(await vis("#land")), "landing closed"); assert(await vis("#sheet"), "normal first run: channel picker after closing landing");
+      await snap("14_landing_firstvisit_after");
+      await page.evaluate(() => localStorage.removeItem("tvg.sel")); // הבא יזרע מחדש
+    });
+    await step("landing-back-and-close", async () => {
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v); const url0 = page.url();
+      assert(await page.evaluate(() => !!(history.state && history.state.tvgLayer)), "pushState on landing");
+      await page.goBack(); await page.waitForTimeout(500); assert(!(await vis("#land")), "back closes landing"); assert(page.url() === url0, "still in app " + page.url());
+      await landOpen(pk.v); await page.click("[data-landclose]"); await page.waitForTimeout(500);
+      assert(!(await vis("#land")) && !(await vis("#scrim2")), "UI close hides scrim"); assert(await page.evaluate(() => !history.state), "history clean after UI close");
+      assert(await page.evaluate((id) => TVG.chId === id && TVG.tab === "dial", pk.id), "guide on program channel");
+      await landOpen(pk.v); await page.keyboard.press("Escape"); await page.waitForTimeout(400); assert(!(await vis("#land")), "Escape closes");
+      await snap("14_landing_closed_guide");
+    });
+    await step("landing-reminder", async () => {
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => { localStorage.setItem("tvg.sel", JSON.stringify(["3787"])); }); await landOpen(pk.v);
+      await page.click("[data-landrem]"); await page.waitForTimeout(600);
+      assert(await vis("#rem") && await vis("#land"), "reminder sheet opens above landing"); await snap("14_landing_reminder");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(400);
+      assert(!(await vis("#rem")) && await vis("#land") && await vis("#scrim2"), "back to landing, scrim kept");
+      await page.evaluate(() => localStorage.removeItem("tvg.sel"));
+    });
+    if (d.name.indexOf("iphone") === 0) await step("landing-ics", async () => {
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 4000 }), page.click("[data-landcal]")]);
+      const name = dl.suggestedFilename(); assert(/\.ics$/.test(name) && name.indexOf(pk.t.slice(0, 8)) >= 0, "ics filename from title: " + name);
+      const body = fs.readFileSync(await dl.path(), "utf8"); assert(/TRIGGER:-PT15M/.test(body) && /BEGIN:VALARM/.test(body), "ics has 15m alarm");
+      await page.waitForTimeout(300); await snap("14_landing_ics_toast");
     });
     if (d.name === "iphone_375") await step("card-png", async () => {
       await fresh();

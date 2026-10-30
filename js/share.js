@@ -5,9 +5,9 @@
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, dstr = TVG.dstr;
   TVG.shareBtn = shareBtn;
   TVG.openShare = openShare;
-  TVG.openShared = openShared;
   TVG.shareCard = shareCard;
   TVG.shareParts = parts;
+  TVG.shareText = function (r, cardOnly) { return textOf(parts(r), cardOnly); };
 
   var APP = "https://eladweiss-ops.github.io/tv-guide/";
   var S = null; // {id, p, mode: "text" | "card", blob, url}
@@ -50,27 +50,29 @@
       kind: TVG.kindOf(r.id, p.title)
     };
   }
-  function textOf(x) {
-    var l = ["‏" + x.emoji + " *" + x.title + "*", "‏" + x.day + " · " + x.time + " · " + x.ch + (x.live ? " (ישיר)" : "")];
-    if (x.syn) l.push("‏_" + x.syn.replace(/_/g, " ") + "_");
-    l.push("", "‏⏰ לתזכורת בלחיצה:", x.link);
+  var RLM = "\u200F", CTA = "📅 להוספה ליומן ותזכורת:";
+  function textOf(x, cardOnly) { // במצב כרטיס: רק הקריאה לפעולה והקישור (הפרטים כבר בתמונה)
+    if (cardOnly) return [RLM + CTA, x.link].join("\n");
+    var l = [RLM + x.emoji + " *" + x.title + "*", RLM + x.day + " · " + x.time + " · " + x.ch + (x.live ? " · ישיר" : "")];
+    if (x.syn) l.push(RLM + "_" + x.syn.replace(/_/g, " ") + "_");
+    l.push("", RLM + CTA, x.link);
     return l.join("\n");
   }
-  function bubbleHtml(x) {
-    return '<div class="shbub" dir="rtl"><div class="shl1">' + x.emoji + " <b><bdi>" + esc(x.title) + "</bdi></b></div>" +
-      '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi>" + esc(x.ch) + "</bdi>" + (x.live ? " (ישיר)" : "") + "</div>" +
-      (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") +
-      // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה כרטיס תצוגה מקדימה מתגיות og של האתר
-      '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>' +
-      '<div class="shl2">⏰ לתזכורת בלחיצה:</div>' +
-      '<div class="shl3" dir="ltr">' + esc(x.link) + "</div></div>";
+  function bubbleHtml(x, mode, imgUrl) {
+    // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה (במצב טקסט) כרטיס תצוגה מקדימה מתגיות og של האתר
+    var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
+    var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
+    if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
+    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi>" + esc(x.title) + "</bdi></b></div>" +
+      '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi>" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "") + "</div>" +
+      (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") + '<div class="shgap"></div>' + cta + "</div>";
   }
   function shareBtn(p, cid) {
     if (!cid) return "";
     return '<button type="button" class="ghost shbtn" data-share="' + esc(cid) + "|" + p.s.getTime() + '">📤 שיתוף</button>';
   }
 
-  // ---- כרטיס תמונה 1080x1350 ----
+  // ---- כרטיס "כרטיס כניסה" 1200x630 (גם היחס של תצוגת קישור) ----
   var GRAD = { sport: ["#5E5CE6", "#BF5AF2"], ent: ["#FF9F0A", "#FF375F"], news: ["#0A84FF", "#5AC8FA"], life: ["#30D158", "#00B8A9"], oth: ["#8E8E93", "#48484A"] };
   function fontsReady(sample) {
     if (!document.fonts || !document.fonts.load) return Promise.resolve();
@@ -105,37 +107,39 @@
   function shareCard(r) { // -> Promise<Blob>
     var x = parts(r);
     return fontsReady(x.title + x.ch).then(function () {
-      var W = 1080, H = 1350, PAD = 90, R = W - PAD, MW = W - 2 * PAD, c = document.createElement("canvas"); c.width = W; c.height = H;
+      var W = 1200, H = 630, PAD = 64, R = W - PAD, MW = W - 2 * PAD, c = document.createElement("canvas"); c.width = W; c.height = H;
       var ctx = c.getContext("2d"), g = GRAD[x.kind] || GRAD.ent, F = 'Heebo, "Segoe UI", system-ui, sans-serif';
-      var bg = ctx.createLinearGradient(0, 0, W, H); bg.addColorStop(0, g[0]); bg.addColorStop(1, g[1]); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-      var rg = ctx.createRadialGradient(W, 0, 0, W, 0, 760); rg.addColorStop(0, "rgba(255,255,255,.28)"); rg.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-      var rg2 = ctx.createRadialGradient(0, H, 0, 0, H, 700); rg2.addColorStop(0, "rgba(0,0,0,.28)"); rg2.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = rg2; ctx.fillRect(0, 0, W, H);
-      ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#fff";
-      // כותרת האפליקציה
-      ctx.font = "700 54px " + F; ctx.fillText("📺 לוח שידורים", R, 160);
-      // תאריך ושעה
-      ctx.font = "600 60px " + F; ctx.globalAlpha = 0.95; ctx.fillText(x.day + " · " + x.time, R, 300); ctx.globalAlpha = 1;
-      // כותרת: עד 3 שורות, הגודל יורד לפי הצורך
-      var sizes = [124, 108, 94, 82], size = 82, lay = null, i;
-      for (i = 0; i < sizes.length; i++) { ctx.font = "800 " + sizes[i] + "px " + F; var w = wrap(ctx, x.emoji + " " + x.title, MW, 3); if (!w.cut) { size = sizes[i]; lay = w; break; } }
-      if (!lay) { size = 82; ctx.font = "800 82px " + F; lay = wrap(ctx, x.emoji + " " + x.title, MW, 3); }
+      var bg = ctx.createLinearGradient(W, 0, 0, H); bg.addColorStop(0, g[0]); bg.addColorStop(1, g[1]); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      var rg = ctx.createRadialGradient(W, 0, 0, W, 0, 620); rg.addColorStop(0, "rgba(255,255,255,.30)"); rg.addColorStop(1, "rgba(255,255,255,0)"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+      var rg2 = ctx.createRadialGradient(0, H, 0, 0, H, 560); rg2.addColorStop(0, "rgba(0,0,0,.30)"); rg2.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = rg2; ctx.fillRect(0, 0, W, H);
+      // אימוג'י ענק עדין ברקע (עומק)
+      ctx.direction = "ltr"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.globalAlpha = 0.22; ctx.font = "400 330px " + F; ctx.fillStyle = "#fff"; ctx.fillText(x.emoji, 18, 330); ctx.globalAlpha = 1;
+      ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.fillStyle = "#fff";
+      // שורה עליונה: סימן האפליקציה (ימין) ושידור ישיר (שמאל)
+      ctx.font = "700 36px " + F; ctx.globalAlpha = 0.92; ctx.fillText("📺 לוח שידורים", R, 100); ctx.globalAlpha = 1;
+      if (x.live) {
+        ctx.font = "800 32px " + F; var lw = Math.ceil(ctx.measureText("● שידור ישיר").width) + 48;
+        ctx.fillStyle = "#fff"; rr(ctx, PAD, 56, lw, 60, 30); ctx.fill(); ctx.fillStyle = "#D70015"; ctx.textAlign = "center"; ctx.fillText("● שידור ישיר", PAD + lw / 2, 98); ctx.textAlign = "right"; ctx.fillStyle = "#fff";
+      }
+      // כותרת: עד 2 שורות, הגודל יורד לפי הצורך
+      var sizes = [92, 80, 70, 62], size = 62, lay = null, i;
+      for (i = 0; i < sizes.length; i++) { ctx.font = "800 " + sizes[i] + "px " + F; var w = wrap(ctx, x.title, MW, 2); if (!w.cut) { size = sizes[i]; lay = w; break; } }
+      if (!lay) { ctx.font = "800 62px " + F; lay = wrap(ctx, x.title, MW, 2); }
       ctx.font = "800 " + size + "px " + F;
-      var lh = Math.round(size * 1.2), y = 470 + size;
-      ctx.shadowColor = "rgba(0,0,0,.25)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 6;
+      var lh = Math.round(size * 1.18), y = 190 + size * 0.5;
+      ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 5;
       lay.lines.forEach(function (ln, k) { ctx.fillText(ln, R, y + k * lh); });
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      // ערוץ (+ ישיר)
-      ctx.font = "700 64px " + F;
-      var cw = Math.min(MW, Math.ceil(ctx.measureText(x.ch).width) + 80), cy = 1010;
-      ctx.fillStyle = "rgba(255,255,255,.22)"; rr(ctx, R - cw, cy, cw, 110, 55); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(x.ch, R - cw / 2, cy + 77);
-      if (x.live) {
-        ctx.font = "800 48px " + F;
-        var lw = Math.ceil(ctx.measureText("● שידור ישיר").width) + 64, lx = R - cw - 24 - lw;
-        if (lx > PAD) { ctx.fillStyle = "#fff"; rr(ctx, lx, cy + 8, lw, 94, 47); ctx.fill(); ctx.fillStyle = "#D70015"; ctx.fillText("● שידור ישיר", lx + lw / 2, cy + 72); }
-      }
-      // כתובת האפליקציה
-      ctx.direction = "ltr"; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.globalAlpha = 0.85; ctx.font = "500 38px " + F; ctx.fillText("eladweiss-ops.github.io/tv-guide", W / 2, 1262); ctx.globalAlpha = 1;
+      // לוח זכוכית תחתון: ערוץ (ימין), יום ושעה (שמאל)
+      var py = 400, ph = 166;
+      ctx.fillStyle = "rgba(255,255,255,.22)"; rr(ctx, PAD, py, MW, ph, 44); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 2; rr(ctx, PAD + 1, py + 1, MW - 2, ph - 2, 43); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.direction = "rtl";
+      var chs = 60; ctx.font = "800 " + chs + "px " + F; while (ctx.measureText(x.ch).width > 520 && chs > 36) { chs -= 4; ctx.font = "800 " + chs + "px " + F; }
+      ctx.fillText(x.ch, R - 40, py + 100);
+      ctx.textAlign = "left"; ctx.direction = "ltr"; ctx.font = "800 104px " + F; ctx.fillText(x.time, PAD + 44, py + 118);
+      var tw = ctx.measureText(x.time).width;
+      ctx.direction = "rtl"; ctx.textAlign = "left"; ctx.font = "700 44px " + F; ctx.globalAlpha = 0.95; ctx.fillText(x.day, PAD + 44 + tw + 30, py + 104); ctx.globalAlpha = 1;
       return new Promise(function (res, rej) { c.toBlob(function (b) { if (b) res(b); else rej(new Error("toBlob")); }, "image/png"); });
     });
   }
@@ -145,7 +149,7 @@
     if (S && S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
     S = { id: r.id, p: r.p, mode: "text", blob: null, url: null };
     TVG.rem = null; TVG.LP = null;
-    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">ככה זה ייראה בוואטסאפ</p><div id="shPrev"></div>' +
+    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">ככה זה ייראה אצל מי שמקבל</p><div id="shPrev"></div>' +
       '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div>' +
       '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
     paintPrev();
@@ -155,8 +159,8 @@
   function paintPrev() {
     var el = $("#shPrev"); if (!el || !S) return;
     var r = { id: S.id, p: S.p };
-    if (S.mode === "text") { el.innerHTML = bubbleHtml(parts(r)); return; }
-    el.innerHTML = '<div class="shcard' + (S.url ? "" : " ld") + '">' + (S.url ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + S.url + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>";
+    el.innerHTML = bubbleHtml(parts(r), S.mode, S.url);
+    if (S.mode === "text") return;
     if (S.blob) return;
     var cur = S; // הגנה מפני החלפת תוכנית באמצע
     shareCard(r).then(function (b) {
@@ -181,7 +185,7 @@
     TVG.pill(msg, 1800);
   }
   function send() {
-    var x = parts({ id: S.id, p: S.p }), text = textOf(x);
+    var x = parts({ id: S.id, p: S.p }), text = textOf(x, S.mode === "card");
     if (S.mode === "text") { openWa(text); done("📤 נשלח לוואטסאפ"); return; }
     if (!S.blob) { TVG.pill("הכרטיס עוד בהכנה, עוד רגע", 1500); return; }
     var file = null; try { file = new File([S.blob], "tv-guide.png", { type: "image/png" }); } catch (e) {}
@@ -208,18 +212,5 @@
     if (t.closest("[data-shcopy]")) { e.stopPropagation(); copyLink(); return; }
   }, true);
 
-  // ---- קישור עמוק ?p=<ערוץ>|<התחלה> ----
-  // v = ערך הפרמטר p (כבר מפוענח על ידי URLSearchParams). קורא לו nav.js (handleUrl), שגם מנקה את הכתובת ואוכף קדימות rem > p > q > tab
-  function openShared(v) {
-    v = String(v == null ? "" : v);
-    var m = /^(.+)\.(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/.exec(v); // פורמט קצר: ערוץ.YYMMDDHHMM
-    if (m) v = m[1] + "|20" + m[2] + "-" + m[3] + "-" + m[4] + "T" + m[5] + ":" + m[6];
-    var k = v.lastIndexOf("|"), id = v.slice(0, k), st = v.slice(k + 1), r = null;
-    if (k > 0 && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(st)) r = TVG.findProg((TVG.IDMAP[id] || id) + "|" + TVG.parse(st).getTime());
-    if (!r) { TVG.pill("התוכנית כבר לא בלוח", 2800); return; }
-    if (!TVG.chans().some(function (c) { return c.id === r.id; })) { TVG.sel.add(r.id); TVG.saveSel(); }
-    TVG.setSearch(false); if (!$("#rem").hidden) TVG.closeRem(); TVG.chId = r.id; TVG.day = dstr(r.p.s); TVG.scrub = Math.round((r.p.s - TVG.dObj(TVG.day)) / 60000);
-    TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render();
-    TVG.pill("📺 התוכנית ששיתפו איתך", 2200);
-  }
+  // קישור עמוק ?p=: דף הנחיתה ב-landing.js (TVG.openShared)
 })(window.TVG);

@@ -289,6 +289,15 @@
   .remnote { margin: 4px 0 12px; color: var(--muted); font-size: .95rem; line-height: 1.5; }
   a.btn, a.ghost { display: flex; align-items: center; justify-content: center; text-decoration: none; }
   a.ghost { color: var(--ink); } a.btn { color: #fff; }
+  .confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -6px 0 12px; padding: 10px 14px; border-radius: 16px; background: var(--soft); }
+  .confirm span { flex: 1; font-weight: 700; }
+  .btn.sm, .ghost.sm { min-height: 40px; padding: 0 14px; width: auto; }
+  .btn.danger { background: #ff3b30; color: #fff; }
+  details.calopt { margin: 0 0 12px; padding: 10px 14px; border-radius: 16px; background: var(--soft); }
+  details.calopt summary { cursor: pointer; font-weight: 700; list-style: none; }
+  details.calopt summary::-webkit-details-marker { display: none; }
+  details.calopt summary::after { content: " ›"; color: var(--muted); }
+  details.calopt[open] summary::after { content: " ‹"; }
 </style>
 </head>
 <body>
@@ -622,7 +631,7 @@
     syncRems().then(function (ok) {
       $("#remBody").innerHTML = '<h2>יומן "לוח שידורים"</h2>' + (ok ? "" : '<p class="remnote">⚠️ לא הצלחתי להתחבר לשרת כרגע. אפשר להירשם בכל זאת, והתזכורות יופיעו כשהחיבור יחזור.</p>') +
         '<ol class="remnote"><li>לחצו "הרשמה ליומן" ואז "הירשם".</li><li>במסך ההגדרות שנפתח, <b>כבו את "הסר התראות"</b>, אחרת לא תקבלו התראה לפני השידור.</li><li>לחצו "סיום". היומן יופיע באפליקציית היומן בשם "לוח שידורים".</li></ol>' +
-        '<a class="btn" href="' + esc(calUrl()) + '">הרשמה ליומן</a><button type="button" class="ghost" data-remclose>סגירה</button>' +
+        '<a class="btn" data-calsub href="' + esc(calUrl()) + '">הרשמה ליומן</a><button type="button" class="ghost" data-remclose>סגירה</button>' +
         '<p class="credit">שינויים מגיעים ליומן בעדכון הבא שלו (בדרך כלל עד רבע שעה). את התדירות אפשר לקבוע בהגדרות ← יומן ← חשבונות ← יומנים מנויים.</p>';
       if (rem && !hasRem(remKey(rem.id, rem.p.s))) {
         var p = rem.p; REMS.push({ k: remKey(rem.id, p.s), id: rem.id, ts: p.s.getTime(), end: p.e.getTime(), title: p.title, ch: chName(rem.id), desc: (p.desc || "").slice(0, 300), lead: lead, at: Date.now() });
@@ -630,15 +639,23 @@
       }
     });
   }
+  function calWelcome() {
+    $("#remBody").innerHTML = '<h2>🎉 היומן שלך מוכן!</h2><p class="remnote">מעכשיו "לוח שידורים" יושב לך ביומן. כל תזכורת שתוסיף כאן תקפוץ אליו לבד, ונזכיר לך רגע לפני שהשידור מתחיל. צפייה נעימה 📺</p>' +
+      '<p class="credit">לא רואים התראות? בהגדרות ← יומן ← חשבונות ← יומנים מנויים ← "לוח שידורים", ודאו ש"הסר התראות" כבוי.</p>' +
+      '<button type="button" class="btn" data-remclose>מעולה, תודה</button>';
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+  }
   function useIcs() {
     var r0 = rem; calMode = "ics"; store("tvg.calmode", "ics"); closeRem();
     if (r0 && !hasRem(remKey(r0.id, r0.p.s))) { rem = r0; downloadIcs(); } else render();
   }
   function calCard() {
-    if (calMode === "sub") return '<div class="note">📅 מחובר ליומן "לוח שידורים". הוספה וביטול כאן מתעדכנים ביומן לבד.' + (syncBad ? ' <b>⚠️ העדכון האחרון לא הגיע לשרת.</b> <button type="button" class="ghost" data-calsync>נסה שוב</button>' : "") +
-      '<div class="bar"><a class="ghost" href="' + esc(calUrl()) + '">הרשמה מחדש ליומן</a><button type="button" class="ghost" data-calics>מעבר לקבצים</button></div></div>';
+    if (calMode === "sub") return (syncBad ? '<div class="note">⚠️ השינוי האחרון עוד לא הגיע ליומן. <button type="button" class="ghost" data-calsync>לנסות שוב</button></div>' : "") +
+      '<details class="calopt"><summary>📅 יומן "לוח שידורים" מחובר ✓</summary><p class="remnote">כל תזכורת שמוסיפים או מבטלים כאן מתעדכנת ביומן לבד (בדרך כלל תוך רבע שעה).</p>' +
+      '<div class="bar"><a class="ghost" data-calsub href="' + esc(calUrl()) + '">הרשמה מחדש ליומן</a><button type="button" class="ghost" data-calics>מעבר לקבצים</button></div></details>';
     return '<div class="note">📅 אפשר להקים יומן נפרד בשם "לוח שידורים" שמתעדכן לבד, כולל ביטולים.<div class="bar"><button type="button" class="ghost" data-calsetup>הקמת יומן ייעודי</button></div></div>';
   }
+  var askK = null, askT = null;
   function vRems() {
     var now = Date.now(), up = REMS.filter(function (x) { return x.end > now; });
     if (!up.length) return calCard() + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
@@ -648,7 +665,9 @@
       if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
       var live = x.ts <= now;
       h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub">' + esc(x.ch) + " · " + (live ? "משודר עכשיו" : "התראה " + x.lead + " דק׳ לפני") + "</span></span></button>" +
-        (live ? "" : '<button type="button" class="rbt" data-remcancel="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button>') + "</div>";
+        (live ? "</div>" : askK === x.k
+          ? '</div><div class="confirm"><span>לבטל את התזכורת?</span><button type="button" class="btn sm danger" data-remcancel="' + esc(x.k) + '">כן, לבטל</button><button type="button" class="ghost sm" data-remkeep>להשאיר</button></div>'
+          : '<button type="button" class="rbt" data-remask="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button></div>');
     });
     return h;
   }
@@ -1073,7 +1092,10 @@
     var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
     var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
-    var rc = t.closest("[data-remcancel]"); if (rc) { cancelRem(rc.getAttribute("data-remcancel")); return; }
+    var rc = t.closest("[data-remcancel]"); if (rc) { askK = null; cancelRem(rc.getAttribute("data-remcancel")); return; }
+    var ra = t.closest("[data-remask]"); if (ra) { askK = ra.getAttribute("data-remask"); render(); clearTimeout(askT); askT = setTimeout(function () { if (askK) { askK = null; if (tab === "rems") render(); } }, 6000); return; }
+    if (t.closest("[data-remkeep]")) { askK = null; render(); return; }
+    if (t.closest("[data-calsub]")) { store("tvg.calJust", "1"); }
     if (t.closest("[data-calsetup]")) { setupCal(); return; }
     if (t.closest("[data-calics]")) { useIcs(); return; }
     if (t.closest("[data-calsync]")) { syncRems().then(function (ok) { pill(ok ? "היומן עודכן" : "עדיין אין חיבור", 1500); render(); }); return; }
@@ -1170,7 +1192,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.2", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.3", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
@@ -1184,10 +1206,12 @@
     if (document.hidden) return;
     if (Date.now() - bootAt > 3 * 3600000) { location.reload(); return; } // נתונים טריים אחרי הפסקה ארוכה
     if (syncBad) syncRems();
+    if (store("tvg.calJust") === "1") { store("tvg.calJust", "0"); calWelcome(); }
     checkUpdate();
   });
   setTimeout(checkUpdate, 1500);
   pullRems(); if (syncBad) syncRems();
+  if (store("tvg.calJust") === "1") { store("tvg.calJust", "0"); setTimeout(calWelcome, 800); }
 
   // ---- גיבוי ושחזור הבחירות ----
   var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok"];

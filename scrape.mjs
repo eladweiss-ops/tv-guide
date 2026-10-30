@@ -42,8 +42,8 @@ export function parseChannel(html) {
   const pageTitle = (clean.match(/<title[^>]*>([^<]*)<\/title>/) || [])[1] || "";
   const name = decode(pageTitle).replace(/\s*-\s*וואלה.*$/, "").replace(/^ערוץ\s+/, "").trim();
 
-  const days = [...clean.matchAll(/<span class="day">[^<]*<\/span><span class="date">(\d{1,2})\.(\d{1,2})<\/span>/g)]
-    .map((m) => ({ d: +m[1], m: +m[2] }));
+  const days = [...clean.matchAll(/<span class="day">([^<]*)<\/span><span class="date">(\d{1,2})\.(\d{1,2})<\/span>/g)]
+    .map((m) => ({ wd: decode(m[1]).trim(), d: +m[2], m: +m[3] }));
   const blocks = clean.split('<div class="broadcasts">').slice(1);
 
   const items = [];
@@ -59,11 +59,20 @@ export function parseChannel(html) {
   return { name, items };
 }
 
-function toStart(item, today) {
+const WD = { "ראשון": 0, "שני": 1, "שלישי": 2, "רביעי": 3, "חמישי": 4, "שישי": 5, "שבת": 6 };
+export function toStart(item, today) {
   let y = today.getFullYear();
   if (item.m < today.getMonth() + 1 - 6) y += 1; // מעבר דצמבר → ינואר
-  const p = (n) => String(n).padStart(2, "0");
-  return `${y}-${p(item.m)}-${p(item.d)}T${item.time}`;
+  let dt = new Date(Date.UTC(y, item.m - 1, item.d));
+  // בחלק מהערוצים בוואלה התאריך לא תואם את שם היום (למשל "שישי 1.11" כשיום שישי הוא 30.10).
+  // שם היום נכון (התוכן מתאים לו), אז מתקנים את התאריך ליום הקרוב עם אותו שם.
+  const want = WD[item.wd];
+  if (want != null && dt.getUTCDay() !== want) {
+    let best = 0;
+    for (const s of [-1, 1, -2, 2, -3, 3]) if ((dt.getUTCDay() + s + 7) % 7 === want) { best = s; break; }
+    dt = new Date(dt.getTime() + best * 864e5);
+  }
+  return dt.toISOString().slice(0, 10) + "T" + item.time;
 }
 
 // אוסף מספרי ערוצים מהעמוד הראשי ומהתצוגות לפי ספק, ושומר מאיזה ספק כל ערוץ מגיע.

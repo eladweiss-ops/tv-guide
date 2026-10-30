@@ -32,6 +32,30 @@ export function parseC14(html) {
   return out;
 }
 
+// ---- ערוץ הכנסת: טבלה לכל יום (broadcasts-table-element-N), מתחילה שבוע אחורה ----
+const ent = (t) => String(t || "").replace(/&#(\d+);/g, (m, d) => String.fromCharCode(+d)).replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCharCode(parseInt(h, 16)))
+  .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ");
+export function parseKnesset(html, today) {
+  const out = [], seen = new Set();
+  const tables = html.split(/class="broadcasts-table-element-(\d+)"/);
+  const base = new Date(today + "T00:00:00Z"); base.setUTCDate(base.getUTCDate() - 7);
+  for (let i = 1; i < tables.length; i += 2) {
+    const n = +tables[i], body = tables[i + 1];
+    let date = new Date(base.getTime() + n * 864e5).toISOString().slice(0, 10);
+    const pd = body.match(/data-programdate="(\d{2})\/(\d{2})\/(\d{4})/);
+    if (pd) date = `${pd[3]}-${pd[2]}-${pd[1]}`; // כשיש תאריך מפורש בטבלה – הוא קובע
+    for (const b of body.split('class="broadcast-list-container"').slice(1)) {
+      const id = (b.match(/id="broadcasts-div-(\d+)"/) || [])[1];
+      if (id && seen.has(id)) continue; if (id) seen.add(id);
+      const time = (b.match(/broadcast-list-content-timing">\s*(\d{1,2}:\d{2})/) || [])[1];
+      const title = clean(ent((b.match(/broadcast-list-content-title">([\s\S]*?)<\/h3>/) || [])[1]));
+      const desc = clean(ent((b.match(/broadcast-desc-alt[^"]*"[^>]*>([\s\S]*?)<\//) || [])[1]).replace(/<[^>]+>/g, " "));
+      if (time && title) out.push({ start: date + "T" + time.padStart(5, "0"), title, desc: desc && desc !== title ? desc : "" });
+    }
+  }
+  return out;
+}
+
 // ---- i24NEWS: לוח שבועי קבוע, שעות UTC, day: 0=שני ... 6=ראשון ----
 export function expandI24(list, days) {
   const out = [];
@@ -67,6 +91,7 @@ async function get(url, json) {
 const SOURCES = [
   { id: "x14", name: "ערוץ 14", prov: "both", load: async () => parseC14(await get("https://www.c14.co.il/shidurim")) },
   { id: "xi24", name: "i24NEWS", prov: "both", load: async (days) => expandI24(await get("https://api.i24news.tv/v2/he/schedules", true), days) },
+  { id: "xknesset", name: "ערוץ הכנסת", prov: "both", load: async (days) => parseKnesset(await get("https://www.knesset.tv/%D7%A2%D7%9B%D7%A9%D7%99%D7%95-%D7%9E%D7%A0%D7%92%D7%9F-%D7%91%D7%A2%D7%A8%D7%95%D7%A5/"), days[0]) },
   { id: "xkids", name: "כאן חינוכית", prov: "both", load: async (days) => {
     const all = [];
     for (const d of days) {

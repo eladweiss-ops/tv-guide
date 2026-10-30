@@ -71,7 +71,48 @@ test("snooze עם חתימה: מתזמן ב-QStash בעוד 5 דק׳", async () 
   assert.ok(c.url.startsWith("https://qstash.example/v2/publish/https://tv-guide-cal.vercel.app/api/fire?s="));
   assert.equal(c.init.headers["upstash-not-before"], String(Math.floor((NOW + 300000) / 1000)));
   assert.deepEqual(JSON.parse(c.init.body), { t: TOK, k: rem.k, at: NOW + 300000, snooze: 1 });
-  assert.ok(d.store[`snz/${TOK}.json`][rem.k]);
+  assert.ok(Object.keys(d.store).find((p) => p.startsWith(`snz/${TOK}/`)));
+});
+
+test("כשל publish משאיר את הנודניק הקודם (לא נמחק)", async () => {
+  const d = mkDeps();
+  await handleSnooze(signed(), d);
+  const keyPath = Object.keys(d.store)[0], before = JSON.stringify(d.store[keyPath]);
+  const t = NOW + 61000; d.now = () => t;
+  d.fetch = async (url, init) => { d.calls.push({ url, init }); return { ok: false, json: async () => ({}) }; };
+  const r = await handleSnooze(signed({ m: 10 }), d);
+  assert.equal(r.status, 502);
+  assert.equal(JSON.stringify(d.store[keyPath]), before);
+  assert.ok(!d.calls.some((c) => c.init.method === "DELETE"));
+});
+
+test("שתי תזכורות במקביל לא דורסות זו את זו", async () => {
+  const d = mkDeps({ load: async () => [rem, { ...rem, k: "9|x" }] });
+  const a = signed(), o = encToken(TOK), b = { k: "9|x", o, a: NOW - 1000, s: signSnz(o, "9|x", NOW - 1000) };
+  await Promise.all([handleSnooze(a, d), handleSnooze(b, d)]);
+  assert.equal(Object.keys(d.store).length, 2);
+  assert.equal(d.calls.length, 2);
+});
+
+test("dedup לפי k+m: m שונה בתוך דקה מתזמן מחדש ומוחק אחרי publish", async () => {
+  const d = mkDeps();
+  await handleSnooze(signed({ m: 5 }), d);
+  const r = await handleSnooze(signed({ m: 10 }), d);
+  assert.ok(!r.json.dup);
+  assert.equal(d.calls.length, 3);
+  assert.equal(d.calls[1].init.method, "POST");
+  assert.equal(d.calls[2].init.method, "DELETE");
+});
+
+test("manifest: id יציב, התאמת start_url/scope, צבעים ואייקונים", async () => {
+  const { readFileSync } = await import("node:fs");
+  const m = JSON.parse(readFileSync(new URL("../../manifest.webmanifest", import.meta.url), "utf8"));
+  assert.equal(m.id, "/tv-guide/");
+  assert.equal(new URL(m.start_url, "https://u.github.io/tv-guide/").pathname, m.id);
+  assert.equal(new URL(m.scope, "https://u.github.io/tv-guide/").pathname, m.id);
+  assert.equal(m.theme_color, m.background_color);
+  assert.ok(m.icons.some((i) => i.purpose === "maskable") && m.icons.some((i) => i.purpose === "any"));
+  assert.ok(m.icons.every((i) => !/any maskable/.test(i.purpose)));
 });
 
 test("חתימה שגויה / חסרה -> 403", async () => {
@@ -103,8 +144,9 @@ test("אחרי דקה: מוחק את ההודעה הקודמת ומתזמן מח
   const r = await handleSnooze({ ...signed(), a: undefined, s: undefined, t: TOK }, d);
   assert.equal(r.status, 200);
   assert.equal(d.calls.length, 3);
-  assert.equal(d.calls[1].init.method, "DELETE");
-  assert.ok(d.calls[1].url.endsWith("/v2/messages/m1"));
+  assert.equal(d.calls[1].init.method, "POST");
+  assert.equal(d.calls[2].init.method, "DELETE");
+  assert.ok(d.calls[2].url.endsWith("/v2/messages/m1"));
 });
 
 test("snooze עם טוקן אישי (מהאפליקציה)", async () => {

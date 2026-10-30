@@ -10,7 +10,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).end();
   try {
-    const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    let b;
+    try { b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}); } catch (e) { return res.status(400).json({ error: "bad request" }); }
     const r = await handleSnooze(b, { okToken, load, readJson, writeJson, fetch });
     return res.status(r.status).json(r.json);
   } catch (e) {

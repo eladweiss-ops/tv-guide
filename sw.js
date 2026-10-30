@@ -3,7 +3,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 // סימן כיוון מימין-לשמאל בתחילת כל שורה, כדי שהאייפון ייישר את ההתראה לימין גם כשהיא מתחילה באימוג'י או במספר
 const RLM = "‏", rtl = (t) => String(t || "").split("\n").map((l) => RLM + l).join("\n");
-const hhmm = (ts) => new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false }).format(ts);
+const hhmm = (ts) => new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(ts);
 
 self.addEventListener("push", (e) => {
   let d = {};
@@ -20,7 +20,7 @@ self.addEventListener("push", (e) => {
 
 async function snooze(n) {
   const z = n.data && n.data.snz, tag = n.tag || "tvg";
-  const show = (t, b) => self.registration.showNotification(rtl(t), { body: b ? rtl(b) : undefined, dir: "rtl", lang: "he", tag, renotify: true, icon: "icon-192.png", badge: "badge-96.png", data: { url: (n.data && n.data.url) || "./" } });
+  const show = (t, b) => self.registration.showNotification(rtl(t), { body: b ? rtl(b) : undefined, dir: "rtl", lang: "he", tag, renotify: false, silent: true, icon: "icon-192.png", badge: "badge-96.png", data: { url: (n.data && n.data.url) || "./" } });
   if (!z || !z.u) return show("לא ניתן לנדנד", "פתחו את האפליקציה כדי לנדנד.");
   try {
     const r = await fetch(z.u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ k: z.k, o: z.o, a: z.a, s: z.s, m: z.m || 5 }) });
@@ -42,7 +42,9 @@ self.addEventListener("notificationclick", (e) => {
     const mine = list.filter((c) => c.url && c.url.startsWith(scope));
     const c = mine.find((x) => x.focused) || mine.find((x) => x.visibilityState === "visible") || mine[0];
     if (c) {
-      try { const nc = await c.navigate(url); return (nc || c).focus(); } catch (x) { try { return await c.focus(); } catch (y) {} }
+      // navigate נכשל בחלון שה-SW לא שולט בו -> הודעה לחלון (הלקוח מאזין ל-{type:"open",url}) ו-focus
+      try { const nc = await c.navigate(url); if (nc) return nc.focus(); } catch (x) {}
+      try { c.postMessage({ type: "open", url }); return await c.focus(); } catch (y) {}
     }
     return self.clients.openWindow(url);
   }));

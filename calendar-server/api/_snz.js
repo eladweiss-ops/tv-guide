@@ -43,7 +43,7 @@ export function snzField(t, k, a) {
   return { u: SELF + "/api/snooze", k, o, a, s: signSnz(o, k, a), m: 5 };
 }
 
-const fmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
+const fmt = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 export const hhmm = (ts) => fmt.format(ts);
 
 // o = { t: טוקן (כדי לצרף snz), at: זמן השליחה, snooze: האם זו תזכורת חוזרת }
@@ -61,10 +61,9 @@ export async function scheduleSnooze(t, k, m, deps) {
   const token = process.env.QSTASH_TOKEN;
   if (!token) return { status: 503, json: { error: "no scheduler" } };
   const now = deps.now ? deps.now() : Date.now();
-  const path = `snz/${t}.json`, db = await deps.readJson(path, {});
-  const cur = db[k];
-  if (cur && now - cur.ts < SNZ_DEDUP && cur.at > now) return { status: 200, json: { ok: true, at: cur.at, m: cur.m, dup: true } };
-  if (cur && cur.at > now && cur.id) { try { await deps.fetch(`${QBASE()}/v2/messages/${cur.id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } }); } catch (e) {} }
+  const path = `snz/${t}/${createHash("sha256").update(k).digest("hex").slice(0, 24)}.json`; // בלוב נפרד לכל תזכורת
+  const cur = await deps.readJson(path, null);
+  if (cur && cur.m === m && now - cur.ts < SNZ_DEDUP && cur.at > now) return { status: 200, json: { ok: true, at: cur.at, m: cur.m, dup: true } };
   const at = now + m * 60000;
   const r = await deps.fetch(`${QBASE()}/v2/publish/${SELF}/api/fire?s=${secret()}`, {
     method: "POST",
@@ -72,10 +71,10 @@ export async function scheduleSnooze(t, k, m, deps) {
     body: JSON.stringify({ t, k, at, snooze: 1 }),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.messageId) return { status: 502, json: { error: "schedule failed" } };
-  db[k] = { at, id: j.messageId, ts: now, m };
-  for (const kk of Object.keys(db)) if (db[kk].at < now - 3600000) delete db[kk];
-  await deps.writeJson(path, db);
+  if (!r.ok || !j.messageId) return { status: 502, json: { error: "schedule failed" } }; // הקודם נשאר במקומו
+  await deps.writeJson(path, { at, id: j.messageId, ts: now, m });
+  // רק אחרי שהחדש תוזמן: מוחקים את הקודם
+  if (cur && cur.id && cur.at > now) { try { await deps.fetch(`${QBASE()}/v2/messages/${cur.id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } }); } catch (e) {} }
   return { status: 200, json: { ok: true, at, m } };
 }
 

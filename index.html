@@ -161,7 +161,7 @@
 
   /* dial */
   .dialwrap { display: flex; justify-content: center; }
-  #dial { width: 100%; max-width: min(360px, 36vh); height: auto; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
+  #dial { width: 100%; max-width: min(360px, 36vh); height: auto; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; border-radius: 50%; }
   #dial .k-ent { fill: var(--c-ent); } #dial .k-sport { fill: var(--c-sport); } #dial .k-news { fill: var(--c-news); } #dial .k-life { fill: var(--c-life); } #dial .k-oth { fill: var(--c-oth); }
   #dial path.on { stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
   #dial text { direction: rtl; unicode-bidi: plaintext; fill: var(--ink); font-family: var(--font-body); text-anchor: middle; }
@@ -1464,7 +1464,7 @@
 
   document.addEventListener("click", function (e) {
     var t = e.target;
-    if (t.closest("#dial")) { if (tapPending) { tapPending = false; tapDial(); } return; }
+    if (t.closest("#dial")) return; // הקשה על השעון מטופלת ב-pointerup
     var st = t.closest("[data-step]"); if (st) { var sp = st.getAttribute("data-step").split("|"); stepCard(sp[1], +sp[0]); return; }
     if (t.closest("#sBtn")) { setSearch($("#qwrap").hidden); return; }
     var rm = t.closest("[data-rem]");
@@ -1584,8 +1584,17 @@
     if (t.closest("#chBtn") || t.closest("[data-open]")) { openSheet(true); return; }
     if (t.closest("#done") || t.closest("#scrim")) { openSheet(false); render(); return; }
   });
+  // רק נגיעה על הטבעת עצמה מסובבת את השעון. נגיעה מחוץ לה (השוליים, מספרי השעות) גוללת את המסך כרגיל.
+  function inRing(pt) {
+    var d = $("#dial"); if (!d) return false;
+    var r = d.getBoundingClientRect(), dx = pt.clientX - (r.left + r.width / 2), dy = pt.clientY - (r.top + r.height / 2);
+    return Math.sqrt(dx * dx + dy * dy) <= (r.width / 2) * (RO + 14) / CX;
+  }
+  document.addEventListener("touchstart", function (e) {
+    if (e.touches.length === 1 && e.target.closest && e.target.closest("#dial") && inRing(e.touches[0])) e.preventDefault();
+  }, { passive: false });
   document.addEventListener("pointerdown", function (e) {
-    var d = e.target.closest && e.target.closest("#dial"); if (!d) return;
+    var d = e.target.closest && e.target.closest("#dial"); if (!d || !inRing(e)) return;
     dragging = true; tapAt = { x: e.clientX, y: e.clientY }; tapPending = false; try { d.setPointerCapture(e.pointerId); } catch (x) {}
     dialSet(dialMin(e)); e.preventDefault();
   });
@@ -1593,7 +1602,8 @@
   function endDrag() { dragging = false; tapAt = null; }
   document.addEventListener("pointerup", function (e) {
     var tap = dragging && tapAt && Math.abs(e.clientX - tapAt.x) < 8 && Math.abs(e.clientY - tapAt.y) < 8;
-    endDrag(); tapPending = !!tap;
+    endDrag(); tapPending = false;
+    if (tap) tapDial();
   });
   document.addEventListener("pointercancel", endDrag);
   document.addEventListener("keydown", function (e) {
@@ -1625,7 +1635,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.28", BUILD = "2026-10-30.28", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.29", BUILD = "2026-10-30.29", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

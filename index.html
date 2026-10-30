@@ -1363,7 +1363,7 @@
   function provOk(c, p) { return p === "all" || c._g === "broad" || c.prov === "both" || !c.prov || c.prov === p; }
   // חיפוש ערוץ: "sport" ו"ספורט" שקולים
   // מספר הערוץ כמו בשלט (11 כאן, 12 קשת, 13 רשת, 14...), לפי המספר שבסוף השם בערוצי החינם
-  var CHNUM = { "ערוץ 9": 9, "ערוץ 24": 24, "מכאן": 33, "ערוץ 33": 33, "כנסת": 99, "ערוץ הכנסת": 99 };
+  var CHNUM = { "ערוץ 14": 14, "כאן חינוכית": 23, "ערוץ 9": 9, "ערוץ 24": 24, "מכאן": 33, "ערוץ 33": 33, "כנסת": 99, "ערוץ הכנסת": 99 };
   function chNum(c) { if (CHNUM[c.name] != null) return CHNUM[c.name]; if (c._g === "broad") { var m = c.name.match(/(\d{1,3})\s*$/); if (m) return +m[1]; } return null; }
   function hay(c) { return (c.name + " " + (chNum(c) != null ? chNum(c) : "")).toLowerCase().replace(/sport/g, "ספורט").replace(/מוזיקה/g, "מוסיקה"); }
   // אותו ערוץ אצל הספק השני: אם כבר נבחר, לא מציגים אותו שוב
@@ -1565,7 +1565,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.24", BUILD = "2026-10-30.24", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.25", BUILD = "2026-10-30.25", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

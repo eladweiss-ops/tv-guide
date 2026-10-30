@@ -43,7 +43,7 @@
       title: String(p.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: "יום " + TVG.DAYS[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1),
       time: hhmm(d),
-      ch: TVG.chName(r.id),
+      ch: TVG.bidi(TVG.chName(r.id)),
       live: p.lv === 1,
       link: linkOf(r.id, p),
       syn: synOf(p),
@@ -63,7 +63,7 @@
     var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
     var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
     if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
-    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi>" + esc(x.title) + "</bdi></b></div>" +
+    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"rtl\">" + esc(x.title) + "</bdi></b></div>" +
       '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi>" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "") + "</div>" +
       (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") + '<div class="shgap"></div>' + cta + "</div>";
   }
@@ -128,7 +128,7 @@
       ctx.font = "800 " + size + "px " + F;
       var lh = Math.round(size * 1.18), y = 190 + size * 0.5;
       ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 5;
-      lay.lines.forEach(function (ln, k) { ctx.fillText(ln, R, y + k * lh); });
+      lay.lines.forEach(function (ln, k) { ctx.fillText("\u2067" + ln + "\u2069", R, y + k * lh); });
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       // לוח זכוכית תחתון: ערוץ (ימין), יום ושעה (שמאל)
       var py = 400, ph = 166;

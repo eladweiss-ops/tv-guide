@@ -51,15 +51,15 @@
   function whenHtml(r) {
     var p = r.p, d = p.s;
     return '<div class="lnd-row"><span class="lnd-ic">🗓</span><span>יום ' + TVG.DAYS[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1) + "</span></div>" +
-      '<div class="lnd-row"><span class="lnd-ic">🕐</span><span dir="ltr"><bdi>' + hhmm(d) + "–" + hhmm(p.e) + "</bdi></span></div>";
+      '<div class="lnd-row"><span class="lnd-ic">🕐</span><span><bdi dir="ltr">' + hhmm(d) + '</bdi> – <bdi dir="ltr">' + hhmm(p.e) + "</bdi></span></div>";
   }
 
   function heroHtml(r) {
     var p = r.p, k = TVG.kindOf(r.id, p.title), st = status(p), b = "";
     if (st === "live" || p.lv === 1) b += '<span class="lnd-b live">● שידור ישיר</span>';
     if (p.rr) b += '<span class="lnd-b">שידור חוזר</span>';
-    return '<div class="lnd-hero k-' + k + '"><div class="lnd-em" aria-hidden="true">' + emojiOf(r) + '</div><div class="lnd-ch"><bdi>' + esc(TVG.chName(r.id)) + "</bdi></div>" +
-      '<h1 class="lnd-ttl">' + esc(p.title) + "</h1>" + (b ? '<div class="lnd-bs">' + b + "</div>" : "") + "</div>";
+    return '<div class="lnd-hero k-' + k + '"><div class="lnd-em" aria-hidden="true">' + emojiOf(r) + '</div><div class="lnd-ch"><bdi dir="rtl">' + esc(TVG.bidi(TVG.chName(r.id))) + "</bdi></div>" +
+      '<h1 class="lnd-ttl"><bdi dir="rtl">' + esc(p.title) + "</bdi></h1>" + (b ? '<div class="lnd-bs">' + b + "</div>" : "") + "</div>";
   }
   function bodyHtml() {
     var h = '<div class="lnd-top"><span class="lnd-brand">📺 לוח שידורים</span><button type="button" class="glass round lnd-x" data-landclose aria-label="סגירה">✕</button></div>';
@@ -68,7 +68,7 @@
     }
     if (L.kind === "ended") {
       var o = L.orig;
-      return h + '<div class="lnd-empty"><div class="lnd-big">⏱</div><h1>התוכנית כבר שודרה</h1><p><b>' + esc(o.p.title) + "</b><br><bdi>" + esc(TVG.chName(o.id)) + "</bdi> · " + esc(cdTxt(o, "past")) + '</p><p class="lnd-sm">אין לה שידור נוסף בימים הקרובים בלוח.</p></div>';
+      return h + '<div class="lnd-empty"><div class="lnd-big">⏱</div><h1>התוכנית כבר שודרה</h1><p><b>' + esc(o.p.title) + "</b><br><bdi dir=\"rtl\">" + esc(TVG.bidi(TVG.chName(o.id))) + "</bdi> · " + esc(cdTxt(o, "past")) + '</p><p class="lnd-sm">אין לה שידור נוסף בימים הקרובים בלוח.</p></div>';
     }
     var r = L.r, p = r.p, st = status(p);
     if (L.kind === "rerun") h += '<div class="lnd-note">⏱ התוכנית ששיתפו איתך כבר שודרה. הנה השידור הבא שלה:</div>';

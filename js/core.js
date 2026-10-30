@@ -9,6 +9,8 @@
   TVG.$ = $;
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
   TVG.esc = esc;
+  // bidi: רצפים לטיניים/מספרים (כולל סימן סוף כמו ! או +) בתוך טקסט עברי נעטפים בבידוד LTR, כדי ש"E!" ו-"5+" לא יתהפכו
+  TVG.bidi = function (s) { return String(s == null ? "" : s).replace(/[A-Za-z0-9][A-Za-z0-9 ]*[!?+]*/g, function (m) { return "\u2066" + m.replace(/ +$/, "") + "\u2069" + (/ $/.test(m) ? " " : ""); }); };
   var DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
   TVG.DAYS = DAYS;
   var p2 = function (n) { return String(n).padStart(2, "0"); };

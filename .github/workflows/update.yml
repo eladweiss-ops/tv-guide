@@ -43,10 +43,11 @@ jobs:
       - name: Add HOT summaries from cache (filled by the home computer)
         continue-on-error: true
         run: node enrich_hot.mjs --apply-cache
-      - name: Fetch Netflix list from TMDB
+      - name: Fetch Netflix list from TMDB (+ ratings from OMDb)
         continue-on-error: true
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: |
           if [ -n "$TMDB_API_KEY" ]; then node netflix.mjs; else echo "TMDB_API_KEY not set, skipping"; fi
       - name: Commit if changed
@@ -56,6 +57,7 @@ jobs:
           git add guide.json
           if [ -f extra-cache.json ]; then git add extra-cache.json; fi
           if [ -f netflix.json ]; then git add netflix.json; fi
+          if [ -f ratings-cache.json ]; then git add ratings-cache.json; fi
           if git diff --cached --quiet; then
             echo "No changes"
           else

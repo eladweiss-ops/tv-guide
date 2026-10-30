@@ -144,8 +144,8 @@
       }
       ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.direction = "rtl";
       var tw0 = 0; ctx.font = "800 100px " + F; tw0 = ctx.measureText(x.time).width;
-      var maxW = pw - 36 - 36 - tw0 - 30, chs = 48; ctx.font = "800 " + chs + "px " + F; while (ctx.measureText(x.ch).width > maxW && chs > 30) { chs -= 2; ctx.font = "800 " + chs + "px " + F; }
-      ctx.fillText(x.ch, px + pw - 36, py + 78);
+      var maxW = pw - 36 - 36 - tw0 - 30, chs = 48; ctx.font = "800 " + chs + "px " + F; while (ctx.measureText(TVG.bidi(x.ch)).width > maxW && chs > 30) { chs -= 2; ctx.font = "800 " + chs + "px " + F; }
+      ctx.fillText(TVG.bidi(x.ch), px + pw - 36, py + 78);
       ctx.font = "700 40px " + F; ctx.globalAlpha = 0.95; ctx.fillText(x.day, px + pw - 36, py + 134); ctx.globalAlpha = 1;
       ctx.textAlign = "left"; ctx.direction = "ltr"; ctx.font = "800 100px " + F; ctx.fillText(x.time, px + 36, py + 118);
       ctx.font = "600 28px " + F; ctx.globalAlpha = 0.92; ctx.textAlign = "right"; ctx.fillText(x.link.replace(/^https?:\/\//, ""), R, py + ph + 44); ctx.globalAlpha = 1;

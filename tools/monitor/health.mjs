@@ -100,7 +100,7 @@ export function evaluateNetflix(nf, now = new Date()) {
   if (list.length < T.NETFLIX_MIN_ITEMS) problems.push("נטפליקס: " + list.length + " פריטים (מינימום " + T.NETFLIX_MIN_ITEMS + ")");
   if (nf.updated) { const age = hoursSince(nf.updated, now); info.ageH = Math.round(age * 10) / 10; if (!(age < T.NETFLIX_MAX_AGE_H)) problems.push("נטפליקס לא התעדכן " + fmtAge(age)); }
   else problems.push("netflix.json: אין שדה updated");
-  info.rated = list.filter((i) => i && (i.rating != null || i.vote > 0)).length; // מידע בלבד
+  info.rated = list.filter((i) => i && i.ratings && i.ratings.imdb != null).length; // ציוני IMDb מ-OMDb (מידע בלבד)
   return { problems, info };
 }
 

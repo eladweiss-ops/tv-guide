@@ -17,15 +17,18 @@ export async function writeJson(p, o) {
 export const getSubs = (t) => readJson(`push/${t}.json`, []);
 export const setSubs = (t, s) => writeJson(`push/${t}.json`, s);
 
-export async function sendTo(t, payload) {
-  webpush.setVapidDetails("mailto:tv-guide@users.noreply.github.com", process.env.VAPID_PUBLIC, process.env.VAPID_PRIVATE);
-  const subs = await getSubs(t);
+// d (לבדיקות): {getSubs, setSubs, send}
+export async function sendTo(t, payload, d = {}) {
+  const send = d.send || ((s, body, o) => webpush.sendNotification(s, body, o));
+  if (!d.send) webpush.setVapidDetails("mailto:tv-guide@users.noreply.github.com", process.env.VAPID_PUBLIC, process.env.VAPID_PRIVATE);
+  const subs = await (d.getSubs || getSubs)(t);
   let ok = 0; const keep = [];
   for (const s of subs) {
-    try { await webpush.sendNotification(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); }
+    if (!validSub(s)) { keep.push(s); continue; } // מנוי שלא עומד באימות לא מקבל בקשת רשת (SSRF), אבל גם לא נמחק
+    try { await send(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); }
     catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) keep.push(s); else console.log("subscription gone", e.statusCode); }
   }
-  if (keep.length !== subs.length) await setSubs(t, keep);
+  if (keep.length !== subs.length) await (d.setSubs || setSubs)(t, keep);
   return { ok, total: subs.length };
 }
 

@@ -49,9 +49,10 @@ export function verifySnz(o, k, a, s, now = Date.now()) {
   return now - +a <= SNZ_TTL && +a <= now + 60000;
 }
 
-// כתובת היעד של QStash. כשיש מפתחות חתימה של QStash אין סוד בכתובת (האימות לפי Upstash-Signature)
+// כתובת היעד של QStash. מעבר מדורג: ?s= נשאר ביעד גם כשיש מפתחות חתימה, ויוסר רק עם QSTASH_STRICT=1 (ואחרי שה-JWT אומת בלוגים)
 export const hasQstashKeys = () => !!process.env.QSTASH_CURRENT_SIGNING_KEY;
-export const fireDest = () => SELF + "/api/fire" + (hasQstashKeys() || !secret() ? "" : "?s=" + encodeURIComponent(secret()));
+export const strictMode = () => process.env.QSTASH_STRICT === "1" && hasQstashKeys();
+export const fireDest = () => SELF + "/api/fire" + (strictMode() || !secret() ? "" : "?s=" + encodeURIComponent(secret()));
 
 // השדה snz שנכנס לפוש
 export function snzField(t, k, a) {

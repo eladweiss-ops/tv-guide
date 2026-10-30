@@ -28,13 +28,13 @@ export function readBody(req, max) {
   if (Number.isFinite(len) && len > max) return { ok: false, status: 413, error: "too big" };
   try {
     if (typeof raw === "string") {
-      if (raw.length > max) return { ok: false, status: 413, error: "too big" };
+      if (Buffer.byteLength(raw) > max) return { ok: false, status: 413, error: "too big" };
       const b = JSON.parse(raw || "{}");
       return b && typeof b === "object" ? { ok: true, body: b } : { ok: false, status: 400, error: "bad request" };
     }
     const b = raw || {};
     if (typeof b !== "object") return { ok: false, status: 400, error: "bad request" };
-    if (JSON.stringify(b).length > max) return { ok: false, status: 413, error: "too big" };
+    if (Buffer.byteLength(JSON.stringify(b)) > max) return { ok: false, status: 413, error: "too big" };
     return { ok: true, body: b };
   } catch (e) { return { ok: false, status: 400, error: "bad request" }; }
 }

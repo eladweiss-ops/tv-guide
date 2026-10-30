@@ -4,7 +4,7 @@ import { okToken, load, save, clean } from "./_store.js";
 import { reschedule } from "./_push.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
-export const MAX_BODY = 65536;
+export const MAX_BODY = 262144;
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();

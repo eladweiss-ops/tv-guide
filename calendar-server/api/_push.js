@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { put, list } from "@vercel/blob";
 import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
+import { wantedSchedule, START_SUFFIX } from "./_rems.js";
 export { remPayload };
 
 export async function readJson(p, dflt) {
@@ -47,10 +48,14 @@ export async function reschedule(t, rems, d = {}) {
   const sched = await rj(`sched/${t}.json`, {});
   const day = Math.floor(now / 86400000);
   let q = sched.__q; delete sched.__q;
+  // __f: מה נורה לאחרונה (מפתח -> {at, w}); מונע תזמון מחדש של התראה שנורתה זה עתה (שמירה חוזרת של הרשימה תוך שניות מהירי)
+  const fired = sched.__f || {}; delete sched.__f;
+  for (const k of Object.keys(fired)) if (now - fired[k].w > FIRED_MS) delete fired[k];
   if (!q || q.d !== day) q = { d: day, n: 0 };
-  let want = {};
-  if (subs.length) for (const r of rems) { const at = r.ts - (r.lead || 0) * 60000; if (at > now - 30000 && r.ts > now) want[r.k] = Math.max(at, now + 5000); }
-  // תקרה: רק ה-MAX_SCHED הקרובות ביותר
+  let want = subs.length ? wantedSchedule(rems, now) : {}; // כולל הודעות k#s (תחילת שידור)
+  const noNew = new Set(rems.filter((r) => r.stOnly).map((r) => r.k + START_SUFFIX)); // stOnly: רק משאירים k#s קיימת, לא מפרסמים
+  for (const k of Object.keys(want)) if (fired[k] && Math.abs(fired[k].at - want[k]) < 60000) delete want[k];
+  // תקרה: רק ה-MAX_SCHED הקרובות ביותר (כל הודעה מתוזמנת נספרת, כולל k#s)
   let capped = 0;
   const ks = Object.keys(want);
   if (ks.length > MAX_SCHED) {
@@ -65,24 +70,29 @@ export async function reschedule(t, rems, d = {}) {
     delete sched[k]; removed++;
   }
   for (const [k, at] of Object.entries(want)) {
+    if (noNew.has(k)) continue;
     if (q.n >= MAX_PUBLISH_DAY) { limited = true; break; }
     q.n++;
     const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
       method: "POST",
       headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2" },
-      body: JSON.stringify({ t, k, at }),
+      body: JSON.stringify(k.endsWith(START_SUFFIX) ? { t, k: k.slice(0, -START_SUFFIX.length), at, st: 1 } : { t, k, at }), // st: התראת תחילת שידור
     });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j.messageId) { sched[k] = { at, id: j.messageId }; added++; } else console.log("qstash publish failed", r.status, JSON.stringify(j).slice(0, 200));
   }
   sched.__q = q;
+  if (Object.keys(fired).length) sched.__f = fired;
   await wj(`sched/${t}.json`, sched);
-  const out = { added, removed, total: Object.keys(sched).length - 1 };
+  const out = { added, removed, total: Object.keys(sched).filter((k) => !k.startsWith("__")).length };
   if (capped) out.capped = capped;
   if (limited) out.limited = "daily";
   return out;
 }
-export async function dropSched(t, k) {
-  const sched = await readJson(`sched/${t}.json`, {});
-  if (sched[k]) { delete sched[k]; await writeJson(`sched/${t}.json`, sched); }
+const FIRED_MS = 120000;
+// d (לבדיקות): {readJson, writeJson, now}. רושם ב-__f שההודעה נורתה, כדי ש-reschedule לא יתזמן אותה שוב
+export async function dropSched(t, k, d = {}) {
+  const rj = d.readJson || readJson, wj = d.writeJson || writeJson, now = d.now ? d.now() : Date.now();
+  const sched = await rj(`sched/${t}.json`, {});
+  if (sched[k]) { const f = sched.__f || {}; f[k] = { at: sched[k].at, w: now }; sched.__f = f; delete sched[k]; await wj(`sched/${t}.json`, sched); }
 }

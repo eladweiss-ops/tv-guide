@@ -105,7 +105,6 @@
     }
     var pd = t.closest("[data-day]"); if (pd) { TVG.day = pd.getAttribute("data-day"); TVG.scrub = null; TVG.scrollNext = true; TVG.render(); return; }
     var th = t.closest("[data-theme-set]"); if (th) { TVG.setTheme(th.getAttribute("data-theme-set")); return; }
-    var nv = t.closest("[data-nf]"); if (nv) { TVG.nfView = nv.getAttribute("data-nf"); TVG.render(); return; }
     var cc = t.closest("[data-chip]"); if (cc) { TVG.gen = cc.getAttribute("data-chip"); TVG.render(); return; }
     var pv = t.closest("[data-prov]"); if (pv) { TVG.PROV = pv.getAttribute("data-prov"); TVG.store("tvg.prov", TVG.PROV); TVG.buildSheet(); return; }
     var sc = t.closest("[data-cchip]"); if (sc) { TVG.cf = sc.getAttribute("data-cchip"); TVG.buildSheet(); return; }

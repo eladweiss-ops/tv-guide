@@ -40,7 +40,6 @@
   TVG.gen = "all";
   TVG.cf = "all";
   TVG.NF = null;
-  TVG.nfView = "pop";
   TVG.scrub = null;
   TVG.D = null;
   TVG.dragging = false;

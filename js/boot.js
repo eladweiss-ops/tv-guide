@@ -24,13 +24,14 @@
     var st0 = TVG.store("tvg.tab"); TVG.tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
     TVG.scrollNext = TVG.tab === "grid";
     TVG.render();
-    if (TVG.needsPick() && TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
+    if (TVG.afterBoot) TVG.afterBoot(); // nav.js: מקום אחד לפרמטרים בכתובת, קדימות rem > p > q > tab
+    if (TVG.needsPick() && $("#rem").hidden &&TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
     // לשונית נטפליקס מופיעה רק אם הקובץ netflix.json קיים
     fetch("netflix.json", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
-        if (!j || !(j.popular || []).length && !(j["new"] || []).length) return;
-        TVG.NF = j;
+        var nf = TVG.nfPrep(j); if (!nf) return; // סכמה ישנה או ריק: הלשונית נשארת מוסתרת
+        TVG.NF = nf;
         if (TVG.store("tvg.tab") === "nf") { TVG.tab = "nf"; if (!$("#sheet").hidden) TVG.openSheet(false); }
         TVG.render();
       }).catch(function () {});

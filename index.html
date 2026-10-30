@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he" dir="rtl" data-theme="light">
+<html lang="he" dir="rtl" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#f2f2f7">
+<meta name="theme-color" content="#0E0F14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="לוח שידורים">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap">
@@ -77,6 +77,8 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
     <textarea id="bkCode" rows="2" placeholder="הדבקת קישור אישי (או קוד גיבוי ישן) לשחזור" aria-label="קישור לשחזור" dir="ltr"></textarea>
     <div class="bar"><button type="button" class="ghost" id="bkRestore">שחזור</button></div>
     <p class="none" id="bkVer"></p>
+    <h2>אודות</h2>
+    <p class="none credit nfcredit"><span>נתונים ותמונות בלשונית נטפליקס:</span> <a class="tmdbmark" href="https://www.themoviedb.org" target="_blank" rel="noopener" aria-label="TMDB">TMDB</a><br>המוצר משתמש ב-API של TMDB אך אינו מאושר או מוסמך על ידי TMDB. הדירוגים מ-OMDb.</p>
     <div id="instBox" hidden><h2>התקנה כאפליקציה</h2><p class="none" id="instTxt"></p><button type="button" class="ghost" id="instBtn" data-install hidden>הוסף למסך הבית</button></div>
     <button class="ghost" type="button" data-setclose>סגירה</button>
   </div>
@@ -86,11 +88,12 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <div class="scrim" id="scrim2" hidden></div>
 <section class="sheet" id="favs" hidden aria-label="מועדפים"><div class="sheet-in" id="favBody"></div></section>
 <section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
+<section class="sheet nfs" id="nfsheet" hidden role="dialog" aria-labelledby="nfsT"><div class="nfs-scroll" id="nfsBody"></div><div class="nfs-bar" id="nfsBar"></div></section>
 
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","events","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

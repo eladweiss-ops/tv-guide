@@ -111,7 +111,7 @@
     return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
       "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:0", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
       "SUMMARY:" + icsEsc(ttl), "DESCRIPTION:" + icsEsc((p.desc || "").slice(0, 300)),
-      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + (r.lead != null ? r.lead : TVG.lead) + "M", "END:VALARM",
-      "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+      "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + (r.lead != null ? r.lead : TVG.lead) + "M", "END:VALARM"]
+      .concat(r.dbl && (r.lead != null ? r.lead : TVG.lead) > 0 ? ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:PT0S", "END:VALARM"] : [], ["END:VEVENT", "END:VCALENDAR"]).join("\r\n");
   }
 })(window.TVG);

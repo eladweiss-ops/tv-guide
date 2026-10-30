@@ -1,17 +1,20 @@
-# מושך תקצירים מ-HOT (עובד רק מכתובת בישראל) ודוחף ל-GitHub.
-# רץ מ-Task Scheduler כל בוקר. התקצירים נשמרים גם ב-hot-cache.json,
+# מושך את כל המקורות שחוסמים שרתים מחוץ לישראל (HOT, ערוץ 14) ודוחף ל-GitHub.
+# רץ מ-Task Scheduler כל בוקר ובהתחברות. הנתונים נשמרים בקבצי מטמון (hot-cache.json, extra-cache.json),
 # והעדכון הלילי ב-GitHub מחיל אותם מחדש, כך שמספיק שהמחשב יהיה דלוק פעם בכמה ימים.
 $ErrorActionPreference = "Continue"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 Set-Location $PSScriptRoot
 $log = Join-Path $PSScriptRoot "hot-local.log"
+function Run($cmd) { & cmd /c "$cmd 2>&1" | Out-File $log -Append -Encoding utf8 }
 "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm') ===" | Out-File $log -Append -Encoding utf8
-git pull --rebase --autostash 2>&1 | Out-File $log -Append -Encoding utf8
-node enrich_hot.mjs 2>&1 | Out-File $log -Append -Encoding utf8
-node extra_channels.mjs 2>&1 | Out-File $log -Append -Encoding utf8
+Run "git pull --rebase --autostash"
+Run "node enrich_hot.mjs"
+Run "node extra_channels.mjs"
 git add guide.json hot-cache.json extra-cache.json
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
-  git commit -m "HOT summaries (home computer)" 2>&1 | Out-File $log -Append -Encoding utf8
-  git pull --rebase 2>&1 | Out-File $log -Append -Encoding utf8
-  git push 2>&1 | Out-File $log -Append -Encoding utf8
+  Run "git commit -m ""Israeli sources (home computer)"""
+  Run "git pull --rebase"
+  Run "git push"
 } else { "no changes" | Out-File $log -Append -Encoding utf8 }

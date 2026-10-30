@@ -136,4 +136,4 @@ async function main() {
   await writeFile("extra-cache.json", JSON.stringify(cache));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.log("extra_channels נכשל:", e.message); process.exit(0); });
+if (process.argv[1] && process.argv[1].endsWith("extra_channels.mjs")) main().catch((e) => { console.log("extra_channels נכשל:", e.message); process.exit(0); });

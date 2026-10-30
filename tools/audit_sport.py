@@ -1,5 +1,5 @@
 import json,re,collections,sys
-g=json.load(open(sys.argv[1] if len(sys.argv)>1 else 'guide.json'))
+g=json.load(open(sys.argv[1] if len(sys.argv)>1 else 'guide.json',encoding='utf-8'))
 names={c['id']:c['name'] for c in g['channels']}
 def kind(t):
     t=t or ''

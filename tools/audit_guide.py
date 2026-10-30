@@ -1,5 +1,5 @@
 import json,re,collections,datetime
-g=json.load(open('guide.json')); names={c['id']:c['name'] for c in g['channels']}
+g=json.load(open('guide.json',encoding='utf-8')); names={c['id']:c['name'] for c in g['channels']}
 P=collections.defaultdict(list)
 for p in g['programs']: P[p['ch']].append(p)
 today=datetime.date(2026,10,30)

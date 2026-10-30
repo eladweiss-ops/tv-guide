@@ -320,8 +320,6 @@ export async function run(opts = {}) {
   const rows = {};
   for (const [name, arr] of Object.entries(refs)) rows[name] = arr.map((r) => key(r.type, r.id)).filter((k) => items[k]);
   rows.recent.sort((a, b) => (items[b].date || "").localeCompare(items[a].date || ""));
-  rows.top.sort((a, b) => items[b].vote - items[a].vote);
-  rows.top = rows.top.slice(0, ROW_LIMIT);
 
   const types = new Set(rows.popular.map((k) => items[k].type));
   if (rows.popular.length < MIN_POPULAR || !types.has("movie") || !types.has("tv")) {
@@ -349,6 +347,10 @@ export async function run(opts = {}) {
     console.log("OMDB_API_KEY לא הוגדר, ללא ציונים");
   }
 
+  // מיון 'הכי מדורגים' אחרי שהציונים מ-OMDb הגיעו
+  const score = (it) => (it.ratings && it.ratings.imdb != null ? it.ratings.imdb : it.vote || 0); // IMDb קודם, TMDB כגיבוי
+  rows.top.sort((a, b) => score(items[b]) - score(items[a]));
+  rows.top = rows.top.slice(0, ROW_LIMIT);
   const out = { v: SCHEMA, updated: new Date().toISOString(), hero: pickHero(rows.popular, items), rows, items };
   await writeFile(dir + "/netflix.json", JSON.stringify(out));
   console.log(`netflix.json: ${rows.popular.length} popular, ${rows.recent.length} recent, ${rows.top.length} top`);

@@ -1,0 +1,13 @@
+name: Telegram setup (one-time)
+on: workflow_dispatch
+permissions: {}
+jobs:
+  find-chat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find chat id of whoever messaged the bot
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          curl -s "https://api.telegram.org/bot${TOKEN}/getUpdates" \
+            | jq -r '.result[] | (.message // .my_chat_member // {}) | .chat | select(.id) | "chat_id=\(.id) type=\(.type) name=\(.first_name // .title // "")"' | sort -u

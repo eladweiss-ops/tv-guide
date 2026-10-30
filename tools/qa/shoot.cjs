@@ -261,7 +261,14 @@ function nfFixtureData() {
 
     await step("share-text", async () => { await fresh(); await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(500); await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (!b) throw new Error("no share btn; dCard=" + document.querySelector("#dCard").innerHTML.slice(-300) + " tab=" + TVG.tab + " ch=" + TVG.chId); b.click(); }); await page.waitForTimeout(700); await snap("11_share_text"); });
     await step("share-card", async () => { await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("12_share_card"); });
-    await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); });
+    await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); if (/הקישור הועתק/.test(t) && !(await page.evaluate(() => document.querySelector("#rem").hidden))) throw new Error("share sheet still open after copy"); });
+    await step("deeplink-short", async () => { // הקישור הקצר החדש: ?p=<ערוץ>.<YYMMDDHHMM>
+      await fresh();
+      const v = await page.evaluate(() => { const now = Date.now(); for (const id of Array.from(TVG.sel)) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000); if (a.length) { const p = a[0]; return id + "." + (TVG.dstr(p.s) + TVG.hhmm(p.s)).replace(/\D/g, "").slice(2); } } return null; });
+      if (!v) throw new Error("no program for short deep link");
+      await page.goto(base + "index.html?p=" + v, { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
+      const t = await page.textContent("#pill"); if (!/ששיתפו איתך/.test(t)) throw new Error("short link not resolved: " + v + " pill=" + t);
+    });
     await step("deeplink", async () => {
       await fresh();
       const v = await page.evaluate(() => { const now = Date.now(); const ids = Array.from(TVG.sel); for (const id of ids) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000 * 1.2); if (a.length) { const p = a[Math.min(3, a.length - 1)]; return id + "%7C" + TVG.dstr(p.s) + "T" + TVG.hhmm(p.s); } } return null; });

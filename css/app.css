@@ -406,6 +406,13 @@
   .shbub b { font-weight: 800; }
   .shl3 { margin-top: 4px; color: #027eb5; text-align: right; font-size: .88rem; }
   :root[data-theme="dark"] .shl3 { color: #7FD4FF; }
+  .shsyn { margin-top: 4px; font-style: italic; opacity: .85; }
+  .shlnk { display: flex; gap: 10px; align-items: center; margin: 8px 0 4px; padding: 8px; border-radius: 12px; background: rgba(0,0,0,.06); }
+  :root[data-theme="dark"] .shlnk { background: rgba(255,255,255,.08); }
+  .shlnk img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+  .shlnk div { display: flex; flex-direction: column; min-width: 0; font-size: .82rem; line-height: 1.35; }
+  .shlnk span { opacity: .8; }
+  .shlnk i { font-style: normal; opacity: .6; font-size: .75rem; text-align: right; }
   .shcard { display: flex; align-items: center; justify-content: center; height: min(300px, 38vh); border-radius: 18px; background: var(--soft); color: var(--muted); overflow: hidden; }
   .shcard img { height: 100%; width: auto; max-width: 100%; object-fit: contain; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
   .btn.wa { background: #25D366; color: #05301E; }

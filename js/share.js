@@ -14,7 +14,14 @@
 
   // ---- תוכן ההודעה ----
   function startStr(d) { return dstr(d) + "T" + hhmm(d); }
-  function linkOf(id, p) { return APP + "?p=" + encodeURIComponent(id) + "%7C" + startStr(p.s); }
+  // קישור קצר ונקי: ?p=<ערוץ>.<YYMMDDHHMM> (הישן ?p=<ערוץ>|<YYYY-MM-DDTHH:MM> עדיין נקרא)
+  function linkOf(id, p) { var t = startStr(p.s).replace(/\D/g, "").slice(2); return APP + "?p=" + encodeURIComponent(id) + "." + t; }
+  function synOf(p) { // תקציר קצר לשיתוף: עד ~140 תווים, חיתוך במילה שלמה
+    var d = String(p.desc || "").replace(/\s+/g, " ").trim();
+    if (!d || d === p.title) return "";
+    if (d.length <= 140) return d;
+    d = d.slice(0, 140); return d.slice(0, Math.max(d.lastIndexOf(" "), 100)) + "…";
+  }
   function emojiOf(id, p) {
     var k = TVG.kindOf(id, p.title), t = p.title;
     if (k === "sport") {
@@ -39,15 +46,23 @@
       ch: TVG.chName(r.id),
       live: p.lv === 1,
       link: linkOf(r.id, p),
+      syn: synOf(p),
       kind: TVG.kindOf(r.id, p.title)
     };
   }
   function textOf(x) {
-    return ["\u200F" + x.emoji + " *" + x.title + "*", "\u200F" + x.day + " · " + x.time + " · " + x.ch + (x.live ? " (ישיר)" : ""), x.link].join("\n");
+    var l = ["‏" + x.emoji + " *" + x.title + "*", "‏" + x.day + " · " + x.time + " · " + x.ch + (x.live ? " (ישיר)" : "")];
+    if (x.syn) l.push("‏_" + x.syn.replace(/_/g, " ") + "_");
+    l.push("", "‏⏰ לתזכורת בלחיצה:", x.link);
+    return l.join("\n");
   }
   function bubbleHtml(x) {
     return '<div class="shbub" dir="rtl"><div class="shl1">' + x.emoji + " <b><bdi>" + esc(x.title) + "</bdi></b></div>" +
       '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi>" + esc(x.ch) + "</bdi>" + (x.live ? " (ישיר)" : "") + "</div>" +
+      (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") +
+      // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה כרטיס תצוגה מקדימה מתגיות og של האתר
+      '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>' +
+      '<div class="shl2">⏰ לתזכורת בלחיצה:</div>' +
       '<div class="shl3" dir="ltr">' + esc(x.link) + "</div></div>";
   }
   function shareBtn(p, cid) {
@@ -161,18 +176,22 @@
     var u = URL.createObjectURL(blob), a = document.createElement("a"); a.href = u; a.download = "tv-guide.png"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(u); }, 10000);
   }
+  function done(msg) { // אחרי שליחה/העתקה: סוגרים את חלון השיתוף ומאשרים בהודעה קטנה
+    if (!$("#rem").hidden) TVG.closeRem();
+    TVG.pill(msg, 1800);
+  }
   function send() {
     var x = parts({ id: S.id, p: S.p }), text = textOf(x);
-    if (S.mode === "text") { openWa(text); return; }
+    if (S.mode === "text") { openWa(text); done("📤 נשלח לוואטסאפ"); return; }
     if (!S.blob) { TVG.pill("הכרטיס עוד בהכנה, עוד רגע", 1500); return; }
     var file = null; try { file = new File([S.blob], "tv-guide.png", { type: "image/png" }); } catch (e) {}
-    var fallback = function () { download(S.blob); openWa(text); TVG.pill("התמונה נשמרה במכשיר. צרפו אותה להודעה בוואטסאפ", 5000); };
+    var fallback = function () { download(S.blob); openWa(text); if (!$("#rem").hidden) TVG.closeRem(); TVG.pill("התמונה נשמרה במכשיר. צרפו אותה להודעה בוואטסאפ", 5000); };
     if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], text: text }).catch(function (e) { if (!e || e.name !== "AbortError") fallback(); });
+      navigator.share({ files: [file], text: text }).then(function () { done("📤 נשלח"); }).catch(function (e) { if (!e || e.name !== "AbortError") fallback(); });
     } else fallback();
   }
   function copyLink() {
-    var l = parts({ id: S.id, p: S.p }).link, ok = function () { TVG.pill("הקישור הועתק", 1600); };
+    var l = parts({ id: S.id, p: S.p }).link, ok = function () { done("🔗 הקישור הועתק"); };
     function old() {
       var t = document.createElement("textarea"); t.value = l; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;opacity:0"; document.body.appendChild(t); t.select();
       var good = false; try { good = document.execCommand("copy"); } catch (e) {} t.remove(); if (good) ok(); else TVG.pill("לא הצלחנו להעתיק", 1800);
@@ -193,6 +212,8 @@
   // v = ערך הפרמטר p (כבר מפוענח על ידי URLSearchParams). קורא לו nav.js (handleUrl), שגם מנקה את הכתובת ואוכף קדימות rem > p > q > tab
   function openShared(v) {
     v = String(v == null ? "" : v);
+    var m = /^(.+)\.(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$/.exec(v); // פורמט קצר: ערוץ.YYMMDDHHMM
+    if (m) v = m[1] + "|20" + m[2] + "-" + m[3] + "-" + m[4] + "T" + m[5] + ":" + m[6];
     var k = v.lastIndexOf("|"), id = v.slice(0, k), st = v.slice(k + 1), r = null;
     if (k > 0 && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(st)) r = TVG.findProg((TVG.IDMAP[id] || id) + "|" + TVG.parse(st).getTime());
     if (!r) { TVG.pill("התוכנית כבר לא בלוח", 2800); return; }

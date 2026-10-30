@@ -620,7 +620,7 @@
   }
   function askCal() {
     $("#remBody").innerHTML = '<h2>להקים יומן ייעודי?</h2><p class="remnote">אפשר להקים ביומן של הטלפון יומן נפרד בשם "לוח שידורים". כל תזכורת שתוסיפו או תבטלו כאן תופיע או תימחק בו לבד, בלי קבצים ובלי כפילויות.</p>' +
-      '<button type="button" class="btn" data-calsetup>כן, הקם יומן "לוח שידורים"</button><button type="button" class="ghost" data-calics>לא, קובץ ליומן לכל תזכורת</button>' +
+      '<button type="button" class="btn" data-calsetup>כן, הקם יומן "לוח שידורים"</button><button type="button" class="ghost" data-calics>לא, להוסיף ליומן הרגיל שלי</button>' +
       '<p class="credit">אפשר לשנות את זה בכל רגע בלשונית "תזכורות".</p>';
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
@@ -652,7 +652,8 @@
   function calCard() {
     if (calMode === "sub") return (syncBad ? '<div class="note">⚠️ השינוי האחרון עוד לא הגיע ליומן. <button type="button" class="ghost" data-calsync>לנסות שוב</button></div>' : "") +
       '<details class="calopt"><summary>📅 יומן "לוח שידורים" מחובר ✓</summary><p class="remnote">כל תזכורת שמוסיפים או מבטלים כאן מתעדכנת ביומן לבד (בדרך כלל תוך רבע שעה).</p>' +
-      '<div class="bar"><a class="ghost" data-calsub href="' + esc(calUrl()) + '">הרשמה מחדש ליומן</a><button type="button" class="ghost" data-calics>מעבר לקבצים</button></div></details>';
+      '<div class="bar"><a class="ghost" data-calsub href="' + esc(calUrl()) + '">חיבור היומן מחדש</a><button type="button" class="ghost" data-calics>להפסיק להשתמש ביומן הייעודי</button></div>' +
+      '<p class="credit">"חיבור מחדש" – אם מחקת את היומן מהטלפון או החלפת מכשיר. "להפסיק" – תזכורות חדשות ייכנסו ליומן הרגיל של הטלפון, אחת-אחת.</p></details>';
     return '<div class="note">📅 אפשר להקים יומן נפרד בשם "לוח שידורים" שמתעדכן לבד, כולל ביטולים.<div class="bar"><button type="button" class="ghost" data-calsetup>הקמת יומן ייעודי</button></div></div>';
   }
   var askK = null, askT = null;
@@ -1192,7 +1193,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.3", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.4", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

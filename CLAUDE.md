@@ -83,6 +83,8 @@ GitHub Actions רץ בארה״ב. אתה רץ על המחשב של אלעד בי
 
 7. אחרי התיקון: להריץ את בדיקות האיכות (סעיף 9) ולדווח לאלעד במספרים (כמה תוכניות, כמה ימים, כמה תקצירים לכל ערוץ שתוקן).
 
+**אבטחה במחשב בבית:** Task Scheduler מריץ את `%LOCALAPPDATA%\tv-guide-runner\runner.ps1` (מחוץ למאגר). הוא מושך מ-GitHub ומריץ את `hot-local.ps1` רק אם כל הקבצים שהמשימה מריצה (`tools/home/closure.ps1`: hot-local, enrich_hot, extra_channels והקבצים שהם מייבאים) זהים לאישור האחרון. **כל שינוי באחד מהם: לבקש מאלעד להריץ** `powershell -ExecutionPolicy Bypass -File C:\Users\eladw\tv-guide\tools\home\trust.ps1` (אישור אנושי בלבד, הסוכן לא מאשר בעצמו). עד האישור המשימה עוצרת ודוחפת `home-status.json`, והבקרה מתריעה בטלגרם.
+
 **תיקייה:** אתה עובד ב-`C:\Users\eladw\לוח שידורים` (עותק פיתוח). המשימה המתוזמנת עובדת מ-`C:\Users\eladw\tv-guide` – לא לגעת בו בזמן פיתוח, רק לעדכן את הסקריפט דרך git.
 
 ## 6. שרת, תזכורות והתראות

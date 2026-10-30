@@ -9,5 +9,9 @@ jobs:
         env:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          curl -s "https://api.telegram.org/bot${TOKEN}/getUpdates" \
-            | jq -r '.result[] | (.message // .my_chat_member // {}) | .chat | select(.id) | "chat_id=\(.id) type=\(.type) name=\(.first_name // .title // "")"' | sort -u
+          echo "token length: ${#TOKEN}"
+          curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | jq -c '{ok, description, bot: .result.username}'
+          curl -s "https://api.telegram.org/bot${TOKEN}/getWebhookInfo" | jq -c '{ok, webhook: .result.url, pending: .result.pending_update_count}'
+          U=$(curl -s "https://api.telegram.org/bot${TOKEN}/getUpdates")
+          echo "$U" | jq -c '{ok, description, updates: (.result // [] | length)}'
+          echo "$U" | jq -r '.result // [] | .[] | (.message // .my_chat_member // {}) | .chat | select(.id) | "chat_id=\(.id) type=\(.type) name=\(.first_name // .title // "")"' | sort -u

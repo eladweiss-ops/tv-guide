@@ -11,7 +11,7 @@ const toMin = (s) => Date.parse(s + ":00Z") / 60000;
 const key = (x) => String(x).replace(/[^\p{L}\p{N}]/gu, "");
 
 export function parseEpg(j) {
-  return (j && j.programs || []).map((x) => ({ start: local(x.StartTimeUTC), title: String(x.ProgramName || "").trim(), desc: String(x.EventDescription || "").replace(/\s+/g, " ").trim() }))
+  return (j && j.programs || []).map((x) => ({ start: local(x.StartTimeUTC), title: String(x.ProgramName || "").trim(), desc: String(x.EventDescription || "").replace(/\s+/g, " ").trim(), rr: !!x.RerunBroadcast }))
     .filter((x) => x.start && x.desc);
 }
 
@@ -23,7 +23,7 @@ export function enrich(guide, items) {
     const t = toMin(p.start); let best = null, bd = 11;
     for (const it of items) { const d = Math.abs(toMin(it.start) - t); if (d < bd) { bd = d; best = it; } }
     if (!best || key(best.desc) === key(p.title)) continue;
-    p.desc = best.desc; n++;
+    p.desc = best.desc; if (best.rr) p.rr = 1; n++;
   }
   return { ids: [...ids], n };
 }

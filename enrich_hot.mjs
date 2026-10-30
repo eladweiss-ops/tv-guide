@@ -23,7 +23,7 @@ export function cleanSyn(s) { return String(s || "").replace(/\((ש\.?ח\.?|כת
 // "2026/10/27 02:00:00" → "2026-10-27T02:00"
 export function parseHot(j) {
   return ((j && j.data && j.data.programsDetails) || []).map((x) => ({
-    ch: String(x.channelID), title: String(x.programTitle || "").trim(), desc: cleanSyn(x.synopsis),
+    ch: String(x.channelID), title: String(x.programTitle || "").trim(), desc: cleanSyn(x.synopsis), rr: /\(ש\.?ח\.?\)/.test(String(x.synopsis || "")),
     start: String(x.programStartTime || "").replace(/\//g, "-").replace(" ", "T").slice(0, 16),
   })).filter((x) => /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(x.start));
 }
@@ -57,7 +57,7 @@ export function enrich(guide, hot) {
       const t = toMin(p.start); let pick = null, pd = 16;
       for (const h of hs) { const d = Math.abs(toMin(h.start) - t); if (d < pd && sameShow(p.title, h.title)) { pd = d; pick = h; } }
       if (!pick || !pick.desc || pick.desc.length < 12) continue;
-      p.desc = pick.desc; p._hot = pick.title; n++;
+      p.desc = pick.desc; p._hot = pick.title; if (pick.rr) p.rr = 1; n++;
     }
   }
   return { matched, n };
@@ -72,7 +72,7 @@ export function applyCache(guide, cache) {
   for (const p of guide.programs) {
     if (p.desc) continue; const e = cache[p.ch + "|" + p.start]; if (!e) continue;
     if (typeof e === "string" || !e.t || !sameShow(p.title, e.t)) continue; // מטמון ישן או שם שלא מתאים - לא מצמידים
-    p.desc = e.d; n++;
+    p.desc = e.d; if (e.r) p.rr = 1; n++;
   }
   return n;
 }
@@ -95,7 +95,7 @@ async function main() {
   const r = enrich(guide, hot);
   const keep = new Date(now.getTime() - 864e5).toISOString().slice(0, 10), out = {};
   for (const [k, v] of Object.entries(cache)) if (k.split("|")[1] >= keep && v && v.t) out[k] = v;
-  for (const p of guide.programs) { const k = p.ch + "|" + p.start; if (p._hot) { out[k] = { d: p.desc, t: p._hot }; delete p._hot; } }
+  for (const p of guide.programs) { const k = p.ch + "|" + p.start; if (p._hot) { out[k] = { d: p.desc, t: p._hot, r: p.rr ? 1 : 0 }; delete p._hot; } }
   await writeFile(CACHE, JSON.stringify(out));
   console.log(`HOT: ${hot.length} תוכניות באתר, ${r.matched} ערוצים הותאמו, ${r.n} תוכניות קיבלו תקציר, ${Object.keys(out).length} במטמון`);
   await writeFile("guide.json", JSON.stringify(guide));

@@ -356,6 +356,8 @@
   .scrim { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   :root[data-theme="dark"] .scrim { background: rgba(0,0,0,.5); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   .vertag { float: left; margin-top: 4px; padding: 3px 10px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: .8rem; font-weight: 700; }
+  .tagk { display: inline-block; font-size: .72rem; font-weight: 800; padding: 1px 7px; border-radius: 999px; vertical-align: 2px; }
+  .tagk.nw { background: rgba(48,209,88,.2); color: #30D158; } .tagk.rr { background: var(--soft); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -535,7 +537,7 @@
         var lid = IDMAP[p.ch] || p.ch;
         if ((lid === p.ch) !== leadPass || !by.has(lid)) return;
         if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; return; }
-        var o = { title: unent(p.title), desc: p.desc || "", s: parse(p.start) };
+        var o = { title: unent(p.title), desc: p.desc || "", s: parse(p.start), rr: p.rr ? 1 : 0 };
         seen[lid][p.start] = o; by.get(lid).push(o);
       });
     });
@@ -1066,7 +1068,19 @@
     out.sort(function (a, b) { return a.p.s - b.p.s; });
     return limit ? out.slice(0, limit) : out;
   }
-  var sWhen = "all", topicAdd = false;
+  var sWhen = "all", topicAdd = false, sKind = "all", LASTHITS = [];
+  // שידור חוזר? סימון מפורש מהמקור (mako, HOT), סימון בשם/תקציר, או אותו פרק שכבר שודר קודם. זה ניחוש טוב, לא מידע רשמי.
+  function epKey(p) { return String(p.title).replace(/\s*[-–:]\s*(עונה חדשה|פרק|ספיישל).*$/, "").replace(/[^\p{L}\p{N}]/gu, "").slice(0, 14) + "|" + String(p.desc || "").replace(/[^\p{L}]/gu, "").slice(0, 40); }
+  function markReruns(list) { // list: [{p}] ממוין לפי זמן
+    var seen = {};
+    list.forEach(function (x) {
+      var p = x.p, txt = p.title + " " + (p.desc || ""), k = p.desc ? epKey(p) : null;
+      var isNew = /עונה חדשה|פרק חדש|בכורה|חדש!/.test(txt);
+      var night = p.s.getHours() < 6; // סדרות בין חצות לשש בבוקר הן כמעט תמיד שידור חוזר
+      x.rr = !isNew && (p.rr || night || /ש\.ח|\(שח\)|שידור חוזר/.test(txt) || (k && seen[k] && seen[k] < p.s.getTime() - 30 * 60000));
+      if (k && !seen[k]) seen[k] = p.s.getTime();
+    });
+  }
   // ---- חיפושים אחרונים ----
   var RECENT = []; try { RECENT = JSON.parse(store("tvg.recent") || "[]") || []; } catch (e) { RECENT = []; }
   function addRecent(text, exact) {
@@ -1105,6 +1119,10 @@
       });
     });
     hits.sort(function (a, b) { return a.p.s - b.p.s; });
+    // אותו שידור בשני ערוצים תאומים (SD/HD, או כאן וערוץ 1) - מציגים פעם אחת
+    var twin = {}; hits = hits.filter(function (x) { var k = x.p.s.getTime() + "|" + String(x.p.title).replace(/[^\p{L}]/gu, "").slice(0, 8); if (twin[k]) return false; twin[k] = 1; return true; });
+    var series = qExact || isTopic(q.trim());
+    if (series) { markReruns(hits); var nNew = hits.filter(function (x) { return !x.rr; }).length, nRr = hits.length - nNew; if (sKind === "new") hits = hits.filter(function (x) { return !x.rr; }); else if (sKind === "rerun") hits = hits.filter(function (x) { return x.rr; }); }
     var h = favBanner() + '<div class="chips" role="group" aria-label="היקף חיפוש"><button type="button" class="chip" data-scope="all" aria-pressed="' + (scope === "all") + '">כל הלוח</button><button type="button" class="chip" data-scope="mine" aria-pressed="' + (scope === "mine") + '">הערוצים שלי</button>' +
       (qExact ? '<button type="button" class="chip xchip" data-clearx="1" aria-label="ביטול הבחירה">' + esc(qExact) + " ✕</button>" : "") + "</div>" +
       '<div class="chips" role="group" aria-label="מתי">' + [["all", "הכל"], ["live", "● משודר עכשיו"], ["today", "הערב"], ["week", "השבוע"]].map(function (w) { return '<button type="button" class="chip" data-when="' + w[0] + '" aria-pressed="' + (sWhen === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
@@ -1123,15 +1141,18 @@
       }).join("");
     }
     if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
-    if (qExact) {
+    if (series) h += '<div class="chips seg3" role="group" aria-label="סוג שידור">' + [["all", "הכל"], ["new", "✨ פרקים חדשים (" + nNew + ")"], ["rerun", "🔁 שידורים חוזרים (" + nRr + ")"]].map(function (w) { return '<button type="button" class="chip" data-kind="' + w[0] + '" aria-pressed="' + (sKind === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
+    if (series) {
       var todo = hits.filter(function (x) { return !hasRem(remKey(x.c.id, x.p.s)); }).length;
-      h += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני כל " + (todo === 1 ? "שידור" : todo + " השידורים") + "?" : "✓ יש תזכורת לכל השידורים") + "</span>" +
-        (todo ? '<button type="button" class="btn sm" data-remall="' + esc(qExact) + '">' + (calMode === "sub" ? "כן, להזכיר" : "להקים תזכורות") + "</button>" : "") + "</div>";
+      var what = sKind === "new" ? "הפרקים החדשים" : sKind === "rerun" ? "השידורים החוזרים" : "השידורים";
+      h += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני " + (todo === 1 ? "השידור" : "כל " + todo + " " + what) + "?" : "✓ יש תזכורת לכל " + what) + "</span>" +
+        (todo ? '<button type="button" class="btn sm" data-remlist>' + (calMode === "sub" ? "כן, להזכיר" : "להקים תזכורות") + "</button>" : "") + "</div>";
     }
+    LASTHITS = hits;
     h += '<h2 class="sech">שידורים קרובים (' + hits.length + (hits.length > 80 ? ", מוצגים 80 הראשונים" : "") + ")</h2>";
     h += hits.slice(0, 80).map(function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
+      return '<div class="srow k-' + kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + (series ? (x.rr ? '<span class="tagk rr">🔁 חוזר</span> ' : '<span class="tagk nw">✨ חדש</span> ') : "") + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
         synBtn(v) + '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, x.p, x.c.id);
     }).join("");
     return h;
@@ -1213,7 +1234,7 @@
     document.querySelectorAll("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === t)); });
   }
   if (window.matchMedia) { try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themeSel === "auto") setTheme("auto"); }); } catch (e) {} }
-  function setSearch(on) { if (!on) { favPick = false; topicAdd = false; sWhen = "all"; } $("#qwrap").hidden = !on; if (on) { $("#q").focus(); render(); } else { if (q) { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; } render(); } }
+  function setSearch(on) { if (!on) { favPick = false; topicAdd = false; sWhen = "all"; sKind = "all"; } $("#qwrap").hidden = !on; if (on) { $("#q").focus(); render(); } else { if (q) { $("#q").value = ""; q = ""; qExact = null; $("#qx").hidden = true; } render(); } }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });
   function openSheet(on) { $("#sheet").hidden = !on; $("#scrim").hidden = !on; if (on) { find = ""; cf = "all"; $("#chFind").value = ""; buildSheet(); setInst(); } }
   var PROV = store("tvg.prov") === "hot" || store("tvg.prov") === "yes" ? store("tvg.prov") : "all";
@@ -1307,6 +1328,8 @@
     var tdl = t.closest("[data-topicdel]"); if (tdl) { var td = tdl.getAttribute("data-topicdel"); TOPICS = TOPICS.filter(function (x) { return x !== td; }); saveTopics(); $("#favBody").innerHTML = favHtml(); pill("הפסקת לעקוב אחרי " + td, 3000, "ביטול", function () { TOPICS.push(td); saveTopics(); $("#favBody").innerHTML = favHtml(); }); return; }
     if (t.closest("[data-topicadd]")) { topicAdd = true; startSearch("", false); return; }
     var wh = t.closest("[data-when]"); if (wh) { sWhen = wh.getAttribute("data-when"); render(); return; }
+    var kd = t.closest("[data-kind]"); if (kd) { sKind = kd.getAttribute("data-kind"); render(); return; }
+    if (t.closest("[data-remlist]")) { var lst = LASTHITS.map(function (x) { return { id: x.c.id, p: x.p }; }); if (calMode === "sub") quickAdd(lst); else { rem = lst[0] || null; askCal(); } return; }
     if (t.closest("[data-favadd]")) { favPick = true; startSearch("", false); return; }
     var fp = t.closest("[data-favpick]");
     if (fp) { var ft2 = fp.getAttribute("data-favpick"); FAV.add(ft2); saveFav(); updFav(); favPick = false; setSearch(false); openFavs(); pill("★ " + ft2 + " נוסף למועדפים", 1800); return; }
@@ -1399,7 +1422,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.12", BUILD = "2026-10-30.12", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.13", BUILD = "2026-10-30.13", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

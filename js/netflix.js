@@ -7,12 +7,27 @@
   TVG.nfPrep = nfPrep;
   TVG.openNf = openNf;
   TVG.closeNf = closeNf;
-  TVG.tmdbCredit = tmdbCredit;
 
   var ROWS = [["popular", "הכי נצפים"], ["recent", "יצא לאחרונה"], ["top", "הכי מדורגים"]];
 
   // ---- נתונים: בדיקת סכמה v2 ונרמול. מחזיר null כשאין מה להציג (הלשונית נשארת מוסתרת) ----
-  function nfPrep(j) {
+  var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_TR = /^[A-Za-z0-9_-]{11}$/;
+  // שדה לא תקין מושמט (לא הפריט כולו)
+  function clean(x) {
+    var o = {}, k;
+    for (k in x) if (Object.prototype.hasOwnProperty.call(x, k)) o[k] = x[k];
+    if (!RE_LINK.test(o.link || "")) delete o.link;
+    if (!RE_IMG.test(o.poster || "")) delete o.poster;
+    if (!RE_IMG.test(o.backdrop || "")) delete o.backdrop;
+    if (!RE_TR.test(o.trailer || "")) delete o.trailer;
+    return o;
+  }
+  function nfPrep(j0) {
+    var j = j0;
+    if (j0 && typeof j0 === "object" && j0.items && typeof j0.items === "object") {
+      j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {} };
+      Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k]); });
+    }
     if (!j || typeof j !== "object" || !(j.v >= 2) || !j.items || typeof j.items !== "object") return null;
     var rows = {}, any = false, seen = {};
     ROWS.forEach(function (r) {
@@ -41,12 +56,14 @@
     if (x.type === "tv") return x.seasons > 0 ? (x.seasons === 1 ? "עונה אחת" : x.seasons + " עונות") : "";
     return runtimeTxt(x.runtime);
   }
+  // שם מקורי מוצג רק בכתב לטיני (גם עם סימנים כמו é) ורק אם שונה מהכותרת אחרי נרמול
+  function normT(t) { t = String(t || "").toLowerCase(); try { t = t.normalize("NFD"); } catch (e) {} return t.replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0590-\u05ff]+/g, ""); }
+  function showOrig(x) { var o = x.orig || ""; return /[A-Za-z]/.test(o) && /^[\u0020-\u024F\u2010-\u206F]+$/.test(o) && normT(o) !== normT(x.title); }
   function kindTxt(x) { return x.type === "tv" ? "סדרה" : "סרט"; }
   function bdis(a) { return a.filter(Boolean).map(function (s) { return "<bdi>" + esc(s) + "</bdi>"; }).join(" · "); }
   function imdbChip(x, cls) { var v = imdbOf(x); return v ? '<span class="nfimdb ' + (cls || "") + '" title="דירוג IMDb"><bdi dir="ltr">⭐ ' + fmtRate(v) + "</bdi></span>" : ""; }
-  function tmdbCredit(full) {
-    return '<p class="credit nfcredit"><span>נתונים ותמונות:</span> <a class="tmdbmark" href="https://www.themoviedb.org" target="_blank" rel="noopener" aria-label="TMDB">TMDB</a>' +
-      (full ? "<br>המוצר משתמש ב-API של TMDB אך אינו מאושר או מוסמך על ידי TMDB." : "") + "</p>";
+  function tmdbCredit() {
+    return '<p class="credit nfcredit"><span>נתונים ותמונות:</span> <a class="tmdbmark" href="https://www.themoviedb.org" target="_blank" rel="noopener" aria-label="TMDB">TMDB</a></p>';
   }
 
   // ---- כרטיסים ----
@@ -85,7 +102,7 @@
         h += '<section class="nfsec"><h2 class="sech">' + r[1] + '</h2><div class="nfrow">' + ks.map(function (k) { return card(k, NF.items[k]); }).join("") + "</div></section>";
       });
     }
-    return h + tmdbCredit(false);
+    return h + tmdbCredit();
   }
 
   // ---- תמונות: שלד בזמן טעינה, ומקום חלופי לתמונה שנכשלה ----
@@ -111,17 +128,17 @@
     var bd = imgUrl(x.backdrop), u = bd || imgUrl(x.poster);
     var h = '<div class="nfbd' + (u ? "" : " er") + (bd ? "" : " ispo") + '">' + (u ? '<img alt="" decoding="async" src="' + esc(u) + '">' : "") + '<span class="nfph" aria-hidden="true">🎬</span></div>';
     h += '<div class="nfpg"><h2 id="nfsT"><bdi>' + esc(x.title) + "</bdi></h2>";
-    if (x.orig && x.orig !== x.title) h += '<div class="nforig"><bdi dir="ltr">' + esc(x.orig) + "</bdi></div>";
+    if (showOrig(x)) h += '<div class="nforig"><bdi dir="ltr">' + esc(x.orig) + "</bdi></div>";
     h += '<div class="nfmeta">' + bdis([kindTxt(x), x.year ? String(x.year) : "", lenTxt(x), (x.genres || []).slice(0, 3).join(", ")]) + "</div>";
     h += ratesHtml(x);
     h += '<p class="nfov">' + (x.overview ? esc(x.overview) : "אין עדיין תקציר בעברית לתוכן הזה.") + "</p>";
     // "חברים שראו": שלב 3. אין נתונים אמיתיים, לכן אין בלוק בכלל.
-    if (/^[\w-]{6,20}$/.test(x.trailer || "")) h += '<a class="ghost nftr" href="https://www.youtube.com/watch?v=' + esc(x.trailer) + '" target="_blank" rel="noopener">🎬 טריילר</a>';
+    if (RE_TR.test(x.trailer || "")) h += '<a class="ghost nftr" href="https://www.youtube.com/watch?v=' + esc(x.trailer) + '" target="_blank" rel="noopener">🎬 טריילר</a>';
     return h + "</div>";
   }
   function barHtml(x) {
     // 💌 ו-🍿 יתווספו בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
-    var ok = /^https?:\/\//.test(x.link || "");
+    var ok = RE_LINK.test(x.link || "");
     return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }

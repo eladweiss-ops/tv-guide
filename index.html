@@ -282,6 +282,13 @@
   #qwrap input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
   #qx { position: absolute; inset-inline-end: 8px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: 50%; background: rgba(118,118,128,.28); color: var(--ink); font-size: 1rem; line-height: 1; cursor: pointer; }
   #bkCode { width: 100%; box-sizing: border-box; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 14px; padding: 10px 12px; font: 13px/1.4 ui-monospace, monospace; resize: vertical; }
+  .dock .tabs button { position: relative; }
+  .tcnt { position: absolute; top: 4px; inset-inline-start: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: #fff; font: 700 11px/18px var(--font-body); }
+  .tcnt:empty { display: none; }
+  .rbt.on, .btn.rem.on { background: var(--accent); color: #fff; }
+  .remnote { margin: 4px 0 12px; color: var(--muted); font-size: .95rem; line-height: 1.5; }
+  a.btn, a.ghost { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+  a.ghost { color: var(--ink); } a.btn { color: #fff; }
 </style>
 </head>
 <body>
@@ -301,6 +308,7 @@
     <button type="button" role="tab" id="tabDial" data-tab="dial" aria-selected="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg><span>היום</span></button>
     <button type="button" role="tab" id="tabNow" data-tab="now" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"></circle><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9"></path><path d="M16.5 7.5a6.4 6.4 0 0 1 0 9"></path></svg><span>עכשיו</span></button>
     <button type="button" role="tab" id="tabGrid" data-tab="grid" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="7" x2="20" y2="7"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="17" x2="20" y2="17"></line><circle cx="4.5" cy="7" r="0.8"></circle><circle cx="4.5" cy="12" r="0.8"></circle><circle cx="4.5" cy="17" r="0.8"></circle></svg><span>לוח</span></button>
+    <button type="button" role="tab" id="tabRems" data-tab="rems" aria-selected="false"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span>תזכורות</span><b class="tcnt" id="remCount"></b></button>
     <button type="button" role="tab" id="tabNf" data-tab="nf" aria-selected="false" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"></rect><polygon points="10.5 9.5 15 12 10.5 14.5"></polygon></svg><span>נטפליקס</span></button>
   </nav>
   <button type="button" class="glass round big" id="sBtn" aria-label="חיפוש תוכנית"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.2" y2="16.2"></line></svg></button>
@@ -505,9 +513,37 @@
   var lead = +(store("tvg.lead") || 10), rem = null, tapPending = false, tapAt = null, pillT = null;
   var FAV = new Set(); try { JSON.parse(store("tvg.fav") || "[]").forEach(function (t) { FAV.add(t); }); } catch (e) {}
   function saveFav() { store("tvg.fav", JSON.stringify(Array.from(FAV))); }
+  // ---- התזכורות שלי: רשימת התזכורות שנוספו ליומן, כדי למנוע כפילויות ולאפשר ביטול ----
+  var REMS = []; try { REMS = JSON.parse(store("tvg.rem") || "[]") || []; } catch (e) { REMS = []; }
+  function saveRems() {
+    var cut = Date.now() - 2 * 3600000; REMS = REMS.filter(function (x) { return x.end > cut; }); // שידורים שהסתיימו יורדים מהרשימה
+    REMS.sort(function (a, b) { return a.ts - b.ts; }); store("tvg.rem", JSON.stringify(REMS));
+  }
+  saveRems();
+  function remKey(id, s) { return id + "|" + (s.getTime ? s.getTime() : s); }
+  function hasRem(k) { return REMS.filter(function (x) { return x.k === k; })[0] || null; }
+  function remCount() { var now = Date.now(); return REMS.filter(function (x) { return x.ts > now; }).length; }
+  // ---- יומן ייעודי "לוח שידורים" (יומן מנוי). השרת שומר את הרשימה ומגיש אותה כיומן ----
+  var CAL_API = "https://tv-guide-cal.vercel.app";
+  var calMode = store("tvg.calmode") || "", calTok = store("tvg.calTok") || "", syncBad = store("tvg.remDirty") === "1";
+  function newTok() { var a = new Uint8Array(20); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (v, i) { a[i] = Math.random() * 256; }); return Array.from(a).map(function (b) { return (b % 36).toString(36); }).join("") + Date.now().toString(36); }
+  function calUrl() { return CAL_API.replace(/^https?:/, "webcal:") + "/cal/" + calTok + ".ics"; }
+  function syncRems() {
+    if (calMode !== "sub" || !calTok) return Promise.resolve(true);
+    return fetch(CAL_API + "/api/rems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: calTok, rems: REMS }) })
+      .then(function (r) { if (!r.ok) throw 0; syncBad = false; store("tvg.remDirty", "0"); return true; })
+      .catch(function () { syncBad = true; store("tvg.remDirty", "1"); return false; });
+  }
+  function pullRems() { // שחזור הרשימה מהשרת (למשל אחרי התקנה מחדש וקוד גיבוי)
+    if (calMode !== "sub" || !calTok || REMS.length) return;
+    fetch(CAL_API + "/api/rems?t=" + calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (j && Array.isArray(j.rems) && j.rems.length && !REMS.length) { REMS = j.rems; saveRems(); if (G) render(); }
+    }).catch(function () {});
+  }
   function remBtn(p, cid, small) {
     if (!cid || p.s <= new Date()) return "";
-    return '<button type="button" class="btn rem' + (small ? " sm" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="תזכיר לי (התראה ביומן)" title="תזכיר לי (התראה ביומן)">⏰' : ">⏰ תזכיר לי (התראה ביומן)") + "</button>";
+    var on = !!hasRem(remKey(cid, p.s));
+    return '<button type="button" class="btn rem' + (small ? " sm" : "") + (on ? " on" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="' + (on ? "יש תזכורת" : "תזכיר לי (התראה ביומן)") + '">' + (on ? "✓" : "⏰") : ">" + (on ? "✓ יש תזכורת ביומן" : "⏰ תזכיר לי (התראה ביומן)")) + "</button>";
   }
   function favBtn(p) {
     var on = FAV.has(p.title);
@@ -521,10 +557,13 @@
     return p ? { id: id, p: p } : null;
   }
   function chName(id) { return (G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || ""; }
-  function icsText(r) {
+  function icsText(r, cancel) {
     var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : "");
-    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
-      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
+    if (cancel) return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "METHOD:CANCEL", "BEGIN:VEVENT",
+      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:1", "STATUS:CANCELLED", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
+      "SUMMARY:" + icsEsc("בוטל: " + ttl), "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:0", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
       "SUMMARY:" + icsEsc(ttl), "DESCRIPTION:" + icsEsc((p.desc || "").slice(0, 300)),
       "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + lead + "M", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"].join("\r\n");
@@ -532,19 +571,86 @@
   function pill(t, ms) { var el = $("#pill"); el.textContent = t; el.hidden = false; clearTimeout(pillT); if (ms) pillT = setTimeout(function () { el.hidden = true; }, ms); }
   function openRem(r) {
     rem = r;
+    var ex = hasRem(remKey(r.id, r.p.s));
+    if (ex) {
+      $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(chName(r.id)) + "</span><span>" + dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
+        '<p class="remnote">✓ כבר יש תזכורת ביומן לתוכנית הזו, ' + ex.lead + " דקות לפני השידור.</p>" +
+        '<button type="button" class="btn" data-remcancel="' + esc(ex.k) + '">ביטול התזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
+        '<p class="credit">' + (calMode === "sub" ? "הביטול ימחק את האירוע מיומן \"לוח שידורים\" בעדכון הבא שלו." : "הביטול מוריד את התזכורת מהרשימה ופותח ביומן קובץ ביטול. אם האירוע עדיין מופיע ביומן, מוחקים אותו שם.") + "</p>";
+      $("#rem").hidden = false; $("#scrim2").hidden = false; return;
+    }
     $("#remBody").innerHTML = "<h2>" + esc(r.p.title) + '</h2><div class="meta"><span>' + esc(chName(r.id)) + "</span><span>" + dayLabel(dstr(r.p.s)) + "</span><span>" + hhmm(r.p.s) + "</span></div>" +
       '<div class="lbl">התראה לפני השידור</div><div class="chips" role="group">' + [5, 10, 30].map(function (m) { return '<button type="button" class="chip" data-lead="' + m + '" aria-pressed="' + (lead === m) + '">' + m + " דקות</button>"; }).join("") + "</div>" +
       '<button type="button" class="btn" data-ics>הוספה ליומן עם תזכורת</button><button type="button" class="ghost" data-remclose>סגירה</button>' +
       '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>';
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
-  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; }
+  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = true; rem = null; }
+  function saveIcs(text, name) {
+    var url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
+    var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
   function downloadIcs() {
     if (!rem) return;
-    var url = URL.createObjectURL(new Blob([icsText(rem)], { type: "text/calendar;charset=utf-8" }));
-    var a = document.createElement("a"); a.href = url; a.download = "reminder.ics"; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-    closeRem(); pill("נוסף ליומן", 1600);
+    var k = remKey(rem.id, rem.p.s);
+    if (hasRem(k)) { openRem(rem); return; } // לא מוסיפים פעמיים
+    if (!calMode) { askCal(); return; }
+    REMS.push({ k: k, id: rem.id, ts: rem.p.s.getTime(), end: rem.p.e.getTime(), title: rem.p.title, ch: chName(rem.id), desc: (rem.p.desc || "").slice(0, 300), lead: lead, at: Date.now() });
+    saveRems();
+    if (calMode === "sub") { syncRems().then(function (ok) { pill(ok ? "נוסף ליומן 'לוח שידורים'" : "נשמר. היומן יתעדכן כשיהיה חיבור", 1800); }); }
+    else { saveIcs(icsText(rem), "reminder.ics"); pill("נוסף ליומן", 1600); }
+    closeRem(); render();
+  }
+  function cancelRem(k) {
+    var x = hasRem(k); if (!x) return;
+    REMS = REMS.filter(function (y) { return y.k !== k; }); saveRems();
+    if (calMode === "sub") { syncRems().then(function (ok) { pill(ok ? "בוטל. יימחק מהיומן בעדכון הבא שלו" : "בוטל. היומן יתעדכן כשיהיה חיבור", 2000); }); }
+    else { var p = { title: x.title, s: new Date(x.ts), e: new Date(x.end), desc: "" }; saveIcs(icsText({ id: x.id, p: p }, true), "cancel-reminder.ics"); pill("התזכורת בוטלה", 1800); }
+    closeRem(); render();
+  }
+  function askCal() {
+    $("#remBody").innerHTML = '<h2>להקים יומן ייעודי?</h2><p class="remnote">אפשר להקים ביומן של הטלפון יומן נפרד בשם "לוח שידורים". כל תזכורת שתוסיפו או תבטלו כאן תופיע או תימחק בו לבד, בלי קבצים ובלי כפילויות.</p>' +
+      '<button type="button" class="btn" data-calsetup>כן, הקם יומן "לוח שידורים"</button><button type="button" class="ghost" data-calics>לא, קובץ ליומן לכל תזכורת</button>' +
+      '<p class="credit">אפשר לשנות את זה בכל רגע בלשונית "תזכורות".</p>';
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+  }
+  function setupCal() {
+    calMode = "sub"; store("tvg.calmode", "sub");
+    if (!calTok) { calTok = newTok(); store("tvg.calTok", calTok); }
+    $("#remBody").innerHTML = '<h2>מקימים את היומן…</h2>'; $("#rem").hidden = false; $("#scrim2").hidden = false;
+    syncRems().then(function (ok) {
+      $("#remBody").innerHTML = '<h2>יומן "לוח שידורים"</h2>' + (ok ? "" : '<p class="remnote">⚠️ לא הצלחתי להתחבר לשרת כרגע. אפשר להירשם בכל זאת, והתזכורות יופיעו כשהחיבור יחזור.</p>') +
+        '<ol class="remnote"><li>לחצו "הרשמה ליומן" ואז "הירשם".</li><li>במסך ההגדרות שנפתח, <b>כבו את "הסר התראות"</b>, אחרת לא תקבלו התראה לפני השידור.</li><li>לחצו "סיום". היומן יופיע באפליקציית היומן בשם "לוח שידורים".</li></ol>' +
+        '<a class="btn" href="' + esc(calUrl()) + '">הרשמה ליומן</a><button type="button" class="ghost" data-remclose>סגירה</button>' +
+        '<p class="credit">שינויים מגיעים ליומן בעדכון הבא שלו (בדרך כלל עד רבע שעה). את התדירות אפשר לקבוע בהגדרות ← יומן ← חשבונות ← יומנים מנויים.</p>';
+      if (rem && !hasRem(remKey(rem.id, rem.p.s))) {
+        var p = rem.p; REMS.push({ k: remKey(rem.id, p.s), id: rem.id, ts: p.s.getTime(), end: p.e.getTime(), title: p.title, ch: chName(rem.id), desc: (p.desc || "").slice(0, 300), lead: lead, at: Date.now() });
+        saveRems(); syncRems(); render();
+      }
+    });
+  }
+  function useIcs() {
+    var r0 = rem; calMode = "ics"; store("tvg.calmode", "ics"); closeRem();
+    if (r0 && !hasRem(remKey(r0.id, r0.p.s))) { rem = r0; downloadIcs(); } else render();
+  }
+  function calCard() {
+    if (calMode === "sub") return '<div class="note">📅 מחובר ליומן "לוח שידורים". הוספה וביטול כאן מתעדכנים ביומן לבד.' + (syncBad ? ' <b>⚠️ העדכון האחרון לא הגיע לשרת.</b> <button type="button" class="ghost" data-calsync>נסה שוב</button>' : "") +
+      '<div class="bar"><a class="ghost" href="' + esc(calUrl()) + '">הרשמה מחדש ליומן</a><button type="button" class="ghost" data-calics>מעבר לקבצים</button></div></div>';
+    return '<div class="note">📅 אפשר להקים יומן נפרד בשם "לוח שידורים" שמתעדכן לבד, כולל ביטולים.<div class="bar"><button type="button" class="ghost" data-calsetup>הקמת יומן ייעודי</button></div></div>';
+  }
+  function vRems() {
+    var now = Date.now(), up = REMS.filter(function (x) { return x.end > now; });
+    if (!up.length) return calCard() + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
+    var h = calCard() + (calMode === "sub" ? "" : '<p class="remnote">ביטול מוריד את התזכורת מכאן ופותח ביומן קובץ ביטול; אם האירוע נשאר ביומן, מוחקים אותו שם.</p>'), last = "";
+    up.forEach(function (x) {
+      var d = new Date(x.ts), dl = dayLabel(dstr(d));
+      if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
+      var live = x.ts <= now;
+      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub">' + esc(x.ch) + " · " + (live ? "משודר עכשיו" : "התראה " + x.lead + " דק׳ לפני") + "</span></span></button>" +
+        (live ? "" : '<button type="button" class="rbt" data-remcancel="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button>') + "</div>";
+    });
+    return h;
   }
   function tapDial() {
     var T = scrub == null ? dialT() : scrub, now = new Date(), sg = null;
@@ -556,7 +662,7 @@
   function airRow(c, p, sub) {
     var v = c.id + "|" + p.s.getTime();
     return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" +
-      '<button type="button" class="rbt" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">⏰</button></div>';
+      '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>";
   }
   function soonHtml(now) {
     var soon = [], favs = [];
@@ -852,7 +958,7 @@
     h += hits.slice(0, 80).map(function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
       return '<div class="srow"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
-        '<button type="button" class="rbt" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">⏰</button></div>';
+        '<button type="button" class="rbt' + (hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (hasRem(v) ? "✓" : "⏰") + "</button></div>";
     }).join("");
     return h;
   }
@@ -882,20 +988,22 @@
 
   function render() {
     var note = isSample ? '<div class="note"><b>מוצגים נתוני דוגמה.</b> הדף לא מצא את <code>guide.json</code>. פתח אותו דרך שרת (<code>npx serve</code>) ולא ישירות מהקובץ.</div>' : "";
-    var nf = tab === "nf" && NF;
-    var picking = !nf && needsPick(), searching = !nf && !!q.trim();
-    var chips = (!picking && !searching && !nf && tab !== "dial") ? chipsHtml() : "";
-    var body = nf ? vNf() : (searching ? vSearch() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
+    var nf = tab === "nf" && NF, rems = tab === "rems";
+    var picking = !nf && !rems && needsPick(), searching = !nf && !!q.trim();
+    var chips = (!picking && !searching && !nf && !rems && tab !== "dial") ? chipsHtml() : "";
+    var body = nf ? vNf() : (searching ? vSearch() : rems ? vRems() : (picking ? vPick() : (tab === "dial" ? vDial() : (tab === "now" ? vNow() : vGrid()))));
     $("#main").innerHTML = (nf ? "" : note) + chips + body;
     document.body.classList.toggle("tab-dial", tab === "dial" && !nf && !picking && !searching);
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = sel.size ? String(sel.size) : "";
     updFav();
-    $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס" }[nf ? "nf" : tab] || "לוח שידורים");
+    $("#ttl").textContent = searching ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס", rems: "התזכורות שלי" }[nf ? "nf" : tab] || "לוח שידורים");
     if (searching) $("#qwrap").hidden = false;
     $("#tabDial").setAttribute("aria-selected", String(tab === "dial"));
     $("#tabNow").setAttribute("aria-selected", String(tab === "now"));
     $("#tabGrid").setAttribute("aria-selected", String(tab === "grid"));
+    $("#tabRems").setAttribute("aria-selected", String(rems));
+    var rcn = remCount(); $("#remCount").textContent = rcn ? String(rcn) : "";
     $("#tabNf").hidden = !NF;
     if (scrollNext && tab === "grid" && !q.trim()) {
       var el = document.querySelector(".row.now"); if (el) el.scrollIntoView({ block: "center" });
@@ -965,6 +1073,10 @@
     var rm = t.closest("[data-rem]"); if (rm) { var rr = findProg(rm.getAttribute("data-rem")); if (rr) openRem(rr); return; }
     var ld = t.closest("[data-lead]"); if (ld) { lead = +ld.getAttribute("data-lead"); store("tvg.lead", String(lead)); if (rem) openRem(rem); return; }
     if (t.closest("[data-ics]")) { downloadIcs(); return; }
+    var rc = t.closest("[data-remcancel]"); if (rc) { cancelRem(rc.getAttribute("data-remcancel")); return; }
+    if (t.closest("[data-calsetup]")) { setupCal(); return; }
+    if (t.closest("[data-calics]")) { useIcs(); return; }
+    if (t.closest("[data-calsync]")) { syncRems().then(function (ok) { pill(ok ? "היומן עודכן" : "עדיין אין חיבור", 1500); render(); }); return; }
     if (t.closest("[data-remclose]") || t.closest("#scrim2")) { closeRem(); closeFavs(); return; }
     var fv = t.closest("[data-fav]");
     if (fv) {
@@ -1058,7 +1170,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-25.1", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.2", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {
@@ -1071,12 +1183,14 @@
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) return;
     if (Date.now() - bootAt > 3 * 3600000) { location.reload(); return; } // נתונים טריים אחרי הפסקה ארוכה
+    if (syncBad) syncRems();
     checkUpdate();
   });
   setTimeout(checkUpdate, 1500);
+  pullRems(); if (syncBad) syncRems();
 
   // ---- גיבוי ושחזור הבחירות ----
-  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab"];
+  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok"];
   function bkCode() { var o = {}; BK.forEach(function (k) { var v = store(k); if (v != null) o[k] = v; }); return "TVG1:" + btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
   $("#bkCopy").addEventListener("click", function () {
     var c = bkCode(); $("#bkCode").value = c;
@@ -1105,7 +1219,7 @@
   load().then(function (r) {
     G = r.g; isSample = r.s; classify(); index();
     try { var saved = JSON.parse(store("tvg.sel") || "null"); if (Array.isArray(saved)) saved.forEach(function (id) { id = IDMAP[id] || id; if (by.has(id)) sel.add(id); }); if (sel.size !== saved.length) saveSel(); } catch (e) {}
-    var st0 = store("tvg.tab"); tab = (st0 === "grid" || st0 === "now") ? st0 : "dial";
+    var st0 = store("tvg.tab"); tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
     scrollNext = tab === "grid";
     render();
     if (needsPick() && store("tvg.tab") !== "nf") openSheet(true);

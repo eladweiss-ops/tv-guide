@@ -96,7 +96,7 @@ const SOURCES = [
     const all = [];
     for (const d of days) {
       const [y, m, dd] = d.split("-");
-      try { all.push(...parseKan(await get(`https://www.kan.org.il/umbraco/surface/LoadBroadcastSchedule/LoadSchedule?day=${dd}-${m}-${y}&currentPageId=415742`))); } catch (e) { console.log("כאן חינוכית", d, e.message); }
+      try { all.push(...parseKan(await get(`https://www.kankids.org.il/umbraco/surface/LoadBroadcastSchedule/LoadSchedule?day=${dd}-${m}-${y}&currentPageId=415742`))); } catch (e) { console.log("כאן חינוכית", d, e.message); }
       await new Promise((r) => setTimeout(r, 400));
     }
     return all;

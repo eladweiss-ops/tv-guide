@@ -124,14 +124,6 @@
   .opt { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 52px; }
   .opt input { width: 24px; height: 24px; accent-color: var(--accent); flex: none; }
   /* netflix */
-  .nf { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: 14px; padding: 14px 16px; border-top: 1px solid var(--line); cursor: pointer; }
-  .nf:first-child { border-top: 0; }
-  .poster { width: 100%; aspect-ratio: 2 / 3; border-radius: 8px; background: var(--soft); overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.8rem; text-align: center; }
-  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .nfb { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-  .nfb .ttl { font-size: 1.1rem; font-weight: 700; }
-  .ov { margin: 0; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .nf.open .ov { display: block; -webkit-line-clamp: unset; color: var(--ink); }
   .credit { font-size: 0.8rem; color: var(--muted); margin: 6px 0 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; min-height: 38px; font-size: 0.92rem; font-weight: 500; }
@@ -381,3 +373,63 @@
   .days::-webkit-scrollbar { display: none; }
   .days .day { flex: 0 0 auto; min-width: 70px; scroll-snap-align: start; }
   .linkbtn{background:none;border:0;padding:0;margin-top:4px;display:block;color:var(--accent,#7c5cff);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
+
+  /* ===== נטפליקס 2.0: לשונית ודף תוכן ===== */
+  .nfsec { display: flex; flex-direction: column; gap: 8px; }
+  .nfsec .sech { margin: 0; }
+  .nfrow { display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; margin-inline: -16px; padding: 2px 16px 6px; scroll-padding-inline: 16px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+  .nfrow::-webkit-scrollbar { display: none; }
+  .nfc { flex: 0 0 auto; width: 112px; border: 0; background: none; padding: 0; color: var(--ink); font: inherit; text-align: start; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .nfc:active .nfp { transform: scale(.97); }
+  .nfp { position: relative; display: block; width: 100%; aspect-ratio: 2 / 3; border-radius: 14px; overflow: hidden; background: var(--soft); transition: transform .12s; }
+  .nfp:not(.ld):not(.er) { background: linear-gradient(100deg, var(--soft) 30%, var(--line) 50%, var(--soft) 70%) 0 0 / 220% 100%; animation: nfsk 1.3s linear infinite; }
+  @keyframes nfsk { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+  @media (prefers-reduced-motion: reduce) { .nfp:not(.ld):not(.er) { animation: none; } }
+  .nfp img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .25s; }
+  .nfp.ld img { opacity: 1; }
+  .nfp.er img, .nfbd.er img { display: none; }
+  .nfph { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; font-size: 1.8rem; opacity: .55; }
+  .nfp.er .nfph, .nfbd.er .nfph { display: flex; }
+  .nft { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: .86rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+  .nfimdb { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: #F5C518; color: #111; font-size: .75rem; font-weight: 800; white-space: nowrap; }
+  .nfimdb.onp { position: absolute; top: 6px; inset-inline-start: 6px; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+  .nfgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; }
+  .nfgrid .nfc { width: auto; }
+  .nfempty { display: flex; flex-direction: column; gap: 6px; padding: 28px 8px; text-align: center; color: var(--muted); }
+  .nfempty b { color: var(--ink); font-size: 1.05rem; }
+  .nfhero { position: relative; display: block; width: 100%; min-height: 250px; padding: 0; border: 0; border-radius: 28px; overflow: hidden; color: #fff; text-align: start; font: inherit; cursor: pointer; background: linear-gradient(160deg, #E50914, #1A0505); box-shadow: 0 10px 28px rgba(0,0,0,.22); -webkit-tap-highlight-color: transparent; }
+  .nfhi { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .nfhero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 20%, rgba(0,0,0,.82) 100%); }
+  .nfhg { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; min-height: 250px; padding: 18px; }
+  .nfchips { display: flex; gap: 6px; align-items: center; }
+  .nfchip { display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 11px; background: rgba(255,255,255,.2); font-size: .75rem; font-weight: 700; }
+  .nfht { font-size: 1.7rem; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nfhm { font-size: .9rem; opacity: .9; }
+  .nfho { font-size: .9rem; line-height: 1.45; opacity: .9; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nfhg { z-index: 2; }
+  .nfcredit { text-align: center; margin: 4px 0 0; padding-bottom: 6px; line-height: 1.6; }
+  .tmdbmark { display: inline-block; padding: 0 8px; border-radius: 6px; background: linear-gradient(90deg, #90cea1, #01b4e4); color: #0d253f; font-weight: 800; letter-spacing: .04em; text-decoration: none; direction: ltr; unicode-bidi: isolate; }
+  /* דף תוכן */
+  .sheet.nfs { display: flex; flex-direction: column; padding: 0; max-height: 92vh; max-height: 92dvh; overflow: hidden; }
+  .sheet.nfs[hidden] { display: none; }
+  .nfs-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .nfbd { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(160deg, #E50914, #1A0505); overflow: hidden; }
+  .nfbd img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .nfbd.ispo img { object-fit: contain; background: #000; }
+  .nfbd::after { content: ""; position: absolute; inset: auto 0 0 0; height: 55%; background: linear-gradient(180deg, rgba(0,0,0,0), var(--sheet)); }
+  .nfpg { position: relative; margin-top: -34px; z-index: 1; padding: 0 22px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .nfpg h2 { font-size: 1.6rem; line-height: 1.15; overflow-wrap: anywhere; }
+  .nforig { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; text-align: start; }
+  .nfmeta { color: var(--muted); font-size: .92rem; font-weight: 500; }
+  .nfrates { display: flex; gap: 8px; }
+  .nfr { display: inline-flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; text-align: center; border-radius: 16px; background: var(--soft); gap: 1px; }
+  .nfr b { font-size: 1.15rem; font-weight: 800; }
+  .nfr i { font-style: normal; font-size: .66rem; white-space: nowrap; color: var(--muted); font-weight: 600; direction: ltr; }
+  .nfr.im b { color: #F5C518; } .nfr.rt b { color: #FA6E59; } .nfr.mc b { color: #66CC33; }
+  :root:not([data-theme="dark"]) .nfr.im b { color: #8a6d00; } :root:not([data-theme="dark"]) .nfr.rt b { color: #c0391f; } :root:not([data-theme="dark"]) .nfr.mc b { color: #2f7d12; }
+  .nfov { margin: 0; line-height: 1.6; font-size: 1rem; }
+  .nftr { align-self: flex-start; display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); min-height: 44px; }
+  .nfs-bar { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid var(--line); background: var(--sheet); }
+  .nfs-bar .btn, .nfs-bar .ghost { width: 100%; min-height: 50px; }
+  .nfs-bar .ghost { min-height: 44px; background: transparent; }
+  .nfnolink { text-align: center; }

@@ -32,5 +32,5 @@
     return h;
   }
   function openFavs() { TVG.delArm = false; $("#favBody").innerHTML = favHtml(); $("#favs").hidden = false; $("#scrim2").hidden = false; }
-  function closeFavs() { $("#favs").hidden = true; $("#setsheet").hidden = true; if ($("#rem").hidden) $("#scrim2").hidden = true; }
+  function closeFavs() { if (TVG.closeNf) TVG.closeNf(); $("#favs").hidden = true; $("#setsheet").hidden = true; if ($("#rem").hidden) $("#scrim2").hidden = true; }
 })(window.TVG);

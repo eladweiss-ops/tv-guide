@@ -29,8 +29,8 @@
     fetch("netflix.json", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
-        if (!j || !(j.popular || []).length && !(j["new"] || []).length) return;
-        TVG.NF = j;
+        var nf = TVG.nfPrep(j); if (!nf) return; // סכמה ישנה או ריק: הלשונית נשארת מוסתרת
+        TVG.NF = nf;
         if (TVG.store("tvg.tab") === "nf") { TVG.tab = "nf"; if (!$("#sheet").hidden) TVG.openSheet(false); }
         TVG.render();
       }).catch(function () {});

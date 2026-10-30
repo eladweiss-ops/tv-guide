@@ -77,6 +77,8 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
     <textarea id="bkCode" rows="2" placeholder="הדבקת קישור אישי (או קוד גיבוי ישן) לשחזור" aria-label="קישור לשחזור" dir="ltr"></textarea>
     <div class="bar"><button type="button" class="ghost" id="bkRestore">שחזור</button></div>
     <p class="none" id="bkVer"></p>
+    <h2>אודות</h2>
+    <p class="none credit nfcredit"><span>נתונים ותמונות בלשונית נטפליקס:</span> <a class="tmdbmark" href="https://www.themoviedb.org" target="_blank" rel="noopener" aria-label="TMDB">TMDB</a><br>המוצר משתמש ב-API של TMDB אך אינו מאושר או מוסמך על ידי TMDB. הדירוגים מ-OMDb.</p>
     <div id="instBox" hidden><h2>התקנה כאפליקציה</h2><p class="none" id="instTxt"></p><button type="button" class="ghost" id="instBtn" data-install hidden>הוסף למסך הבית</button></div>
     <button class="ghost" type="button" data-setclose>סגירה</button>
   </div>
@@ -86,6 +88,7 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <div class="scrim" id="scrim2" hidden></div>
 <section class="sheet" id="favs" hidden aria-label="מועדפים"><div class="sheet-in" id="favBody"></div></section>
 <section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
+<section class="sheet nfs" id="nfsheet" hidden role="dialog" aria-labelledby="nfsT"><div class="nfs-scroll" id="nfsBody"></div><div class="nfs-bar" id="nfsBar"></div></section>
 
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */

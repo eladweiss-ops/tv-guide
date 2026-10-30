@@ -313,6 +313,10 @@
   .lpcustom input { flex: 1; min-width: 0; min-height: 44px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: inherit; padding: 6px 12px; font: inherit; direction: ltr; }
   .lpnow { margin-top: 8px; }
   .rbts { display: flex; gap: 6px; flex: none; }
+  .pbtn { width: 100%; margin: 4px 0 12px; }
+  .chips.lp .chip:disabled { opacity: .35; }
+  .pin { width: 100%; box-sizing: border-box; min-height: 48px; margin: 6px 0 12px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: inherit; font: inherit; }
+  input[type="datetime-local"].pin { direction: ltr; text-align: right; }
   .pushnote { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
   .srow > .rsyn { flex: 1 1 100%; margin: 0; padding: 0 12px 4px; font-size: .95rem; line-height: 1.5; color: var(--muted); }
   .rsyn p { margin: 0; }
@@ -902,12 +906,49 @@
         pushOn = true; store("tvg.push", "1");
         return syncRems().then(function () {
           closeRem();
-          if (pend && !hasRem(remKey(pend.id, pend.p.s))) quickAdd([pend]); else render();
+          if (pendRec) { REMS.push(pendRec); saveRems(); syncRems(); pill("⏰ נזכיר לך " + leadTxt(pendRec.lead, pendRec.ts), 2200); pendRec = null; render(); }
+          else if (pend && !hasRem(remKey(pend.id, pend.p.s))) quickAdd([pend]); else render();
           fetch(CAL_API + "/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: calTok, test: 1 }) });
-          if (!pend) pill("🔔 ההתראות הופעלו! שלחנו התראת בדיקה", 3000);
+          if (!pend && !REMS.length) pill("🔔 ההתראות הופעלו! שלחנו התראת בדיקה", 3000);
         });
       });
     }).catch(function () { pill("לא הצלחתי להפעיל התראות, נסו שוב", 2500); });
+  }
+  // ---- תזכורת אישית: כל דבר שראיתם בטלוויזיה (הופעה, אירוע, QR) ----
+  var pLead = 0, pendRec = null;
+  function openPersonal() {
+    rem = null; LP = null;
+    var d = new Date(Date.now() + 3600000); d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
+    $("#remBody").innerHTML = '<h2>➕ תזכורת אישית</h2><p class="remnote">לכל דבר שראיתם בטלוויזיה: הופעה, אירוע, מבצע, קוד QR על המסך.</p>' +
+      '<label class="lbl" for="pTitle">מה להזכיר?</label><input id="pTitle" class="pin" type="text" maxlength="120" placeholder="למשל: כרטיסים להופעה" autocomplete="off">' +
+      '<label class="lbl" for="pWhen">מתי?</label><input id="pWhen" class="pin" type="datetime-local" min="' + localVal(new Date(Date.now() + 60000)) + '" value="' + localVal(d) + '">' +
+      '<div class="lbl">כמה זמן לפני להזכיר?</div><div class="chips lp" role="group">' + [[0, "בזמן"], [10, "10 דק׳"], [60, "שעה"], [1440, "יום"]].map(function (x) {
+        return '<button type="button" class="chip" data-plead="' + x[0] + '" aria-pressed="' + (pLead === x[0]) + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+      '<button type="button" class="btn" data-psave>שמירת התזכורת</button><button type="button" class="ghost" data-remclose>ביטול</button>';
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+    pChips();
+    setTimeout(function () { var i = $("#pTitle"); if (i) i.focus(); }, 50);
+  }
+  // אפשרויות שכבר לא אפשריות לזמן שנבחר (למשל "יום לפני" לאירוע בעוד שעה) – כבויות
+  function pChips() {
+    var v = $("#pWhen") && $("#pWhen").value, ts = v ? new Date(v).getTime() : 0;
+    [].forEach.call(document.querySelectorAll("[data-plead]"), function (b) {
+      var m = +b.getAttribute("data-plead"), ok = !ts || ts - m * 60000 > Date.now() + 30000 || m === 0;
+      b.disabled = !ok; if (!ok && pLead === m) { pLead = 0; }
+      b.setAttribute("aria-pressed", String(pLead === m));
+    });
+  }
+  function savePersonal() {
+    var title = ($("#pTitle").value || "").trim(), v = $("#pWhen").value, d = v ? new Date(v) : null;
+    if (!title) { pill("כתבו מה להזכיר", 1500); $("#pTitle").focus(); return; }
+    if (!d || isNaN(d)) { pill("בחרו תאריך ושעה", 1500); return; }
+    var ts = d.getTime();
+    if (ts < Date.now() + 60000) { pill("בחרו זמן עתידי", 1500); return; }
+    var rec = { k: "p|" + ts + "|" + Math.random().toString(36).slice(2, 7), id: "", ts: ts, end: ts + 3600000, title: title, ch: "תזכורת אישית", desc: "", lead: fitLead(ts, pLead), at: Date.now() };
+    if (!srv() && canPush) { pendRec = rec; enablePush(); return; }
+    REMS.push(rec); saveRems();
+    if (srv()) syncRems(); else saveIcs(icsText({ id: "personal", p: { title: title, s: d, e: new Date(rec.end), desc: "" }, lead: rec.lead }), "reminder.ics");
+    closeRem(); render(); pill("⏰ נזכיר לך " + (rec.lead ? leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
   function pushCard() {
     if (pushOn) return '<details class="calopt"><summary>🔔 התראות לטלפון פעילות ✓</summary><p class="remnote">תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div></details>';
@@ -925,15 +966,16 @@
   var askK = null, askT = null, prevTab = null;
   function vRems() {
     var now = Date.now(), up = REMS.filter(function (x) { return x.end > now; });
-    if (!up.length) return pushCard() + calCard() + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
-    var h = pushCard() + calCard() + (srv() ? "" : '<p class="remnote">ביטול מוריד את התזכורת מכאן ופותח ביומן קובץ ביטול; אם האירוע נשאר ביומן, מוחקים אותו שם.</p>'), last = "";
+    var pbtn = '<button type="button" class="btn pbtn" data-personal>➕ תזכורת אישית</button>';
+    if (!up.length) return pushCard() + calCard() + pbtn + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
+    var h = pushCard() + calCard() + pbtn + (srv() ? "" : '<p class="remnote">ביטול מוריד את התזכורת מכאן ופותח ביומן קובץ ביטול; אם האירוע נשאר ביומן, מוחקים אותו שם.</p>'), last = "";
     up.forEach(function (x) {
       var d = new Date(x.ts), dl = dayLabel(dstr(d));
       if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
       var live = x.ts <= now;
       var fp = findProg(x.k), ds = (fp && fp.p.desc) || x.desc || "";
       var syn = ds ? '<div class="rsyn"><p class="rclamp">' + esc(ds) + "</p>" + (ds.length > 90 ? '<button type="button" class="moreb" data-more data-l="הרחב">הרחב…</button>' : "") + "</div>" : "";
-      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub"><bdi>' + esc(x.ch) + "</bdi> · <bdi>" + (live ? "משודר עכשיו" : "🔔 " + esc(leadTxt(x.lead, x.ts))) + "</bdi></span></span></button>" + syn +
+      h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub"><bdi>' + esc(x.ch) + "</bdi> · <bdi>" + (live ? (x.id ? "משודר עכשיו" : "עכשיו") : "🔔 " + esc(!x.id && !x.lead ? "בזמן" : leadTxt(x.lead, x.ts))) + "</bdi></span></span></button>" + syn +
         (live ? "</div>" : askK === x.k
           ? '</div><div class="confirm"><span>לבטל את התזכורת?</span><button type="button" class="btn sm danger" data-remcancel="' + esc(x.k) + '">כן, לבטל</button><button type="button" class="ghost sm" data-remkeep>להשאיר</button></div>'
           : '<span class="rbts">' + (srv() ? '<button type="button" class="rbt" data-ledit="' + esc(x.k) + '" aria-label="שינוי מועד ההתראה: ' + esc(x.title) + '">🔔</button>' : "") + '<button type="button" class="rbt" data-remask="' + esc(x.k) + '" aria-label="ביטול התזכורת: ' + esc(x.title) + '">✕</button></span></div>');
@@ -1534,6 +1576,9 @@
     if (t.closest("[data-calsub]")) { store("tvg.calJust", "1"); }
     if (t.closest("[data-calsetup]")) { setupCal(); return; }
     if (t.closest("[data-pushon]")) { enablePush(); return; }
+    if (t.closest("[data-personal]")) { openPersonal(); return; }
+    if (t.closest("[data-psave]")) { savePersonal(); return; }
+    var pl = t.closest("[data-plead]"); if (pl) { pLead = +pl.getAttribute("data-plead"); [].forEach.call(document.querySelectorAll("[data-plead]"), function (b) { b.setAttribute("aria-pressed", String(b === pl)); }); return; }
     if (t.closest("[data-pushtest]")) { fetch(CAL_API + "/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: calTok, test: 1 }) }).then(function (r) { return r.json(); }).then(function (j) { pill(j && j.ok ? "נשלחה התראת בדיקה" : "לא הצלחתי לשלוח, נסו להפעיל מחדש", 2000); if (!(j && j.ok)) { pushOn = false; store("tvg.push", "0"); render(); } }).catch(function () { pill("אין חיבור", 1500); }); return; }
     if (t.closest("[data-calics]")) { useIcs(); return; }
     if (t.closest("[data-calsync]")) { syncRems().then(function (ok) { pill(ok ? "היומן עודכן" : "עדיין אין חיבור", 1500); render(); }); return; }
@@ -1577,6 +1622,7 @@
     var sc2 = t.closest("[data-scope]"); if (sc2) { scope = sc2.getAttribute("data-scope"); render(); return; }
     if (t.closest("[data-clearx]")) { qExact = null; render(); return; }
     var jp = t.closest("[data-jump]");
+    if (jp && /^p\|/.test(jp.getAttribute("data-jump"))) { if (srv()) openLead([jp.getAttribute("data-jump")]); return; }
     if (jp) {
       if (q.trim()) addRecent(qExact || q, !!qExact);
       var jr = findProg(jp.getAttribute("data-jump"));
@@ -1651,6 +1697,7 @@
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
+    if (t.id === "pWhen") { pChips(); return; }
     if (t.hasAttribute && t.hasAttribute("data-lpsel")) {
       if (t.value === "custom") { var bx = $("[data-lpbox]"); if (bx) { bx.hidden = false; var ip = $("[data-lpdt]"); if (ip) try { ip.focus(); if (ip.showPicker) ip.showPicker(); } catch (er) {} } return; }
       if (t.value !== "") setLead(+t.value); return;
@@ -1670,7 +1717,7 @@
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
   // VERSION מוצג למשתמש (בהגדרות, ובהודעה אחרי עדכון). מעלים אותו בכל שינוי שהמשתמש אמור להרגיש.
-  var VERSION = "1.32", BUILD = "2026-10-30.32", bootAt = Date.now(), lastChk = 0;
+  var VERSION = "1.33", BUILD = "2026-10-30.33", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() { if (restoring || /[?&]r=/.test(location.search)) return;
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

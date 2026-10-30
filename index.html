@@ -352,6 +352,9 @@
   .rchip { display: inline-flex; align-items: center; border-radius: 999px; background: var(--soft); overflow: hidden; }
   .rchip button { border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 600; min-height: 40px; padding: 0 12px; }
   .rchip .rx { padding: 0 10px; color: var(--muted); }
+  /* באייפון לחיצה על אלמנט "לא לחיץ" לא מגיעה למאזין הכללי בלי cursor:pointer */
+  .scrim { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  :root[data-theme="dark"] .scrim { background: rgba(0,0,0,.5); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 </style>
 </head>
 <body>
@@ -1120,6 +1123,11 @@
   }
   function openFavs() { delArm = false; $("#favBody").innerHTML = favHtml(); $("#favs").hidden = false; $("#scrim2").hidden = false; }
   function closeFavs() { $("#favs").hidden = true; if ($("#rem").hidden) $("#scrim2").hidden = true; }
+  // סגירה בלחיצה על המסך שמאחורי החלון, גם בלי להסתמך על המאזין הכללי
+  ["scrim", "scrim2"].forEach(function (id) {
+    var el = document.getElementById(id); if (!el) return;
+    el.addEventListener("click", function (e) { e.stopPropagation(); if (id === "scrim") { openSheet(false); render(); } else { closeRem(); closeFavs(); } });
+  });
   function startSearch(text, exact) {
     closeFavs(); $("#qwrap").hidden = false; $("#qx").hidden = !text; $("#q").value = text || ""; q = text || ""; qExact = exact ? text : null;
     render(); if (!exact) $("#q").focus(); window.scrollTo({ top: 0 });
@@ -1346,7 +1354,7 @@
 
   // ---- עדכון אוטומטי של האפליקציה ----
   // מספר הגרסה. כל שינוי בקובץ הזה צריך להעלות אותו, כדי שהאפליקציה במסך הבית תתעדכן לבד.
-  var BUILD = "2026-10-30.10", bootAt = Date.now(), lastChk = 0;
+  var BUILD = "2026-10-30.11", bootAt = Date.now(), lastChk = 0;
   function checkUpdate() {
     if (Date.now() - lastChk < 120000) return; lastChk = Date.now();
     fetch("index.html?u=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (t) {

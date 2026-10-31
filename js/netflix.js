@@ -138,7 +138,7 @@
     if (showOrig(x)) h += '<div class="nforig"><bdi dir="ltr">' + esc(x.orig) + "</bdi></div>";
     h += '<div class="nfmeta">' + bdis([kindTxt(x), x.year ? String(x.year) : "", lenTxt(x), (x.genres || []).slice(0, 3).join(", ")]) + "</div>";
     h += ratesHtml(x);
-    h += '<p class="nfov">' + (x.overview ? esc(x.overview) : "אין עדיין תקציר בעברית לתוכן הזה.") + "</p>";
+    h += '<p class="nfov" dir="auto">' + (x.overview ? esc(x.overview) : "אין עדיין תקציר בעברית לתוכן הזה.") + "</p>";
     // "חברים שראו": שלב 3. אין נתונים אמיתיים, לכן אין בלוק בכלל.
     if (RE_TR.test(x.trailer || "")) h += '<a class="ghost nftr" href="https://www.youtube.com/watch?v=' + esc(x.trailer) + '" target="_blank" rel="noopener">🎬 טריילר</a>';
     // זמינות, 🔔 התראות, ⏰ תזכורת צפייה (nfsearch.js / nfwatch.js)

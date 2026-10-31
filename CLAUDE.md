@@ -39,6 +39,7 @@
 | &nbsp;&nbsp;`update` · `boot` | עדכון אוטומטי · עליית האפליקציה (אחרון) |
 | `tools/qa/` | `node tools/qa/shoot.cjs <outDir> [baseUrl]` – צילומי מסך בכל המסכים ב-375/393/360/412 + כשל על שגיאות קונסולה. `node tools/qa/diff.cjs <A> <B>` – השוואת פיקסלים. פעם אחת: `cd tools/qa && npm install`. `node tools/qa/loadfail.cjs` – בודק את התאוששות מכשל טעינה (404 על קובץ js: רענון חד-פעמי ואז מסך "נסו שוב"). כל קובץ js מצהיר `TVG.files["name"]=1`, ו-`boot.js` מסמן `TVG.booted=true`. |
 | `sw.js` | Service worker – **רק** התראות פוש (בלי מטמון, כדי לא לשבור עדכונים). |
+| `join/index.html` + `og-join.png` | קישור ההזמנה לאפליקציה (`…/tv-guide/join/`): תמונה ותיאור משלו בתצוגה המקדימה בוואטסאפ, ומעבר מיידי לאפליקציה. התמונה: `node tools/og/make-og.cjs join`. |
 | `guide.json` | הלוח: `{updated, channels:[{id,name,prov}], programs:[{ch,start:"YYYY-MM-DDTHH:MM" שעון ישראל, title, desc?, rr?, lv?}]}` |
 | `scrape.mjs` | איסוף מוואלה (`tv-guide.walla.co.il`). |
 | `enrich*.mjs`, `extra_channels.mjs`, `fill.mjs`, `sportfit.mjs` | העשרה, השלמת ימים, ערוצים חסרים, אימות התאמה בספורט. |

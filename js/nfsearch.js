@@ -11,7 +11,7 @@
   TVG.nfX = {}; // k -> פריט מנוקה מתוצאות החיפוש (netflix.js getItem משתמש בו)
 
   var DEBOUNCE = 400, MINLEN = 2;
-  var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_K = /^[mt][0-9]{1,9}$/;
+  var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_DLINK = /^https:\/\/www\.disneyplus\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_K = /^[mt][0-9]{1,9}$/;
   var cache = {};                       // מפתח שאילתה -> תשובה מנוקה
   var S = { key: "", state: "idle" };   // state: loading | err | rate | ok
   var timer = 0, seq = 0;
@@ -20,12 +20,12 @@
   function str(v, n) { return typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").slice(0, n) : ""; }
   function safeItem(o, partial) {
     if (!o || typeof o !== "object" || !RE_K.test(o.k || "")) return null;
-    var nf = o.nf === true, title = str(o.title, 120);
+    var nf = o.nf === true, ds = o.ds === true, title = str(o.title, 120);
     if (!title) return null;
     return {
       k: o.k, id: +o.id || 0, type: o.type === "tv" ? "tv" : "movie", title: title, orig: str(o.orig, 120), year: +o.year > 0 ? +o.year : 0,
       overview: str(o.overview, 400), poster: RE_IMG.test(o.poster || "") ? o.poster : "", backdrop: RE_IMG.test(o.backdrop || "") ? o.backdrop : "",
-      nf: nf, others: (Array.isArray(o.others) ? o.others : []).map(function (s) { return str(s, 30); }).filter(Boolean).slice(0, 4),
+      nf: nf, ds: ds, dlink: ds && RE_DLINK.test(o.dlink || "") ? o.dlink : "", others: (Array.isArray(o.others) ? o.others : []).map(function (s) { return str(s, 30); }).filter(Boolean).slice(0, 4),
       link: nf && RE_LINK.test(o.link || "") ? o.link : "", _p: !!partial /* תשובה חלקית: זמינות לא ודאית */
     };
   }
@@ -114,7 +114,8 @@
     return '<button type="button" class="nfb' + (big ? " big" : "") + ' tv" data-nfair="' + esc(a.c.id + "|" + a.p.s.getTime()) + '" aria-label="משודר בערוץ ' + esc(a.c.name) + ', פתיחה בלוח">📺 משודר בערוץ <bdi>' + esc(a.c.name) + "</bdi> · " + esc(whenTxt(a.p.s)) + "</button>";
   }
   function badge(x) {
-    if (x.nf) return '<span class="nfb nf"><i>▶</i>בנטפליקס</span>';
+    var sv = (x.nf ? '<span class="nfb nf"><i>▶</i>בנטפליקס</span>' : "") + (x.ds ? '<span class="nfb ds"><i>▶</i>בדיסני+</span>' : "");
+    if (sv) return sv;
     var a = airing(x);
     if (a) return airBtn(x, a, false);
     return '<span class="nfb no">לא זמין כרגע</span>';
@@ -123,10 +124,11 @@
   function availHtml(x) {
     var h = "";
     if (TVG.nfIsNf(x)) h += '<span class="nfb big nf"><i>▶</i>זמין בנטפליקס</span>';
+    if (TVG.nfIsDs(x)) h += '<span class="nfb big ds"><i>▶</i>זמין בדיסני+</span>';
     var a = airing(x);
     if (a) h += airBtn(x, a, true);
     if (!h) h = '<span class="nfb big no">לא זמין כרגע בנטפליקס</span>';
-    var o = (x.others || []).filter(Boolean);
+    var o = (x.others || []).filter(function (s) { return s && !(TVG.nfIsDs(x) && /^disney/i.test(s)); }); // דיסני+ כבר מוצג כתג
     return '<div class="nfav">' + h + (o.length ? '<span class="nfavo">זמין גם ב: ' + o.map(function (s) { return "<bdi>" + esc(s) + "</bdi>"; }).join(" · ") + "</span>" : "") + "</div>";
   }
 
@@ -159,7 +161,7 @@
       if (S.state === "err" || S.state === "rate")
         return { any: true, html: '<div class="nfempty"><b>' + (S.state === "rate" ? "יותר מדי חיפושים" : "החיפוש המלא לא זמין כרגע") + "</b><span>" + (S.state === "rate" ? "נסו שוב בעוד רגע." : "הרשימות שלמעלה זמינות. אפשר לנסות שוב.") +
           '</span><button type="button" class="ghost" data-nfretry>נסו שוב</button></div>' };
-      return { any: true, html: '<div class="nfload" role="status"><i class="nfsp" aria-hidden="true"></i>מחפשים בנטפליקס…</div>' };
+      return { any: true, html: '<div class="nfload" role="status"><i class="nfsp" aria-hidden="true"></i>מחפשים בנטפליקס ובדיסני+…</div>' };
     }
     var used = {}; (localKeys || []).forEach(function (k) { used[k] = 1; });
     var h = r.via ? '<p class="nfvia">תוצאות עבור <bdi dir="ltr">' + esc(r.via) + "</bdi></p>" : "";

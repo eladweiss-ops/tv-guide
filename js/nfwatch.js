@@ -11,11 +11,11 @@
   TVG.wlSync = wlSync;
 
   var MAX = 50, API = TVG.CAL_API;
-  var RE_K = /^[mt][0-9]{1,9}$/, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_NF = /^https:\/\/www\.netflix\.com\//;
-  var KINDS = [["nf", "כשזה מגיע לנטפליקס", "כשזה מגיע לנטפליקס"], ["season", "עונה חדשה", "כשיוצאת עונה חדשה"], ["tv", "כשזה משודר בערוץ", "כשזה משודר בערוץ"]];
+  var RE_K = /^[mt][0-9]{1,9}$/, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_NF = /^https:\/\/www\.(netflix|disneyplus)\.com\//, RE_DS = /^https:\/\/www\.disneyplus\.com\//;
+  var KINDS = [["nf", "כשזה מגיע לנטפליקס", "כשזה מגיע לנטפליקס"], ["season", "עונה חדשה", "כשיוצאת עונה חדשה"], ["tv", "📺 כשמשודר בטלוויזיה", "כשמשודר באחד מערוצי הטלוויזיה"]];
   function kindName(k) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === k) return KINDS[i][2]; return ""; }
   // אותו קישור שהשרת בונה (calendar-server/api/_tmdb.js nfLink): חיפוש בנטפליקס לפי השם המקורי, ואם אין אז העברי
-  function nfLink(title, orig) { var q = String(orig || title || "").slice(0, 100); return q ? "https://www.netflix.com/search?q=" + encodeURIComponent(q) : ""; }
+  function nfLink(title, orig, ds) { var q = String(orig || title || "").slice(0, 100); return q ? (ds ? "https://www.disneyplus.com/he-il/search?q=" : "https://www.netflix.com/search?q=") + encodeURIComponent(q) : ""; }
   // 21:00 הערב / מחר לפי שעון ישראל (גם כשהמכשיר באזור אחר)
   function at21(addDays) { var w = TVG.ilNow(); w.setDate(w.getDate() + addDays); w.setHours(21, 0, 0, 0); return new Date(TVG.ilTs(w)); }
   // d אמיתי -> שעון קיר ישראלי (לתצוגה)
@@ -39,8 +39,9 @@
     if (!w && !nx) return null;
     var title = w ? w.title : nx.t || r.title, orig = w ? w.orig || "" : "", type = (w ? w.type : nx.ty) === "tv" ? "tv" : "movie", poster = w ? w.poster : nx.p;
     var link = (w && RE_NF.test(w.link || "") && w.link) || (nx && RE_NF.test(nx.l || "") && nx.l) || "";
-    var avail = ev === "nf" || (ev === "rem" && !!(nx && nx.l)); // נפתח מ"הגיע" או מתזכורת שנוצרה כשהיה בנטפליקס
-    return { k: k, type: type, title: title, orig: orig, poster: RE_IMG.test(poster || "") ? poster : "", year: w && w.y || 0, nf: avail, link: avail ? link || nfLink(title, orig) : "", others: [], _wl: true };
+    var ds = RE_DS.test(link); // קישור דיסני+ (מרשימת מעקב/תזכורת שנוצרה מדף דיסני+)
+    var avail = ev === "nf" || (ev === "rem" && !!(nx && nx.l)); // נפתח מ"הגיע" או מתזכורת שנוצרה כשהיה בשירות
+    return { k: k, type: type, title: title, orig: orig, poster: RE_IMG.test(poster || "") ? poster : "", year: w && w.y || 0, nf: ds ? false : avail, svc: ds ? "disney" : undefined, link: avail ? link || nfLink(title, orig) : "", others: [], _wl: true };
   }
   // סנכרון לשרת: רק כשההתראות פעילות (השרת מקבל רק מי שיש לו מנוי פוש). אחרת נשמר מקומית וייסנכרן כשיופעלו
   function wlSync() {
@@ -58,7 +59,7 @@
       if (w && w.on.indexOf(kind) >= 0) return false;
       if (!w) {
         if (TVG.WL.length >= MAX) return null;
-        w = { k: x.k, title: String(x.title).slice(0, 120), orig: String(x.orig || "").slice(0, 120), type: x.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(x.poster || "") ? x.poster : "", link: nfLink(x.title, x.orig), y: +x.year > 0 ? +x.year : 0, on: [], at: Date.now() };
+        w = { k: x.k, title: String(x.title).slice(0, 120), orig: String(x.orig || "").slice(0, 120), type: x.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(x.poster || "") ? x.poster : "", link: nfLink(x.title, x.orig, TVG.nfSvc(x) === "disney"), y: +x.year > 0 ? +x.year : 0, on: [], at: Date.now() };
         // בסיס "לא בנטפליקס" נשלח רק מתשובה שלמה (לא חלקית, לא ממצב לא ידוע); אחרת השרת קובע בסיס בבדיקה הראשונה
         if (x.nf === false && !x._p && !x._wl) { w.bn = false; w.bc = 1; }
         TVG.WL.push(w);
@@ -79,8 +80,10 @@
   }
   function alertsHtml(x) {
     var chips = KINDS.filter(function (kd) {
-      if (kd[0] === "nf") return !TVG.nfIsNf(x) || wlHas(x.k, "nf");   // כבר בנטפליקס: אין מה להתריע
+      if (kd[0] === "nf") return wlHas(x.k, "nf") || (TVG.nfSvc(x) !== "disney" && !TVG.nfIsNf(x));   // כבר בנטפליקס: אין מה להתריע. בדף של דיסני+ לא מציעים
       if (kd[0] === "season") return x.type === "tv";
+      // "כשמשודר בטלוויזיה": לא לתוכן שקיים רק בנטפליקס ושיצא בשנתיים האחרונות (כמעט תמיד הפקה מקורית – לא יגיע לערוץ). אם כבר נבחר, נשאר כדי שאפשר יהיה לבטל
+      if (kd[0] === "tv") return wlHas(x.k, "tv") || !(TVG.nfIsNf(x) && !(x.others && x.others.length) && (x.year || x.y || 0) >= new Date().getFullYear() - 1);
       return true;
     }).map(function (kd) {
       return '<button type="button" class="chip" data-wlkind="' + kd[0] + '" aria-pressed="' + wlHas(x.k, kd[0]) + '">' + kd[1] + "</button>";
@@ -107,9 +110,9 @@
   function createRem(x, d) {
     var ts = d.getTime();
     if (!(ts > Date.now() + 60000)) { TVG.pill("בחרו זמן עתידי", 1600); return; }
-    var nf = TVG.nfIsNf(x), link = nf && /^https:\/\/www\.netflix\.com\//.test(x.link || "") ? x.link : "";
+    var sv = TVG.nfSvc(x), ds = sv === "disney", nf = ds ? TVG.nfIsDs(x) : TVG.nfIsNf(x), lk = TVG.nfLinkOf(x), link = nf && (ds ? RE_DS : /^https:\/\/www\.netflix\.com\//).test(lk || "") ? lk : "", sn = ds ? "דיסני+" : "נטפליקס";
     // הפרטים נשמרים ברשומה (מקומית) כדי שהקשה על התזכורת תפתח את דף התוכן גם אחרי רענון
-    var rec = { k: "nf|" + x.k + "|" + ts, id: "", ts: ts, end: ts + 2 * 3600000, title: String(x.title).slice(0, 120), ch: nf ? "נטפליקס" : "צפייה", desc: link ? "▶ לצפייה בנטפליקס: " + link : "", lead: 0, at: Date.now(),
+    var rec = { k: "nf|" + x.k + "|" + ts, id: "", ts: ts, end: ts + 2 * 3600000, title: String(x.title).slice(0, 120), ch: nf ? sn : "צפייה", desc: link ? "▶ לצפייה ב" + sn + ": " + link : "", lead: 0, at: Date.now(),
       nx: { t: String(x.title).slice(0, 120), ty: x.type === "tv" ? "tv" : "movie", p: RE_IMG.test(x.poster || "") ? x.poster : "", l: link } };
     if (TVG.hasRem(rec.k)) { TVG.pill("כבר יש תזכורת לזמן הזה ✓", 1600); return; }
     if (TVG.addRec(rec, d) === "pending") return; // הפעלת התראות בדרך; ההודעה (עם ביטול) מגיעה מ-push.js
@@ -125,7 +128,7 @@
   // ---- הגדרות: רשימת ההתראות ----
   function wlRender() {
     var box = $("#wlList"); if (!box) return;
-    if (!TVG.WL.length) { box.innerHTML = '<p class="none">עדיין אין התראות. בדף של סרט או סדרה (לשונית נטפליקס) בוחרים ״🔔 תודיע לי״.</p>'; return; }
+    if (!TVG.WL.length) { box.innerHTML = '<p class="none">עדיין אין התראות. בדף של סרט או סדרה (לשונית סטרימינג) בוחרים ״🔔 תודיע לי״.</p>'; return; }
     box.innerHTML = TVG.WL.map(function (w) {
       return '<div class="wlrow"><span class="wlt"><b><bdi>' + esc(w.title) + '</bdi></b><span class="wls">' + w.on.map(function (o) { return "🔔 " + esc(kindName(o)); }).join(" · ") + "</span></span>" +
         '<button type="button" class="rbt" data-wlrm="' + esc(w.k) + '" aria-label="הסרת ההתראה: ' + esc(w.title) + '">✕</button></div>';

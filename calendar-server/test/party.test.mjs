@@ -77,8 +77,8 @@ test("create: טוקן חובה ומוכר לשרת, שדות נבדקים, בל
   assert.equal(r.code, 200);
   assert.match(r.body.id, /^[A-Za-z0-9_-]{22}$/);
   assert.equal(r.body.link, ""); assert.equal(r.body.img, ""); assert.equal(r.body.title, "אבג");
-  for (const t of ["https://www.netflix.com/search?q=a"]) assert.equal(cleanLink(t), t);
-  for (const t of ["https://www.netflix.com.evil.com/x", "javascript:alert(1)", "https://eladweiss-ops.github.io.evil.com/"]) assert.equal(cleanLink(t), "");
+  for (const t of ["https://www.netflix.com/search?q=a", "https://www.disneyplus.com/he-il/search?q=%D7%90"]) assert.equal(cleanLink(t), t);
+  for (const t of ["https://www.netflix.com.evil.com/x", "https://www.disneyplus.com.evil.com/x", "http://www.disneyplus.com/x", "javascript:alert(1)", "https://eladweiss-ops.github.io.evil.com/"]) assert.equal(cleanLink(t), "");
   assert.equal(cleanLink("https://eladweiss-ops.github.io/tv-guide/?p=1.2"), "https://eladweiss-ops.github.io/tv-guide/?p=1.2");
   assert.ok(hasContact("wa.me/972501234567") || hasContact("972501234567"));
   assert.equal(hasContact("שבת 21:00"), false);

@@ -4,7 +4,7 @@ import { okKey } from "./_tmdb.js";
 export const MAX_WL = 50;
 export const ON = ["nf", "season", "tv"]; // nf: כשמגיע לנטפליקס · season: עונה חדשה (סדרות) · tv: כשמשודר בערוץ
 
-const RE_NF = /^https:\/\/www\.netflix\.com\//;
+const RE_NF = /^https:\/\/www\.(netflix|disneyplus)\.com\//;
 const RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\/[A-Za-z0-9_]+\/[A-Za-z0-9_.-]+$/;
 const s = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, n) : "");
 

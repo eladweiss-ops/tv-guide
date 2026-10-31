@@ -2,6 +2,7 @@
 // כל הפונקציות מקבלות d.fetch להזרקה בבדיקות.
 
 export const NETFLIX_ID = 8;
+export const DISNEY_ID = 337; // דיסני+ ישראל ב-TMDB (watch/providers)
 const API = "https://api.themoviedb.org/3";
 const RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//;
 const RE_LINK = /^https:\/\/www\.netflix\.com\//;
@@ -24,14 +25,15 @@ export async function tget(path, params = {}, d = {}) {
 }
 
 // ---- נטפליקס ישראל ----
-// מחזיר {nf:boolean, others:[שמות]} מ-watch/providers (flatrate בלבד)
+// מחזיר {nf:boolean, ds:boolean, others:[שמות]} מ-watch/providers (flatrate בלבד). דיסני+ מוצג כדגל (ds), לא ברשימת others
 export async function providersIL(type, id, d = {}) {
   const j = await tget(`/${type === "tv" ? "tv" : "movie"}/${id}/watch/providers`, {}, d);
   const il = (j && j.results && j.results.IL) || {};
   const fl = Array.isArray(il.flatrate) ? il.flatrate : [];
   return {
     nf: fl.some((p) => p && p.provider_id === NETFLIX_ID),
-    others: fl.filter((p) => p && p.provider_id !== NETFLIX_ID && typeof p.provider_name === "string").map((p) => p.provider_name.slice(0, 30)).slice(0, 4),
+    ds: fl.some((p) => p && p.provider_id === DISNEY_ID),
+    others: fl.filter((p) => p && p.provider_id !== NETFLIX_ID && p.provider_id !== DISNEY_ID && typeof p.provider_name === "string").map((p) => p.provider_name.slice(0, 30)).slice(0, 4),
   };
 }
 
@@ -42,6 +44,10 @@ export function img(path, size) {
   if (typeof path !== "string" || !/^\/[A-Za-z0-9_.-]{5,80}$/.test(path)) return "";
   const u = "https://image.tmdb.org/t/p/" + size + path;
   return RE_IMG.test(u) ? u : "";
+}
+export function dsLink(orig, title) {
+  const q = str(orig, 100) || str(title, 100);
+  return q ? "https://www.disneyplus.com/he-il/search?q=" + encodeURIComponent(q) : "";
 }
 export function nfLink(orig, title) {
   const q = str(orig, 100) || str(title, 100);
@@ -63,13 +69,14 @@ export function shapeTitle(he, en, type) {
     overview: str(he.overview, 400) || str(e.overview, 400),
     poster: img(he.poster_path || e.poster_path, "w342"), backdrop: img(he.backdrop_path || e.backdrop_path, "w780"),
     vote: Math.round(num(he.vote_average) * 10) / 10,
-    nf: false, others: [], link: "",
+    nf: false, ds: false, others: [], link: "", dlink: "",
   };
   return o;
 }
 export function applyAvail(o, av) {
   if (!av) return o;
   o.nf = !!av.nf; o.others = (av.others || []).map((s) => str(s, 30)).filter(Boolean).slice(0, 4);
+  o.ds = !!av.ds; o.dlink = o.ds ? dsLink(o.orig, o.title) : "";
   o.link = o.nf ? nfLink(o.orig, o.title) : "";
   if (o.link && !RE_LINK.test(o.link)) o.link = "";
   return o;

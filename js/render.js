@@ -22,7 +22,7 @@
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = ""; // מספר הערוצים הוא לא התראה - לא מציגים
     TVG.updFav();
-    $("#ttl").textContent = (searching || srchOpen) ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "נטפליקס", rems: "התזכורות שלי" }[nf ? "nf" : TVG.tab] || "לוח שידורים");
+    $("#ttl").textContent = (searching || srchOpen) ? "חיפוש" : ({ dial: "היום", now: "עכשיו", grid: "לוח", nf: "סטרימינג", rems: "התזכורות שלי" }[nf ? "nf" : TVG.tab] || "לוח שידורים");
     if (searching) $("#qwrap").hidden = false;
     $("#tabDial").setAttribute("aria-selected", String(TVG.tab === "dial"));
     $("#tabNow").setAttribute("aria-selected", String(TVG.tab === "now"));

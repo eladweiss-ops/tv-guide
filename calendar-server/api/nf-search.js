@@ -1,6 +1,6 @@
 // GET /api/nf-search?q=...  → חיפוש מלא בנטפליקס דרך TMDB (המפתח בשרת: TMDB_API_KEY)
-//   {v, q, collection, brand, titles:[k], persons:[...], items:{k:{k,id,type,title,orig,year,overview,poster,backdrop,vote,nf,others,link}}}
-//   nf=true: יש ב-flatrate של נטפליקס ישראל; link = חיפוש בנטפליקס. others = שירותים אחרים בישראל (מידע בלבד).
+//   {v, q, collection, brand, titles:[k], persons:[...], items:{k:{k,id,type,title,orig,year,overview,poster,backdrop,vote,nf,ds,others,link,dlink}}}
+//   nf=true: יש ב-flatrate של נטפליקס ישראל; link = חיפוש בנטפליקס. ds=true: יש ב-flatrate של דיסני+ ישראל (provider 337); dlink = חיפוש בדיסני+. others = שירותים אחרים בישראל (מידע בלבד).
 // מטמון: זיכרון + Firestore דרך _db.js (cache/nf/<hash>.json) ל-12 שעות. קצב: 30 בדקה ל-IP. שגיאות: 400 קלט, 429 קצב, 502 TMDB, 503 לא מוגדר.
 import { createHash } from "node:crypto";
 import { searchNf, cleanQuery, norm, SEARCH_TTL } from "./_nfs.js";
@@ -12,7 +12,7 @@ export const PARTIAL_TTL = 5 * 60000;
 const provCache = new Map(); // k -> {t, v}  (זמינות לפי פריט, בין חיפושים)
 export const _clearCache = () => { mem.clear(); provCache.clear(); };
 
-export const CACHE_V = "2"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
+export const CACHE_V = "3"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
 export const hashOf = (q) => createHash("sha256").update(CACHE_V + "|" + (norm(q) || q.toLowerCase())).digest("hex").slice(0, 32);
 
 // d (לבדיקות): {fetch, key, readJson, writeJson, now}

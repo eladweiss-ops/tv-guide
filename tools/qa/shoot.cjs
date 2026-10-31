@@ -1172,7 +1172,7 @@ function nfFixtureData() {
       const clean = () => ls({ "tvg.parties": null, "tvg.name": null, "tvg.gid": null });
       const txt = (s) => page.evaluate((x) => { const e = document.querySelector(x); return e ? e.innerText : ""; }, s);
       const waText = () => page.evaluate(() => { try { return decodeURIComponent((window.__wa || "").replace(/^.*[?&]text=/, "")); } catch (e) { return ""; } });
-      const stubWa = () => page.evaluate(() => { window.__wa = ""; window.open = (u) => { window.__wa = u; return {}; }; });
+      const stubWa = () => page.evaluate(() => { window.__wa = ""; window.open = (u) => { window.__wa = u; return {}; }; TVG.openWa = (t) => { window.__wa = "https://wa.me/?text=" + encodeURIComponent(t); }; /* TVG.openWa (1.59): whatsapp:// בטלפון */ });
       const guestOpen = async (extra) => { ptyReset(extra); await fresh("?w=" + PID); await page.waitForTimeout(900); A(await shown("#ptyL"), "?w= opens the guest landing"); A(!/[?&](w|go)=/.test(page.url()), "url cleaned: " + page.url()); };
 
       await pt("create-nf", async () => {

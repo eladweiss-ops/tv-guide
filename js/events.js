@@ -178,4 +178,9 @@
   $("#q").addEventListener("keydown", function (e) { if (e.key === "Enter") { TVG.addRecent(TVG.q, false); e.target.blur(); } });
   $("#qx").addEventListener("click", function () { $("#q").value = ""; TVG.q = ""; TVG.qExact = null; $("#qx").hidden = true; TVG.render(); $("#q").focus(); });
   $("#chFind").addEventListener("input", function (e) { TVG.find = e.target.value; TVG.buildSheet(); });
+  // גלילה בתוצאות סוגרת את המקלדת (כמו ב-iOS): תנועת אצבע מחוץ לשדה החיפוש = blur. הקשה רגילה לא סוגרת (כדי לא להפריע לבחירה)
+  document.addEventListener("touchmove", function (e) {
+    var a = document.activeElement;
+    if (a && a.tagName === "INPUT" && (a.type === "search" || a.type === "text") && !a.contains(e.target)) a.blur();
+  }, { passive: true });
 })(window.TVG);

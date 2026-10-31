@@ -182,9 +182,7 @@
     var n = $("#shNote"); if (n) n.hidden = S.mode !== "card";
   }
   function openWa(text) {
-    var u = "https://wa.me/?text=" + encodeURIComponent(text);
-    var w = null; try { w = window.open(u, "_blank"); } catch (e) {}
-    if (!w) location.href = u;
+    TVG.openWa(text);
   }
   function download(blob) {
     var u = URL.createObjectURL(blob), a = document.createElement("a"); a.href = u; a.download = "tv-guide.png"; document.body.appendChild(a); a.click(); a.remove();

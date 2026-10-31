@@ -78,9 +78,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(ok, old); else old();
   }
   function openWa(text) {
-    var u = "https://wa.me/?text=" + encodeURIComponent(text), w = null;
-    try { w = window.open(u, "_blank"); } catch (e) {}
-    if (!w) location.href = u;
+    TVG.openWa(text);
   }
 
   // ---- הערבים שאני מארח (מקומי) ----

@@ -415,13 +415,13 @@ function dsFixtureData() {
       dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="disney"]').getAttribute("aria-pressed") === "true"), "switch already shows Disney+ while loading");
       await snap("56_ds_skeleton"); await page.waitForTimeout(1800);
       dsChk(await page.evaluate(() => !!document.querySelector('[data-nfrow="marvel"]')), "rows after the slow load");
-      // שגיאה: נסו שוב
+      // אין disney.json בשרת (TMDB לא מחזיר כרגע זמינות לישראל): אין מתג, נטפליקס בלבד – גם אם נשמר tvg.svc=disney
       await dsOpenTab("disney", "fail");
-      const tx = await page.textContent("#main"); dsChk(tx.indexOf("לא הצלחנו לטעון את דיסני+") >= 0 && tx.indexOf("נסו שוב") >= 0, "Hebrew error state: " + tx.slice(0, 120));
-      dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="netflix"]') !== null), "can switch back from the error");
-      await snap("57_ds_error");
-      dsMode = "ok"; await page.click("[data-nfdsretry]"); await page.waitForTimeout(1400);
-      dsChk(await page.evaluate(() => !!document.querySelector('[data-nfrow="marvel"]')), "retry recovers");
+      dsChk(await page.evaluate(() => !document.querySelector('[data-nfsvc]')), "no service switch without disney.json");
+      dsChk(await page.evaluate(() => !!document.querySelector('#main .nfrow') && document.body.textContent.indexOf("לא הצלחנו לטעון את דיסני+") < 0), "Netflix rows shown, no error");
+      await snap("57_ds_missing");
+      dsMode = "ok"; await dsOpenTab("disney"); await page.waitForTimeout(800);
+      dsChk(await page.evaluate(() => !!document.querySelector('[data-nfrow="marvel"]')), "with disney.json: switch + Disney rows");
       await page.evaluate(() => localStorage.removeItem("tvg.svc"));
     });
     await step("ds-dark", async () => {

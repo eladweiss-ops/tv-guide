@@ -191,7 +191,8 @@ export async function runHealth({ base = SITE, server = SERVER, fetchFn = fetch,
   if (guide) { const g = evaluateGuide(guide, now); problems.push(...g.problems); info.guide = g.info; }
   const nf = await json("netflix.json", base + "netflix.json?" + nb);
   if (nf) { const n = evaluateNetflix(nf, now); problems.push(...n.problems); info.netflix = n.info; }
-  const ds = await json("disney.json", base + "disney.json?" + nb);
+  // disney.json אופציונלי: TMDB לא מחזיר כרגע זמינות דיסני+ לישראל, אז הקובץ לא נוצר. חסר = לא תקלה (הלקוח מסתיר את המתג)
+  let ds = null; try { const rd = await fetch(base + "disney.json?" + nb); if (rd.ok) ds = await rd.json(); } catch (e) {}
   if (ds) { const n = evaluateDisney(ds, now); problems.push(...n.problems); info.disney = n.info; }
   const hot = await json("hot-cache.json", base + "hot-cache.json?" + nb);
   const extra = await json("extra-cache.json", base + "extra-cache.json?" + nb);

@@ -110,7 +110,10 @@
   // ---- שירות פעיל ----
   TVG.svc = TVG.store("tvg.svc") === "disney" ? "disney" : "netflix"; // נשמר במכשיר
   TVG.DS = null; TVG.dsState = "idle"; // idle | loading | err | ok
-  function curSvc() { return TVG.svc === "disney" ? "disney" : "netflix"; }
+  // דיסני+ מוצג רק כשיש disney.json בשרת (TMDB לא מחזיר כרגע נתוני זמינות לישראל). בלעדיו: אין מתג, ונטפליקס בלבד
+  TVG.dsOn = false;
+  try { fetch("disney.json", { method: "HEAD", cache: "no-store" }).then(function (r) { if (r.ok) { TVG.dsOn = true; if (TVG.tab === "nf") TVG.render(); } }).catch(function () {}); } catch (e) {}
+  function curSvc() { return TVG.dsOn && TVG.svc === "disney" ? "disney" : "netflix"; }
   function curData() { return curSvc() === "disney" ? TVG.DS : TVG.NF; }
   function isDs(x) { return !!x && (x.svc === "disney" || x.ds === true); }
   // באיזה שירות "▶ פתח ב…": פריט מ-disney.json, או תוצאת חיפוש שאינה בנטפליקס ובכל זאת בדיסני+
@@ -118,6 +121,7 @@
   function linkOf(x) { return !x ? "" : svcOf(x) === "disney" ? (x.svc === "disney" ? x.link : x.dlink) || "" : x.link || ""; }
   function svcName(x) { return svcOf(x) === "disney" ? "דיסני+" : "נטפליקס"; }
   function svcSwitchHtml() {
+    if (!TVG.dsOn) return "";
     var c = curSvc();
     return '<div class="seg nfsvc" role="group" aria-label="שירות סטרימינג">' +
       '<button type="button" data-nfsvc="netflix" aria-pressed="' + (c === "netflix") + '">נטפליקס</button>' +

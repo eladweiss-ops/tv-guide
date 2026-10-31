@@ -30,9 +30,9 @@
     if (m === "ios-app") first("פותחים את הקישור בספארי", "בוואטסאפ: ⋯ ← פתיחה בספארי");
     else if (m === "ios-other") first("פותחים את הקישור בספארי", "מעתיקים את הכתובת ומדביקים בספארי");
     if (m.indexOf("ios") === 0) {
-      s.push(step(s.length + 1, "לוחצים על <span class=\"wl-nw\">כפתור השיתוף " + IC_SHARE + "</span> למטה"));
+      s.push(step(s.length + 1, "לוחצים על <span class=\"wl-nw\">שיתוף " + IC_SHARE + "</span> בתחתית"));
       s.push(step(s.length + 1, "גוללים ובוחרים ״הוסף <span class=\"wl-nw\">למסך הבית״ " + IC_PLUS + "</span>"));
-      s.push(step(s.length + 1, "״הוסף״ – וזפזופ מופיע במסך הבית"));
+      s.push(step(s.length + 1, "״הוסף״ – וזהו, זפזופ במסך הבית"));
     } else if (m === "and-app") {
       first("פותחים את הקישור בכרום", "בוואטסאפ: ⋮ ← פתיחה בדפדפן");
       s.push(step(s.length + 1, "לוחצים על ⋮ בפינת הדפדפן"));

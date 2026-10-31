@@ -1,4 +1,5 @@
-/* js/netflix.js - לשונית 'נטפליקס' (סכמה v2): כרטיס ראשי, שורות פוסטרים, דף תוכן בחלון תחתון.
+/* js/netflix.js - לשונית 'סטרימינג' (נטפליקס ודיסני+, סכמה v2 לשניהם): כרטיס ראשי, שורות פוסטרים, דף תוכן בחלון תחתון.
+   המתג בראש הלשונית (tvg.svc) בוחר שירות; disney.json נטען בעצלתיים בהחלפה הראשונה (TVG.DS). מזהה הלשונית נשאר nf (קישורים ישנים).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid. */
 (function (TVG) {
   TVG.files["netflix"] = 1;
@@ -11,6 +12,10 @@
   TVG.nfGet = getItem;
   TVG.nfIsNf = isNf;
   TVG.nfReopen = reopen;
+  TVG.nfSvc = svcOf;         // "disney" | "netflix": באיזה שירות הפריט נפתח (svc בפריט מ-disney.json, או ds בלבד בחיפוש)
+  TVG.nfIsDs = isDs;         // זמין בדיסני+
+  TVG.nfLinkOf = linkOf;     // קישור "▶ פתח ב…" לפי השירות
+  TVG.nfSvcName = svcName;
 
   TVG.nfAfterRender = afterRender;
   TVG.nfFavs = function () { return FAVS.slice(); };
@@ -20,35 +25,39 @@
 
   // סדר השורות במסך (שורה שלא בנתונים נדלגת; שורה לא מוכרת עם כותרת ב-rowMeta באה בסוף). 'recent' ליד 'week' כי הן קרובות
   var ORDER = ["popular", "israeli", "week", "recent", "series", "movies", "top", "comedy", "crime", "docu", "family"];
+  var ORDER_DS = ["popular", "week", "series", "movies", "kids", "marvel", "starwars", "pixar", "top"];
   var TITLES = { popular: "הכי נצפים", recent: "יצא לאחרונה", top: "הכי מדורגים" }; // ברירת מחדל כשאין rowMeta (נתונים ישנים)
   var FAV_TITLE = "⭐ השמורים שלי", FAV_MAX = 200, FAV_ROW = 16, LAZY_FIRST = 3;
   var RE_NAME = /^[a-z][a-z0-9]{0,15}$/;
   function cleanTitle(s) { return typeof s === "string" ? s.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 40) : ""; }
 
   // ---- נתונים: בדיקת סכמה v2 ונרמול. מחזיר null כשאין מה להציג (הלשונית נשארת מוסתרת) ----
-  var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_TR = /^[A-Za-z0-9_-]{11}$/;
+  var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_DLINK = /^https:\/\/www\.disneyplus\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_TR = /^[A-Za-z0-9_-]{11}$/;
   // שדה לא תקין מושמט (לא הפריט כולו)
-  function clean(x) {
+  function clean(x, re, svc) {
     var o = {}, k;
     for (k in x) if (Object.prototype.hasOwnProperty.call(x, k)) o[k] = x[k];
-    if (!RE_LINK.test(o.link || "")) delete o.link;
+    if (svc === "disney") o.svc = "disney"; else delete o.svc;
+    if (!re.test(o.link || "")) delete o.link;
     if (!RE_IMG.test(o.poster || "")) delete o.poster;
     if (!RE_IMG.test(o.backdrop || "")) delete o.backdrop;
     if (!RE_TR.test(o.trailer || "")) delete o.trailer;
     return o;
   }
-  function nfPrep(j0) {
-    var j = j0;
+  // svc: "netflix" (ברירת מחדל) | "disney": איזה קובץ זה. פריטי דיסני+ מסומנים svc:"disney" (הקישור חייב להיות של דיסני+)
+  function nfPrep(j0, svc) {
+    svc = svc === "disney" ? "disney" : "netflix";
+    var j = j0, order = svc === "disney" ? ORDER_DS : ORDER;
     if (j0 && typeof j0 === "object" && j0.items && typeof j0.items === "object") {
       j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {} };
-      Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k]); });
+      Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k], svc === "disney" ? RE_DLINK : RE_LINK, svc); });
     }
     if (!j || typeof j !== "object" || !(j.v >= 2) || !j.items || typeof j.items !== "object") return null;
     var rows = {}, titles = {}, names = [], seen = {}, flat = [], meta = j0 && j0.rowMeta && typeof j0.rowMeta === "object" ? j0.rowMeta : {};
     var src0 = j.rows && typeof j.rows === "object" ? j.rows : {};
-    ORDER.concat(Object.keys(src0).filter(function (n) { return ORDER.indexOf(n) < 0; }).slice(0, 12)).forEach(function (n) {
+    order.concat(Object.keys(src0).filter(function (n) { return order.indexOf(n) < 0; }).slice(0, 12)).forEach(function (n) {
       if (!RE_NAME.test(n)) return;
-      var src = src0[n], out = [], title = cleanTitle(meta[n] && meta[n].title) || TITLES[n] || "";
+      var src = src0[n], out = [], title = cleanTitle(meta[n] && meta[n].title) || (svc === "disney" ? "" : TITLES[n]) || "";
       if (!title) return;
       (Array.isArray(src) ? src : []).forEach(function (k) { if (j.items[k] && j.items[k].title && out.indexOf(k) < 0) out.push(k); });
       if (!out.length) return;
@@ -60,7 +69,7 @@
     if (!hero) hero = flat[0];
     var all = [];
     flat.concat(Object.keys(j.items)).forEach(function (k) { if (!seen[k] && j.items[k] && j.items[k].title) { seen[k] = 1; all.push(k); } });
-    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all };
+    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all, svc: svc };
   }
 
   // ---- ⭐ שמורים (tvg.nffav): תמונת מצב של הפריט, כדי שיעבוד גם לתוצאות חיפוש. נפרד מ-tvg.fav (מועדפי שידור) ----
@@ -74,7 +83,9 @@
       if (!f || typeof f !== "object" || !RE_KEY.test(f.k || "") || typeof f.title !== "string" || !f.title || seenK[f.k]) return false;
       seenK[f.k] = 1; return true;
     }).map(function (f) {
-      return { k: f.k, title: f.title.slice(0, 120), type: f.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(f.poster || "") ? f.poster : "", y: +f.y > 0 ? +f.y : 0, at: +f.at || 0 };
+      var o = { k: f.k, title: f.title.slice(0, 120), type: f.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(f.poster || "") ? f.poster : "", y: +f.y > 0 ? +f.y : 0, at: +f.at || 0 };
+      if (f.svc === "disney") o.svc = "disney"; // בלי svc = נטפליקס (שמורים ישנים)
+      return o;
     }).sort(function (a2, b2) { return b2.at - a2.at; }).slice(0, FAV_MAX);
   }
   function saveFavs() { TVG.store("tvg.nffav", JSON.stringify(FAVS)); }
@@ -82,7 +93,9 @@
   function isFav(k) { return favIdx(k) >= 0; }
   function favAdd(k, x, at) {
     if (!RE_KEY.test(k) || !x || !x.title || favIdx(k) >= 0) return;
-    FAVS.unshift({ k: k, title: String(x.title).slice(0, 120), type: x.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(x.poster || "") ? x.poster : "", y: +x.year > 0 ? +x.year : 0, at: at || Date.now() });
+    var f = { k: k, title: String(x.title).slice(0, 120), type: x.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(x.poster || "") ? x.poster : "", y: +x.year > 0 ? +x.year : 0, at: at || Date.now() };
+    if (svcOf(x) === "disney") f.svc = "disney";
+    FAVS.unshift(f);
     FAVS.sort(function (a, b) { return b.at - a.at; }); if (FAVS.length > FAV_MAX) FAVS.length = FAV_MAX;
     saveFavs();
   }
@@ -90,8 +103,40 @@
   function favRestore(f) { if (!f || favIdx(f.k) >= 0) return; FAVS.push(f); FAVS.sort(function (a, b) { return b.at - a.at; }); if (FAVS.length > FAV_MAX) FAVS.length = FAV_MAX; saveFavs(); }
   // פריט (כמו ב-NF.items) מתמונת המצב: לפתיחת הדף. nfEnsure (nfsearch.js) משלים תקציר וזמינות מהחיפוש
   function favItem(k) {
-    var i = favIdx(k); if (i < 0) return null; var f = FAVS[i];
-    return { k: f.k, type: f.type, title: f.title, orig: "", year: f.y, poster: f.poster, genres: [], link: "https://www.netflix.com/search?q=" + encodeURIComponent(f.title), others: [], _wl: true };
+    var i = favIdx(k); if (i < 0) return null; var f = FAVS[i], d = f.svc === "disney";
+    return { k: f.k, type: f.type, title: f.title, orig: "", year: f.y, poster: f.poster, genres: [], link: (d ? "https://www.disneyplus.com/he-il/search?q=" : "https://www.netflix.com/search?q=") + encodeURIComponent(f.title), others: [], svc: d ? "disney" : undefined, _wl: true };
+  }
+
+  // ---- שירות פעיל ----
+  TVG.svc = TVG.store("tvg.svc") === "disney" ? "disney" : "netflix"; // נשמר במכשיר
+  TVG.DS = null; TVG.dsState = "idle"; // idle | loading | err | ok
+  function curSvc() { return TVG.svc === "disney" ? "disney" : "netflix"; }
+  function curData() { return curSvc() === "disney" ? TVG.DS : TVG.NF; }
+  function isDs(x) { return !!x && (x.svc === "disney" || x.ds === true); }
+  // באיזה שירות "▶ פתח ב…": פריט מ-disney.json, או תוצאת חיפוש שאינה בנטפליקס ובכל זאת בדיסני+
+  function svcOf(x) { return x && (x.svc === "disney" || (x.nf === false && x.ds === true && RE_DLINK.test(x.dlink || ""))) ? "disney" : "netflix"; }
+  function linkOf(x) { return !x ? "" : svcOf(x) === "disney" ? (x.svc === "disney" ? x.link : x.dlink) || "" : x.link || ""; }
+  function svcName(x) { return svcOf(x) === "disney" ? "דיסני+" : "נטפליקס"; }
+  function svcSwitchHtml() {
+    var c = curSvc();
+    return '<div class="seg nfsvc" role="group" aria-label="שירות סטרימינג">' +
+      '<button type="button" data-nfsvc="netflix" aria-pressed="' + (c === "netflix") + '">נטפליקס</button>' +
+      '<button type="button" data-nfsvc="disney" aria-pressed="' + (c === "disney") + '"><bdi>דיסני+</bdi></button></div>';
+  }
+  // disney.json: נטען רק כשצריך. שגיאה/ריק = מצב err עם "נסו שוב"
+  function loadDs() {
+    if (TVG.dsState !== "idle") return;
+    TVG.dsState = "loading";
+    fetch("disney.json", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) { var d = nfPrep(j, "disney"); if (!d) throw 0; TVG.DS = d; TVG.dsState = "ok"; })
+      .catch(function () { TVG.dsState = "err"; })
+      .then(function () { if (TVG.tab === "nf" && curSvc() === "disney") TVG.render(); if (TVG.nfOpen) reopen(); });
+  }
+  function dsWaitHtml() {
+    if (TVG.dsState === "err") return '<div class="nfempty"><b>לא הצלחנו לטעון את דיסני+</b><span>בדקו את החיבור ונסו שוב.</span><button type="button" class="ghost" data-nfdsretry>נסו שוב</button></div>';
+    var sec = ""; for (var i = 0; i < 3; i++) sec += '<section class="nfsec" aria-hidden="true"><h2 class="sech nfskh"></h2><div class="nfrow">' + skelRow() + "</div></section>";
+    return '<div role="status" aria-label="טוענים את דיסני+"><div class="nfhero nfsk0" aria-hidden="true"></div>' + sec + "</div>";
   }
 
   // ---- עזרים ----
@@ -128,7 +173,7 @@
   // כרטיס של שמור (תמונת מצב): בלחיצה ארוכה מסירים
   function favCard(f) {
     var x = { title: f.title, poster: f.poster };
-    return '<button type="button" class="nfc" data-nfopen="' + esc(f.k) + '" data-nffc="' + esc(f.k) + '">' + poster(x) + '<span class="nft"><bdi>' + esc(f.title) + "</bdi></span></button>";
+    return '<button type="button" class="nfc" data-nfopen="' + esc(f.k) + '" data-nffc="' + esc(f.k) + '"' + (f.svc === "disney" ? ' data-nfpref="disney"' : "") + ">" + poster(x) + '<span class="nft"><bdi>' + esc(f.title) + "</bdi></span></button>";
   }
   function moreChip(name) { return '<button type="button" class="nfmore" data-nfmore="' + esc(name) + '" aria-label="עוד"><i aria-hidden="true">›</i><span>עוד</span></button>'; }
   function skelRow() { var s = ""; for (var i = 0; i < 4; i++) s += '<span class="nfc nfsk" aria-hidden="true"><span class="nfp"></span><span class="nft"></span></span>'; return s; }
@@ -149,8 +194,11 @@
   }
 
   function vNf() {
-    var NF = TVG.NF, t = TVG.q.trim().toLowerCase(), h = "";
-    if (!NF || !NF.items) return '<p class="none">אי אפשר לטעון את רשימת נטפליקס כרגע. נסו שוב מאוחר יותר.</p>';
+    var t = TVG.q.trim().toLowerCase(), h = "";
+    // בחיפוש תמיד רשימות נטפליקס + חיפוש מלא (nfsearch.js, עם תג לכל שירות); המתג מוצג רק בלי חיפוש
+    var NF = t ? TVG.NF : curData(), sw = t ? "" : svcSwitchHtml();
+    if (!t && curSvc() === "disney" && !TVG.DS) { if (TVG.dsState === "idle") loadDs(); return sw + dsWaitHtml(); }
+    if (!NF || !NF.items) return '<p class="none">אי אפשר לטעון את רשימת הסטרימינג כרגע. נסו שוב מאוחר יותר.</p>';
     if (t) {
       var res = NF.all.filter(function (k) {
         var x = NF.items[k];
@@ -162,6 +210,7 @@
       if (!res.length && !rem.any) h = '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> במאגר</b><span>לפעמים השם בעברית בנטפליקס שונה מהשם במאגר. נסו את השם באנגלית, שחקן או במאי, או חפשו ישירות בנטפליקס.</span>' +
         '<a class="ghost" href="https://www.netflix.com/search?q=' + encodeURIComponent(TVG.q.trim()) + '" target="_blank" rel="noopener">🔎 חיפוש בנטפליקס</a></div>';
     } else {
+      h += sw;
       if (NF.hero && NF.items[NF.hero]) h += heroHtml(NF.hero, NF.items[NF.hero]);
       var fr = favRowHtml(), n = fr ? 1 : 0;
       h += fr;
@@ -212,34 +261,40 @@
   }
   // פריט לפי מפתח: רשימות נטפליקס, תוצאות חיפוש מלא, או פריט ברשימת ההתראות (כשפותחים מהודעה)
   // ev: "nf" (נפתח מהודעת "הגיע לנטפליקס") / "rem" (מתזכורת צפייה). לפריט שההודעה אמרה שהגיע: תמיד זמין עם קישור, גם אם החיפוש (במטמון) עדיין אומר אחרת
+  // פריט בשני הקבצים (אותו מפתח TMDB): קודם של השירות שממנו נפתח (שמור/השירות הפעיל)
+  var prefSvc = null;
+  function lookup(k) {
+    var ds = TVG.DS && TVG.DS.items && TVG.DS.items[k], nf = TVG.NF && TVG.NF.items && TVG.NF.items[k];
+    return (prefSvc || curSvc()) === "disney" ? ds || nf || null : nf || ds || null;
+  }
   function getItem(k) {
-    var ev = TVG.nfOpenEv, x = (TVG.NF && TVG.NF.items && TVG.NF.items[k]) || (TVG.nfX && TVG.nfX[k]) || null, w = TVG.wlItem ? TVG.wlItem(k, ev) : null;
+    var ev = TVG.nfOpenEv, x = lookup(k) || (TVG.nfX && TVG.nfX[k]) || null, w = TVG.wlItem ? TVG.wlItem(k, ev) : null;
     if (!x) return w || favItem(k);
     if (ev === "nf" && x.nf === false) x = Object.assign({}, x, { nf: true, link: x.link || (w && w.link) || "" });
     return x;
   }
   // פריט מרשימות נטפליקס (netflix.json) זמין בנטפליקס מעצם היותו שם; בתוצאות חיפוש יש שדה nf מפורש
-  function isNf(x) { return !x || x.nf !== false; }
+  function isNf(x) { return !x || (x.svc !== "disney" && x.nf !== false); } // פריט מ-disney.json אינו (בהכרח) בנטפליקס
   function barHtml(x, k) {
     // 💌 יתווסף בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
-    var ok = isNf(x) && RE_LINK.test(x.link || "");
+    var dsv = svcOf(x) === "disney", lk = linkOf(x), ok = (dsv ? isDs(x) && RE_DLINK.test(lk) : isNf(x) && RE_LINK.test(lk));
     var sv = k && RE_KEY.test(k) ? isFav(k) : null;
     // ⭐ שמירה ו-🍿 באותה שורה (משניים, 44px): הכתום נשאר אחד, למטה
     var row = (sv === null ? "" : '<button type="button" class="ghost nffv' + (sv ? " on" : "") + '" data-nffav="' + esc(k) + '" aria-pressed="' + sv + '">' + (sv ? "★ שמור" : "⭐ שמירה") + "</button>") + (TVG.partyNfBtn ? TVG.partyNfBtn() : ""); /* 🍿 ערב צפייה */
-    return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
+    return (ok ? '<a class="btn nfgo" href="' + esc(lk) + '" target="_blank" rel="noopener">▶ פתח ב' + (dsv ? "דיסני+" : "נטפליקס") + "</a>" : '<p class="none nfnolink">אין קישור ישיר ל' + (dsv ? "דיסני+" : "נטפליקס") + " לתוכן הזה.</p>") +
       (row ? '<div class="nfbar2">' + row + "</div>" : "") +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
-  function openNf(k, ev) {
-    TVG.nfOpenEv = ev || null;
+  function openNf(k, ev, pref) {
+    TVG.nfOpenEv = ev || null; prefSvc = pref === "disney" ? "disney" : null;
     var x = getItem(k);
     if (!x && ev === "rem" && !TVG.nfRemTry && TVG.calTok && TVG.CAL_API) { // תזכורת שלא שמורה במכשיר הזה (נוצרה בספארי/מכשיר אחר): מושכים מהשרת ומנסים שוב פעם אחת
       TVG.nfRemTry = true;
       fetch(TVG.CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
         var rec = j && Array.isArray(j.rems) && j.rems.filter(function (r) { return r && typeof r.k === "string" && r.k.indexOf("nf|" + k + "|") === 0; })[0];
         if (rec && !TVG.hasRem(rec.k)) { TVG.REMS.push(rec); TVG.saveRems(); }
-        openNf(k, ev);
-      }).catch(function () { openNf(k, ev); }).then(function () { TVG.nfRemTry = false; });
+        openNf(k, ev, pref);
+      }).catch(function () { openNf(k, ev, pref); }).then(function () { TVG.nfRemTry = false; });
       return;
     }
     if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
@@ -257,7 +312,7 @@
   }
   function closeNf() {
     if (!$("#nfsheet") || $("#nfsheet").hidden) return;
-    $("#nfsheet").hidden = true; TVG.nfOpen = null;
+    $("#nfsheet").hidden = true; TVG.nfOpen = null; prefSvc = null;
     scrimOff();
   }
   // הרקע הכהה נעלם רק כשאין אף חלון פתוח מתחתיו (רשימת 'עוד' יכולה להיות פתוחה מתחת לדף תוכן)
@@ -269,7 +324,7 @@
   // ---- שורות מתחת לקפל: נבנות כשמתקרבים אליהן ----
   var io = null;
   function fillRow(sec) {
-    var name = sec.getAttribute("data-nflz"), NF = TVG.NF; sec.removeAttribute("data-nflz");
+    var name = sec.getAttribute("data-nflz"), NF = curData(); sec.removeAttribute("data-nflz");
     var r = sec.querySelector(".nfrow"); if (r && NF && NF.rows[name]) r.innerHTML = rowCards(name, NF);
   }
   function afterRender() {
@@ -283,7 +338,7 @@
   // ---- רשימה מלאה ('עוד ›'): חלון תחתון עם כל פריטי השורה ----
   var listName = null;
   function listData(name) {
-    var NF = TVG.NF;
+    var NF = curData();
     if (name === "fav") return FAVS.length ? { title: FAV_TITLE, types: FAVS.map(function (f) { return f.type; }), cards: FAVS.map(favCard) } : null;
     if (!NF || !NF.rows[name]) return null;
     return { title: NF.titles[name], types: NF.rows[name].map(function (k) { return NF.items[k].type; }), cards: NF.rows[name].map(function (k) { return card(k, NF.items[k]); }) };
@@ -312,7 +367,7 @@
 
   // ---- שמירה/הסרה: מעדכנים רק את מה שהשתנה (שורת השמורים, כוכבים על פוסטרים, הכפתור, הרשימה), בלי לצייר מחדש ולקפוץ ----
   function patchMain() {
-    var main = $("#main"); if (TVG.tab !== "nf" || !TVG.NF || TVG.q.trim() || !main) return;
+    var main = $("#main"); if (TVG.tab !== "nf" || !curData() || TVG.q.trim() || !main) return;
     var cur = main.querySelector('[data-nfrow="fav"]'), html = favRowHtml(), h0 = document.documentElement.scrollHeight;
     if (!html) { if (cur) cur.parentNode.removeChild(cur); }
     else {
@@ -358,9 +413,16 @@
 
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t.closest) return;
+    var sv0 = t.closest("[data-nfsvc]");
+    if (sv0) {
+      var ns = sv0.getAttribute("data-nfsvc") === "disney" ? "disney" : "netflix";
+      if (ns !== curSvc()) { TVG.svc = ns; TVG.store("tvg.svc", ns); TVG.render(); window.scrollTo(0, 0); }
+      return;
+    }
+    if (t.closest("[data-nfdsretry]")) { TVG.dsState = "idle"; TVG.render(); return; }
     var fv = t.closest("[data-nffav]"); if (fv) { toggleFav(fv.getAttribute("data-nffav")); return; }
     var mo = t.closest("[data-nfmore]"); if (mo) { openNfList(mo.getAttribute("data-nfmore")); return; }
-    var o = t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen")); return; }
+    var o = t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen"), null, o.getAttribute("data-nfpref")); return; }
     if (t.closest("[data-nfclose]")) closeNf();
     if (t.closest("[data-nflclose]")) closeNfList();
   });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateGuide, evaluateNetflix, evaluateCaches, parseSiteFiles, runHealth, israelNow, T } from "./health.mjs";
+import { evaluateGuide, evaluateNetflix, evaluateDisney, evaluateCaches, parseSiteFiles, runHealth, israelNow, T } from "./health.mjs";
 
 // שישי 2026-10-30 12:00 שעון ישראל (UTC+2 אחרי המעבר לשעון חורף) – מחר שבת
 const NOW = new Date("2026-10-30T10:00:00Z");
@@ -73,6 +73,14 @@ test("נטפליקס", () => {
   assert.ok(evaluateNetflix({ v: 2, updated: "2026-10-28T08:00:00Z", items }, NOW).problems.some((p) => p.includes("לא התעדכן")));
 });
 
+test("דיסני+", () => {
+  const mk = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ["m" + i, {}]));
+  assert.deepEqual(evaluateDisney({ v: 2, updated: "2026-10-30T08:00:00Z", items: mk(60) }, NOW).problems, []);
+  assert.ok(evaluateDisney({ v: 2, updated: "2026-10-30T08:00:00Z", items: mk(59) }, NOW).problems.some((p) => p.startsWith("דיסני+") && p.includes("פריטים")));
+  assert.ok(evaluateDisney({ v: 2, updated: "2026-10-28T08:00:00Z", items: mk(80) }, NOW).problems.some((p) => p.includes("דיסני+ לא התעדכן")));
+  assert.ok(evaluateDisney(null, NOW).problems.some((p) => p.includes("disney.json")));
+});
+
 test("מטמוני המחשב בבית", () => {
   const hot = { "1|2026-11-02T01:57": {}, "1|2026-10-30T10:00": {} };
   assert.deepEqual(evaluateCaches(hot, { x14: { at: "2026-10-30T08:00:00Z" } }, NOW).problems, []);
@@ -102,6 +110,7 @@ test("runHealth עם fetch מזויף: הכול תקין, ורק GET", async () 
     if (u.endsWith("index.html")) return res(idx, "text/html");
     if (u.endsWith("guide.json")) return res(guide);
     if (u.endsWith("netflix.json")) return res(nf);
+    if (u.endsWith("disney.json")) return res({ v: 2, updated: "2026-10-30T09:00:00Z", items: Object.fromEntries(Array.from({ length: 70 }, (_, i) => ["m" + i, {}])) });
     if (u.endsWith("hot-cache.json")) return res({ "1|2026-11-02T01:57": {} });
     if (u.endsWith("extra-cache.json")) return res({ x14: { at: "2026-10-30T08:00:00Z" } });
     if (u.endsWith("/api/push")) return res({ scheduler: true });

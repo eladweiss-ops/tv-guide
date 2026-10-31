@@ -29,7 +29,7 @@ export const APP = "https://eladweiss-ops.github.io/tv-guide/";
 
 const RE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{20}[A-Za-z0-9]$/, RE_GID = /^[A-Za-z0-9][A-Za-z0-9_-]{14,30}[A-Za-z0-9]$/;
 const RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\/[A-Za-z0-9_\/.-]{1,120}$/;
-const RE_NFLINK = /^https:\/\/www\.netflix\.com\/[^\s<>"'\\]{0,300}$/;
+const RE_NFLINK = /^https:\/\/www\.(netflix|disneyplus)\.com\/[^\s<>"'\\]{0,300}$/;
 export const okId = (s) => typeof s === "string" && RE_ID.test(s);
 export const okGid = (s) => typeof s === "string" && RE_GID.test(s);
 

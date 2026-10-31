@@ -87,10 +87,12 @@ function nfFixtureData() {
   if (!base.endsWith("/")) base += "/";
   let browser = null; // דפדפן חדש לכל מכשיר: ריצה ארוכה של כמה מכשירים ברצף עלולה להפיל את הרנדרר (Target crashed)
   let total = 0, failed = 0, auditTotal = 0; const allErrors = [];
-  const RUNS = []; DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0)).forEach((x) => ["main", "nfs"].forEach((p) => RUNS.push([x, p]))); // שני שלבים לכל מכשיר, בדפדפן נפרד: ריצה אחת ארוכה מדי מפילה את הרנדרר בזיכרון
-  for (const [d, phase] of RUNS) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
+  const CHUNK = +(process.env.TVG_CHUNK || 22), RUNS = [], doneDev = {}, savedState = {}; // הצעדים מחולקים לקבוצות, כל קבוצה בדפדפן חדש (עם אותו storage): ריצה ארוכה מפילה את הרנדרר בזיכרון (גם ב-main ללא שינוי)
+  DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0)).forEach((x) => { for (let p = 0; p < 16; p++) RUNS.push([x, p]); RUNS.push([x, "nfs"]); });
+  const tries = {}; // קריסת רנדרר (באג כרום בסביבה, גם ב-main): חוזרים על הקבוצה עד פעמיים, בלי לספור את הניסיון שקרס
+  for (let ri = 0; ri < RUNS.length; ri++) { const [d, phase] = RUNS[ri]; if (doneDev[d.name] && phase !== "nfs") continue; if (process.env.TVG_PHASES && process.env.TVG_PHASES.split(",").indexOf(String(phase)) < 0) continue; /* TVG_PHASES=nfs,0,1: רק קבוצות מסוימות */ let ran = 0, crashed = false; const f0 = failed, t0 = total; // TVG_ONLY=iphone|android|iphone_375,... מצמצם
     browser = await chromium.launch({ channel: "chrome", headless: true, args: process.env.TVG_CHROME_ARGS ? process.env.TVG_CHROME_ARGS.split(" ") : [] });
-    const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem" });
+    const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem", storageState: phase === "nfs" ? undefined : savedState[d.name] || undefined });
     await ctx.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
     // TVG_NO_WRITES=1 (הניטור מול האתר החי): חוסם כל בקשה שאינה GET לשרת התזכורות, כדי שהבדיקה לא תכתוב גיבויים/תזכורות
     if (process.env.TVG_NO_WRITES) await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
@@ -111,10 +113,11 @@ function nfFixtureData() {
     const errs = [], auditRaw = [];
     const audit = (name) => runAudit(page, name, auditRaw);
     const hookPage = () => { page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
-    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => console.log("  !! renderer crashed", d.name)); };
+    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => { crashed = true; console.log("  !! renderer crashed", d.name, String(phase)); }); };
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
     const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await audit(n); };
-    const step = (n, f) => (phase === "main" ? runStep(n, f) : Promise.resolve());
+    let stepIdx = 0;
+    const step = (n, f) => { const i = stepIdx++; if (phase === "nfs" || Math.floor(i / CHUNK) !== phase) return Promise.resolve(); ran++; return runStep(n, f); };
     const runStep = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
     let nfFixture = false;
@@ -264,6 +267,12 @@ function nfFixtureData() {
       A((await page.textContent("#nfsheet")).indexOf("הנוקמים") >= 0 && (await page.getAttribute('[data-wlkind="nf"]', "aria-pressed")) === "true", "item + pressed chip from watchlist");
       await snap("33_nfs_from_push");
       await page.goto(base + "index.html?nf=m1", { waitUntil: "networkidle" }); await page.waitForTimeout(800); A(!(await shown("#nfsheet")), "unknown key does not open"); A(/לא מצאנו/.test(await page.textContent("#pill")), "friendly toast");
+    });
+    await nfsStep("nfs-dark", async () => { // מצב כהה: תוצאות חיפוש, דף תוכן (התראות + תזכורת), הגדרות
+      await nfSearch("הנוקמים"); await page.evaluate(() => TVG.setTheme("dark")); await page.waitForTimeout(400); await snap("34_nfs_dark_results");
+      await page.click('[data-nfopen="t88001"]'); await page.waitForTimeout(600); await page.click('[data-wlkind="season"]'); await page.waitForTimeout(500); await snap("34_nfs_dark_sheet");
+      await page.evaluate(() => { document.querySelector("#nfsBody").scrollTop = 9999; }); await page.waitForTimeout(300); await snap("34_nfs_dark_sheet_bottom");
+      await page.evaluate(() => { try { localStorage.removeItem("tvg.theme"); } catch (e) {} });
     });
     await page.evaluate(() => { try { localStorage.removeItem("tvg.wl"); localStorage.removeItem("tvg.rem"); localStorage.removeItem("tvg.wlDirty"); localStorage.removeItem("tvg.calTok"); } catch (e) {} });
     await setupPage(); // עמוד חדש אחרי בלוק החיפוש (זיכרון)
@@ -657,6 +666,7 @@ function nfFixtureData() {
       out.forEach((b64, i) => fs.writeFileSync(path.join(OUT, "card_" + (i + 1) + ".png"), Buffer.from(b64, "base64")));
     });
 
+    const key = d.name + ":" + phase; if (crashed && (tries[key] || 0) < 2) { tries[key] = (tries[key] || 0) + 1; failed = f0; total = t0; console.log("  retry", key); RUNS.splice(ri + 1, 0, [d, phase]); try { await browser.close(); } catch (e) {} browser = null; continue; }
     const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     console.log(d.name, "scrollWidth/clientWidth", overflow.sw + "/" + overflow.cw, "errors:", errs.length);
     errs.forEach((e) => { console.log("   ", e); allErrors.push(d.name + " " + e); });
@@ -668,6 +678,7 @@ function nfFixtureData() {
     console.log("audit " + d.name + " " + phase + " issues: " + issues.length + " " + JSON.stringify(byType));
     issues.slice(0, 5).forEach((i) => console.log("    audit: [" + i.type + "] " + i.el + (i.el2 ? " <> " + i.el2 : "") + " - " + i.msg + " @" + i.steps[0]));
     auditTotal += issues.length;
+    if (phase !== "nfs") { if (!ran) doneDev[d.name] = true; else savedState[d.name] = await ctx.storageState(); }
     await ctx.close(); await browser.close(); browser = null;
   }
   if (browser) await browser.close(); if (srv) srv.close();

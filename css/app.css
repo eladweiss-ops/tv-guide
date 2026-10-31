@@ -477,7 +477,7 @@
   :root:not([data-theme="dark"]) .nfr.im b { color: #8a6d00; } :root:not([data-theme="dark"]) .nfr.rt b { color: #c0391f; } :root:not([data-theme="dark"]) .nfr.mc b { color: #2f7d12; }
   .nfov { margin: 0; line-height: 1.6; font-size: 1rem; }
   .nftr { align-self: flex-start; display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); min-height: 44px; }
-  .nfs-bar { flex: none; display: flex; flex-direction: column; gap: 8px; position: relative; padding: 12px 22px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--nfsbg); }
+  .nfs-bar { flex: none; display: flex; flex-direction: column; gap: 8px; position: sticky; bottom: 0; padding: 12px 22px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--nfsbg); }
   .nfs-bar::before { content: ""; position: absolute; inset: -22px 0 auto 0; height: 22px; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0), var(--nfsbg)); }
   .nfs-bar .btn, .nfs-bar .ghost { width: 100%; min-height: 50px; }
   .nfs-bar .ghost { min-height: 44px; background: transparent; }
@@ -525,9 +525,10 @@
   .nfgrp .chip { background: color-mix(in srgb, var(--surface) 70%, transparent); }
   .nfgrp .chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); }
   .nfgrp .credit { margin: 4px 0 2px; }
+  .nfgrp .linkbtn { display: inline-flex; align-items: center; min-height: 44px; margin-top: 0; }
   .nfgrp .lpcustom { margin-top: 6px; }
   .nfremd { color: var(--ink); font-weight: 600; }
-  .nfrl { display: inline-flex; align-items: center; min-height: 36px; color: var(--accent); font-weight: 700; text-decoration: none; }
+  .nfrl { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 700; text-decoration: none; }
   /* הגדרות: רשימת ההתראות */
   .wlrow { display: flex; align-items: center; gap: 10px; padding: 10px 8px 10px 14px; margin-bottom: 8px; border-radius: 22px; background: var(--soft); }
   .wlt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }

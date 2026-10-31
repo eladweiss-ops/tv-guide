@@ -82,7 +82,7 @@
   function remBtn(p, cid, small) {
     if (!cid || p.s <= new Date()) return "";
     var on = !!hasRem(remKey(cid, p.s));
-    return '<button type="button" class="btn rem' + (small ? " sm" : "") + (on ? " on" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="' + (on ? "יש תזכורת" : "תזכיר לי (התראה ביומן)") + '">' + (on ? "✓" : "⏰") : ">" + (on ? "✓ יש תזכורת ביומן" : "⏰ תזכיר לי (התראה ביומן)")) + "</button>";
+    return '<button type="button" class="btn rem' + (small ? " sm" : "") + (on ? " on" : "") + '" data-rem="' + esc(cid) + "|" + p.s.getTime() + '"' + (small ? ' aria-label="' + (on ? "יש תזכורת" : "תזכיר לי") + '">' + (on ? "✓" : "⏰") : ">" + (on ? "✓ יש תזכורת" : "⏰ תזכיר לי")) + "</button>";
   }
   function favBtn(p) {
     var on = FAV.has(p.title);

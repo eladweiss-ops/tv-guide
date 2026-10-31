@@ -33,6 +33,7 @@
   }
   function shortLead(m) { return m === 0 ? "בהתחלה" : m === 1440 ? "יום לפני" : leadName(m).replace(" לפני", ""); }
   function isStdLead(m) { return LEAD_MAIN.indexOf(m) >= 0 || LEAD_MORE.indexOf(m) >= 0; }
+  TVG.leadOpts = { main: LEAD_MAIN, more: LEAD_MORE, name: leadName, short: shortLead, std: isStdLead }; // אותן אפשרויות מועד התראה גם במעקב אחרי סדרה (series.js)
   function leadTxt(m, ts) { // "10 דק׳ לפני", או לשעה מסוימת: "ב־19:45" / "ב־ראשון 19:45"
     if (isStdLead(m) && leadName(m)) return leadName(m);
     var a = new Date(ts - m * 60000), same = dstr(a) === dstr(new Date(ts));

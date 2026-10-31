@@ -85,6 +85,26 @@ function nfFixtureData() {
   let srv = null, base = process.argv[3];
   if (!base) { const s = await serve(); srv = s.srv; base = s.url; }
   if (!base.endsWith("/")) base += "/";
+  // ---- בחירה דינמית של סדרות לבדיקת המעקב מתוך guide.json (הלוח גולל קדימה; בלי שמות קבועים): ≥2 שידורים ראשיים עתידיים, לא כותרת כללית ----
+  const SER = await import(require("url").pathToFileURL(path.join(REPO, "calendar-server", "api", "_series.js")).href);
+  const GUIDE = JSON.parse(fs.readFileSync(path.join(REPO, "guide.json"), "utf8")), NOW_MS = new Date(FIXED_NOW).getTime();
+  const pickSeries = (filter) => {
+    const titles = new Map();
+    GUIDE.programs.forEach((p) => { if (SER.seriesTitle(p.title) === p.title) titles.set(p.title, 1); });
+    let best = null;
+    for (const t of titles.keys()) {
+      if (SER.genericTitle(GUIDE, t)) continue;
+      const a = SER.seriesAirings(GUIDE, t, null, NOW_MS), prim = a.filter((x) => x.primary);
+      if (prim.length < 2 || !filter(a, prim)) continue;
+      const mine = prim.filter((x) => SEL.indexOf(x.ch) >= 0).length, score = mine * 100 + prim.length;
+      if (!best || score > best.score) best = { t, score };
+    }
+    return best && best.t;
+  };
+  const FOL_TITLE = pickSeries((a, prim) => prim.some((x) => SEL.indexOf(x.ch) >= 0) && !prim.every((x) => /^x/.test(x.ch)));
+  const X_TITLE = pickSeries((a, prim) => prim.every((x) => /^x/.test(x.ch)));
+  console.log("follow-series:", FOL_TITLE, "| x-channel series:", X_TITLE || "(none)");
+  if (!FOL_TITLE) throw new Error("no followable series in guide.json for FIXED_NOW=" + FIXED_NOW);
   let browser = null; // דפדפן חדש לכל מכשיר: ריצה ארוכה של כמה מכשירים ברצף עלולה להפיל את הרנדרר (Target crashed)
   let total = 0, failed = 0, auditTotal = 0; const allErrors = [];
   const CHUNK = +(process.env.TVG_CHUNK || 22), RUNS = [], doneDev = {}, savedState = {}; // הצעדים מחולקים לקבוצות, כל קבוצה בדפדפן חדש (עם אותו storage): ריצה ארוכה מפילה את הרנדרר בזיכרון (גם ב-main ללא שינוי)
@@ -350,8 +370,9 @@ function nfFixtureData() {
     const TOK = "qa0123456789abcdefghijklmn";
     const mkRem = (title, startIso, endIso, lead) => ({ k: "208|" + new Date(startIso).getTime(), id: "208", ts: new Date(startIso).getTime(), end: new Date(endIso).getTime(), title, ch: "ערוץ ויוה", desc: "", lead, at: 1 });
     // תזכורות לדוגמה על תוכניות אמיתיות בערוץ 208 סביב FIXED_NOW (הלוח גולל קדימה: אין תאריכים קבועים)
-    const p208 = JSON.parse(fs.readFileSync(path.join(REPO, "guide.json"), "utf8")).programs.filter((p) => p.ch === "208").sort((x, y) => (x.start < y.start ? -1 : 1)), msOf = (s) => new Date(s + ":00+02:00").getTime(), nowMs = new Date(FIXED_NOW).getTime();
+    const p208 = JSON.parse(fs.readFileSync(path.join(REPO, "guide.json"), "utf8")).programs.filter((p) => p.ch === "208").sort((x, y) => (x.start < y.start ? -1 : 1)), msOf = (s) => SER.ilToMs(s), nowMs = new Date(FIXED_NOW).getTime(); // שעון ישראל כולל מעבר שעון קיץ
     const iNext = p208.findIndex((p) => msOf(p.start) > nowMs + 10 * 60000), iStarted = p208.findIndex((p) => msOf(p.start) > nowMs) - 1;
+    if (iNext < 1 || iStarted < 0 || iNext + 1 >= p208.length || iStarted + 1 >= p208.length) throw new Error("guide.json has no usable channel-208 programs around " + FIXED_NOW + " (iNext=" + iNext + ", iStarted=" + iStarted + ")");
     const asRem = (i, lead) => mkRem(p208[i].title, new Date(msOf(p208[i].start)).toISOString(), new Date(msOf(p208[i + 1].start)).toISOString(), lead);
     const REM_NEXT = asRem(iNext, 10);
     const REM_STARTED = asRem(iStarted, 10);
@@ -460,7 +481,6 @@ function nfFixtureData() {
       assert((await page.getAttribute("[data-dbl]", "aria-pressed")) === "true", "dbl pressed"); await snap("12_rem_double");
     });
     // ---- 📺 מעקב אחרי סדרה (js/series.js). ההתראות מאושרות בהקשר (pushOn אמיתי), /api/follow מדומה, ו-/api/rems נחסם ב-TVG_NO_WRITES ----
-    const FOL_TITLE = "הזמר במסכה";
     const folSeed = async (push) => { await page.evaluate(([tok, p]) => { localStorage.removeItem("tvg.fol"); localStorage.removeItem("tvg.folDirty"); localStorage.setItem("tvg.calTok", tok); if (p) localStorage.setItem("tvg.push", "1"); else localStorage.removeItem("tvg.push"); localStorage.setItem("tvg.calmode", "sub"); }, [TOK, push]); };
     const pushNow = () => page.evaluate(() => { TVG.pushOn = true; });
     const folKeep = (title) => page.evaluate(([t, tok]) => { localStorage.setItem("tvg.fol", JSON.stringify([{ title: t, mode: "new", lead: 10, ch: "", chn: "", u: Date.now() }])); localStorage.setItem("tvg.calTok", tok); }, [title, TOK]);
@@ -483,7 +503,7 @@ function nfFixtureData() {
         await page.click('[data-folmode="new"]'); await page.waitForTimeout(200);
         await page.click("[data-folgo]"); await page.waitForTimeout(900);
         assert(!(await vis("#rem")), "sheet closed after follow");
-        const st = await page.evaluate(() => TVG.FOL.filter((x) => !x.x).map((x) => x.title + "|" + x.mode + "|" + x.lead)); assert(st.length === 1 && /הזמר במסכה\|new\|/.test(st[0]), "follow saved: " + JSON.stringify(st));
+        const st = await page.evaluate(() => TVG.FOL.filter((x) => !x.x).map((x) => x.title + "|" + x.mode + "|" + x.lead)); assert(st.length === 1 && st[0].indexOf(FOL_TITLE + "|new|") === 0, "follow saved: " + JSON.stringify(st));
         assert(folPosts.length >= 1 && folPosts[folPosts.length - 1].follows.some((x) => x.title === FOL_TITLE && x.mode === "new"), "POST /api/follow sent");
         const pt = await page.textContent("#pill"); assert(/נזכיר לך על כל פרק חדש/.test(pt), "toast: " + pt); await snap(F + "04_toast");
         assert(await vis(".serfol .ghost"), "search row now shows manage");
@@ -510,6 +530,43 @@ function nfFixtureData() {
         assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x).length)) === 1, "restored by undo"); assert((await page.evaluate(() => document.querySelectorAll(".folrow").length)) === 1, "row back");
       });
     }
+    await step("fol-topic-link", async () => { // כותרת מדויקת של סדרה: גם "לעקוב אחרי הסדרה" וגם קישור משני לנושא; נושא שכבר במעקב מציג "הפסק לעקוב"
+      await folSeed(true); await fresh(); await pushNow(); await folOpenSearch();
+      assert(await vis(".serfol [data-folnew]"), "series follow row"); assert(await vis(".foltopic [data-follow]"), "secondary topic link");
+      assert(/או לעקוב אחרי כל מה שמזכיר/.test(await page.textContent(".foltopic")), "topic link text"); await snap("21_fol_topic_link");
+      await page.click(".foltopic [data-follow]"); await page.waitForTimeout(400);
+      assert(/אתה עוקב אחרי הנושא/.test(await page.textContent("#main")), "followed topic row shown"); assert(/הפסק לעקוב/.test(await page.textContent("#main")), "stop topic");
+      await page.evaluate(() => { TVG.TOPICS = []; TVG.saveTopics(); });
+    });
+    await step("fol-generic-topic-only", async () => { // NBA / חדשות: כותרת כללית = נושא בלבד
+      await folSeed(true); await fresh(); await pushNow(); await page.evaluate(() => { TVG.tab = "dial"; TVG.startSearch("NBA", true); }); await page.waitForTimeout(700);
+      assert(!(await vis("[data-folnew]")), "no series follow for a generic title"); assert(await vis("[data-follow]"), "topic follow stays"); await snap("21_fol_generic_topic");
+      await page.evaluate(() => { TVG.TOPICS = []; TVG.saveTopics(); });
+    });
+    if (X_TITLE) await step("fol-x-channel", async () => { // ערוצים עם מזהה x14/xi24/xknesset/xkids
+      await folSeed(true); await fresh(); await pushNow();
+      await page.evaluate((t) => { TVG.tab = "dial"; TVG.startSearch(t, true); }, X_TITLE); await page.waitForTimeout(700);
+      assert(await vis(".serfol [data-folnew]"), "follow row for x-channel series"); await page.click(".serfol [data-folnew]"); await page.waitForTimeout(400); await page.click("[data-folgo]"); await page.waitForTimeout(800);
+      const k = await page.evaluate((t) => { const f = TVG.FOL.filter((x) => !x.x)[0]; const a = TVG.folAirings(t, null)[0]; return a ? "f|" + TVG.folKey(t) + "|" + a.c.id + "|" + a.ts : ""; }, X_TITLE);
+      assert(/^f\|[^|]+\|x[a-z0-9]+\|\d+$/.test(k), "derived key with x-channel: " + k);
+      await fresh("?rem=" + encodeURIComponent(k)); assert(await vis("#snzRoot"), "tap on an x-channel derived reminder opens snooze"); await snap("21_fol_xchannel_snooze");
+      await page.evaluate(() => { localStorage.removeItem("tvg.fol"); });
+    });
+    await step("fol-skip-lead-scope", async () => { // דילוג על פרק (עם ביטול), בורר התראה זהה לחלון התזכורת, ערוצים שלי, וכתובת ההודעה
+      await fresh(); await folKeep(FOL_TITLE); await fresh(); await pushNow(); await page.evaluate(() => { TVG.tab = "rems"; TVG.render(); }); await page.waitForTimeout(500);
+      assert(!/אין תזכורות פעילות/.test(await page.textContent("#main")), "no 'no active reminders' text when follows exist");
+      await page.click(".folrow .go"); await page.waitForTimeout(500);
+      assert(await vis("[data-folsel]"), "same lead select as the reminder sheet"); assert(await vis("[data-foldbl]"), "double-reminder chip"); assert(await vis('[data-folscope="mine"]'), "my-channels scope chip");
+      assert(/הפרק הבא: .+ · /.test(await page.textContent(".meta")), "header has the middle dot between time and channel");
+      await snap("21_fol_sheet_full");
+      await page.click("[data-foldbl]"); await page.waitForTimeout(200); assert((await page.evaluate(() => !!TVG.FOL.filter((x) => !x.x)[0].dbl)), "dbl saved");
+      await page.selectOption("[data-folsel]", "5"); await page.waitForTimeout(200); assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x)[0].lead)) === 5, "lead 5 via select");
+      const n0 = await page.evaluate(() => (TVG.FOL.filter((x) => !x.x)[0].skip || []).length);
+      await page.click("[data-folskip]"); await page.waitForTimeout(300);
+      assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x)[0].skip.length)) === n0 + 1, "episode skipped"); assert(/דילגנו/.test(await page.textContent("#pill")), "skip toast"); await snap("21_fol_skipped");
+      assert(folPosts[folPosts.length - 1].follows.some((x) => (x.skip || []).length === n0 + 1), "skip sent to server");
+      await page.click("[data-pillact]"); await page.waitForTimeout(300); assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x)[0].skip.length)) === n0, "skip undone");
+    });
     await step("fol-from-remsheet", async () => {
       await folSeed(true); await fresh(); await pushNow(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(500);
       const ok = await page.evaluate((t) => { for (const c of TVG.G.channels) { const p = (TVG.by.get(c.id) || []).filter((x) => x.s > new Date() && TVG.folKey(x.title) === TVG.folKey(t))[0]; if (p) { TVG.openRem({ id: c.id, p: p }); return true; } } return false; }, FOL_TITLE);

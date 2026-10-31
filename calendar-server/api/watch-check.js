@@ -4,7 +4,7 @@ import { safeEq } from "./_sig.js";
 import { readJson, writeJson, getSubs, sendTo } from "./_push.js";
 import { listJson, delJson } from "./_db.js";
 import { runCheck } from "./_wcheck.js";
-import { runFollowCheck } from "./_fcheck.js";
+import { runFollowCheck, getGuide, FOLLOW_BUDGET_MS } from "./_fcheck.js";
 import { load } from "./_store.js";
 import { reschedule } from "./_push.js";
 import { SEARCH_TTL } from "./_nfs.js";
@@ -52,11 +52,13 @@ export default async function handler(req, res, d = {}) {
   try {
     // אותו cron, שני שלבים: קודם רענון מעקב הסדרות (תזכורות, חשוב יותר וקל יותר) עם חצי מהזמן, אחר כך בדיקת רשימות המעקב של נטפליקס
     const t0 = Date.now();
+    // הלוח נטען פעם אחת בהרצה ומשותף לשני השלבים. שלב המעקב מוגבל ל-20 שניות (לא מתחיל עבודה חדשה אחריהן), ולבדיקת נטפליקס נשארים 25+
+    let gm = null; const guideOnce = () => (gm = gm || getGuide(d));
     let fo;
     try {
-      fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems) => reschedule(t, rems), deadline: t0 + 40000, ...d, ...(d.follow || {}) });
+      fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems, o) => reschedule(t, rems, o), deadline: t0 + FOLLOW_BUDGET_MS + 10000, ...d, ...(d.follow || {}), guide: guideOnce });
     } catch (e) { console.error("follow-check", e && e.message); fo = { error: true }; }
-    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 60000, ...d });
+    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 60000, ...d, guide: guideOnce });
     r.follow = fo;
     console.log("watch-check", JSON.stringify(r));
     res.setHeader("cache-control", "no-store");

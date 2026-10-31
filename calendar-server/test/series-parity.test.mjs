@@ -41,3 +41,19 @@ test("parity: classify זהה בלקוח ובשרת על 400 סדרות אמית
   ];
   for (const rows of edge) assert.deepEqual(strip(TVG.folClassify(rows)), strip(classify(rows)));
 });
+
+const coreOf = (f, open, close) => { const t = fs.readFileSync(path.join(ROOT, f), "utf8").replace(/\r\n/g, "\n"); return t.slice(t.indexOf(open), t.indexOf(close)); };
+test("parity: קטע <core> זהה במילה בשרת ובלקוח", () => {
+  const a = coreOf("calendar-server/api/_series.js", "// <core>", "// </core>"), b = coreOf("js/series.js", "// <core>", "// </core>").replace(/^ {2}\/\/ <core>/, "// <core>");
+  assert.ok(a.length > 3000); assert.equal(a.replace(/\s+$/, ""), b.replace(/\s+$/, ""));
+});
+test("parity: dayCap / isGeneric / fillTwins / מזהי ערוץ (x14, xi24, xknesset, xkids) זהים", async () => {
+  const S = await import("../api/_series.js");
+  const rows = [{ start: "2026-11-02T09:00", why: "first", epk: "a" }, { start: "2026-11-02T21:00", why: "first", epk: "b" }, { start: "2026-11-03T14:00", why: "live", epk: "c" }, { start: "2026-11-03T20:30", why: "live", epk: "d" }];
+  for (const m of ["new", "all"]) assert.deepEqual(JSON.parse(JSON.stringify(TVG.folDayCap(rows, m))), S.dayCap(rows, m));
+  const many = Array.from({ length: 40 }, (_, i) => ({ start: `2026-11-0${1 + (i % 2)}T${String(6 + (i % 18)).padStart(2, "0")}:${String(i).padStart(2, "0")}`, title: "כללי" }));
+  assert.equal(TVG.folGeneric("כללי", many), S.isGeneric("כללי", many)); assert.equal(TVG.folGeneric("NBA", []), true);
+  const tw = [{ start: "s", title: "t", desc: "d" }, { start: "s", title: "t" }];
+  assert.deepEqual(JSON.parse(JSON.stringify(TVG.folFill(tw))), S.fillTwins(tw));
+  for (const id of ["x14", "xi24", "xknesset", "xkids", "3787", "x", "a14", "1234567", "x1|2"]) assert.equal(TVG.folIdOk(id), S.ID_RE.test(id), id);
+});

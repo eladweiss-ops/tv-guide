@@ -1,12 +1,15 @@
-// מעקב אחרי סדרות: רענון הנגזרות מול הלוח החי (בבקשת POST /api/follow ובבדיקה היומית /api/watch-check), בלי תלות ב-Vercel: הכול מוזרק דרך d.
+// מעקב אחרי סדרות: רענון הנגזרות מול הלוח החי (בבקשת POST /api/follow, בפתיחת האפליקציה, בירי כשהלוח השתנה, ובבדיקה היומית /api/watch-check), בלי תלות ב-Vercel: הכול מוזרק דרך d.
 import { GUIDE_URL, DEADLINE_MARGIN_MS } from "./_wcheck.js";
-import { deriveItems, folPath } from "./_fol.js";
+import { deriveItems, mergeFollows, pruneDerived, activeOf, folPath } from "./_fol.js";
+import { ilToMs } from "./_series.js";
 
 let gCache = { t: 0, g: null };
 export const GUIDE_TTL = 10 * 60000;
+export const FOLLOW_BUDGET_MS = 20000;       // שלב המעקב בבדיקה היומית: לא מתחילים עבודה חדשה אחרי 20 שניות (לנטפליקס נשארים 25+)
+export const PUBLISH_TIMEOUT_MS = 8000;
 export const _resetGuide = () => { gCache = { t: 0, g: null }; };
 
-// הלוח החי (guide.json מ-GitHub Pages), עם מטמון של 10 דקות בזיכרון. כשל = null (המצב הנגזר הקודם נשאר)
+// הלוח החי (guide.json מ-GitHub Pages), עם מטמון של 10 דקות בזיכרון. כשל = הישן אם יש, אחרת null (המצב הנגזר הקודם נשאר)
 export async function getGuide(d = {}) {
   if (d.guide) return d.guide();
   const now = d.now ? d.now() : Date.now();
@@ -16,26 +19,46 @@ export async function getGuide(d = {}) {
     const g = r.ok ? await r.json() : null;
     if (g && Array.isArray(g.programs) && g.programs.length) { gCache = { t: now, g }; return g; }
   } catch (e) { console.error("follow guide", e && e.message); }
-  return gCache.g; // ישן עדיף על כלום
+  return gCache.g;
 }
+export const guideStamp = (g) => String((g && g.updated) || "");
 
-// גוזר מחדש את התזכורות של משתמש אחד, שומר ומסנכרן תזמון. d: {readJson, writeJson, load(t), reschedule(t, rems), guide?, fetch?, now?}
-// מחזיר {n, changed, sch?, stale?}
+// גוזר מחדש את התזכורות של משתמש אחד, שומר ומסנכרן תזמון. d: {readJson, writeJson, load(t), reschedule(t, rems, o), guide?, fetch?, now?, create?, deadline?}
+// הכתיבה: קוראים שוב את המסמך רגע לפני, ממזגים את המעקבים לפי u וכותבים רק derived/chk/gu (מעקבים שהמשתמש שינה בינתיים לא נדרסים)
 export async function refreshUser(t, doc, d) {
   const now = d.now ? d.now() : Date.now();
   const guide = await getGuide(d);
   const rems = await d.load(t);
-  let derived = Array.isArray(doc.derived) ? doc.derived : [], stale = false;
-  if (guide) derived = deriveItems(doc.follows, guide, now, doc.derived, rems);
-  else stale = true;
-  const next = { ...doc, derived, chk: now };
-  if (!guide) next.chk = doc.chk || 0; // לא נחשב כבדיקה שהצליחה
-  const changed = JSON.stringify(derived) !== JSON.stringify(doc.derived || []);
+  const fresh = await d.readJson(folPath(t), null);
+  if (!fresh && !d.create) return { n: 0, changed: false, gone: true }; // המסמך נמחק בינתיים (המשתמש הפסיק לעקוב אחרי הכול)
+  const base = fresh || doc;
+  const follows = fresh ? mergeFollows(doc.follows, fresh.follows, now).follows : doc.follows;
+  let derived = Array.isArray(base.derived) ? base.derived : [];
+  const stale = !guide;
+  if (guide) derived = deriveItems(follows, guide, now, base.derived);
+  derived = pruneDerived(derived, follows); // גם כשהלוח לא נטען: מעקב שנעצר לא יורה
+  const next = { ...base, v: 1, follows, derived, at: base.at || doc.at || now, chk: guide ? now : base.chk || 0, gu: guide ? guideStamp(guide) : base.gu || "" };
+  const changed = JSON.stringify(derived) !== JSON.stringify(base.derived || []);
   await d.writeJson(folPath(t), next);
   const out = { n: derived.length, changed };
   if (stale) out.stale = true;
-  try { out.sch = await d.reschedule(t, rems); } catch (e) { console.error("follow reschedule", e && e.message); out.sch = { error: "schedule failed" }; }
+  try { out.sch = await d.reschedule(t, rems, { deadline: d.deadline ? d.deadline - DEADLINE_MARGIN_MS : 0 }); } catch (e) { console.error("follow reschedule", e && e.message); out.sch = { error: "schedule failed" }; }
   return out;
+}
+
+// גזירה מחדש לפי מה ששמור (בירי כשפריט נגזר כבר לא בלוח, ובפתיחת אפליקציה כשהלוח חדש מהגזירה האחרונה)
+export async function rederive(t, d) {
+  const doc = await d.readJson(folPath(t), null);
+  if (!doc || !activeOf(doc.follows).length) return null;
+  return refreshUser(t, doc, d);
+}
+// האם הלוח הנוכחי חדש ממה שנגזר ממנו
+export async function guideNewer(doc, d) { const g = await getGuide(d); return !!g && !!doc && guideStamp(g) !== String(doc.gu || ""); }
+
+// האם נגזרת עדיין קיימת בלוח הנוכחי (אותו ערוץ, אותו זמן). בלי לוח זמין: כן (לא חוסמים)
+export async function derivedStillAired(item, d) {
+  const g = await getGuide(d); if (!g) return true;
+  return (g.programs || []).some((p) => p && String(p.ch) === String(item.c) && ilToMs(p.start) === item.ts);
 }
 
 export const FOLLOW_RECHECK_MS = 6 * 3600000; // לא מרעננים משתמש שנבדק בשש השעות האחרונות

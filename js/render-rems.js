@@ -12,7 +12,8 @@
     var now = Date.now(), up = TVG.REMS.filter(function (x) { return x.end > now; });
     var pbtn = '<button type="button" class="btn pbtn" data-personal>➕ תזכורת אישית</button>';
     var fh = TVG.folRows ? TVG.folRows() : ""; // 📺 סדרות במעקב: שורה אחת לכל סדרה (series.js)
-    if (!up.length) return TVG.pushCard() + TVG.calCard() + pbtn + fh + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
+    if (!up.length && fh) return TVG.pushCard() + TVG.calCard() + pbtn + fh; // יש מעקב אחרי סדרות: לא כותבים "אין תזכורות פעילות" (הן נגזרות בשרת ולא ברשימה הזו)
+    if (!up.length) return TVG.pushCard() + TVG.calCard() + pbtn + '<h2 class="sech">התזכורות שלי</h2><p class="none">אין תזכורות פעילות. לחיצה על ⏰ ליד תוכנית מוסיפה תזכורת ליומן, והיא תופיע כאן.</p>';
     var h = TVG.pushCard() + TVG.calCard() + pbtn + (TVG.srv() ? "" : '<p class="remnote">ביטול מוריד את התזכורת מכאן ופותח ביומן קובץ ביטול; אם האירוע נשאר ביומן, מוחקים אותו שם.</p>') + fh, last = "";
     up.forEach(function (x) {
       var d = new Date(x.ts), dl = TVG.dayLabel(dstr(d));

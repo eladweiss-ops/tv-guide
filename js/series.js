@@ -7,6 +7,10 @@
   TVG.folAirings = airingsOf;
   TVG.folClassify = classify;
   TVG.folInfo = info;
+  TVG.folDayCap = dayCap;
+  TVG.folFill = fillTwins;
+  TVG.folGeneric = isGeneric;
+  TVG.folIdOk = function (s) { return ID_RE.test(s); };
   TVG.folKey = seriesKey;
   TVG.folOpen = openFol;
   TVG.folOpt = folOpt;
@@ -18,22 +22,56 @@
   TVG.folFind = folFind;
   TVG.folParse = parseTitle;
 
-  // ---------------- מסווג (זהה ל-calendar-server/api/_series.js) ----------------
+  // <core>
+  // ---- מסווג ועזרים (נוסח אחד לשרת ולקוח: calendar-server/api/_series.js ו-js/series.js; test/series-parity.test.mjs בודק שהקטע זהה) ----
+  var ID_RE = /^(x[a-z0-9]{1,12}|\d{1,6})$/; // מזהה ערוץ: מספר, או x14 / xi24 / xknesset / xkids
   function normT(s) { var t = String(s || "").toLowerCase(); try { t = t.normalize("NFD"); } catch (e) {} return t.replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9֐-׿]+/g, ""); }
+  // סימוני שיווק בכותרת ("בכורה:", "חדש !", "- בכורה!", "-חדש בערוץ!", "(חדש)") אינם חלק משם הסדרה
+  function stripMarks(t) {
+    var p = t, i;
+    for (i = 0; i < 3; i++) {
+      p = p.replace(/\s*\(\s*(?:חדש|בכורה|שידור חוזר)\s*!?\s*\)\s*$/, "").replace(/\s*[-–]\s*(?:בכורה|חדש(?: בערוץ)?)\s*!?\s*$/, "").replace(/^(?:בכורה|חדש)\s*[:!]\s*/, "").trim();
+    }
+    return normT(p).length >= 2 ? p : t;
+  }
+  // כותרת תוכנית -> {stem, ep}. ep = מזהה הפרק אם הוא מופיע בכותרת ("הנדר 4 - פרק 130" -> stem "הנדר 4", ep "e130"; "טילדה 2: 7" -> ep "e7").
+  // בכוונה לא חותכים לפי ":" או " - " בכלל (אחרת "NCIS: ההתחלה" ו-"NCIS" היו נבלעות באותה סדרה): רק סימון פרק מפורש בסוף הכותרת
   function parseTitle(title) {
-    var t = String(title || "").replace(/\s+/g, " ").trim();
+    var t = stripMarks(String(title || "").replace(/\s+/g, " ").trim());
     var m = t.match(/^(.*?)\s*[-–]\s*פרק\s*(\d+)\s*$/) || t.match(/^(.*\S)\s+פרק\s*(\d+)\s*$/) || t.match(/^(.*?\S)\s*:\s*(\d{1,4})\s*$/);
-    if (m && normT(m[1]).length >= 2) return { stem: m[1].trim(), ep: "e" + (+m[2]) };
+    if (m && normT(m[1]).length >= 2) return { stem: stripMarks(m[1].trim()), ep: "e" + (+m[2]) };
     m = t.match(/^(.*?)\s*[-–]\s*(?:עונה חדשה|פרק חדש|ספיישל)\s*$/);
-    if (m && normT(m[1]).length >= 2) return { stem: m[1].trim(), ep: "" };
+    if (m && normT(m[1]).length >= 2) return { stem: stripMarks(m[1].trim()), ep: "" };
     return { stem: t, ep: "" };
   }
   function seriesTitle(title) { return parseTitle(title).stem; }
+  // מפתח הסדרה (קצר, בלי "|"): נרמול הגזע. המפתח הוא זהות העוקב, ולכן נגזר רק מהכותרת
   function seriesKey(title) { return normT(seriesTitle(title)).slice(0, 32); }
-  var NEW_RX = /עונה חדשה|פרק חדש|בכורה|חדש!/, RERUN_RX = /ש\.ח|\(שח\)|שידור חוזר|מקוצר/, LIVE_RX = /ישיר|LIVE/i;
+  var NEW_RX = /עונה חדשה|פרק חדש|בכורה|חדש!|\(חדש\)|חדש בערוץ/, RERUN_RX = /ש\.ח|\(שח\)|שידור חוזר|מקוצר/, LIVE_RX = /ישיר|LIVE/i;
+  var MAX_PER_DAY = 1, MAX_PER_DAY_ALL = 4, NEAR_MIN = 20;
+  var GENERIC = ["nba", "חדשות", "סרט", "ספורט", "מבזקחדשות", "מבזק", "חדשותהבוקר", "חדשותהערב", "מהדורתחדשות", "סרטעלילתי", "סדרה", "תוכנית", "פרסומות", "תשדירי"];
+  // כותרות כלליות (NBA, חדשות, סרט, ספורט, או יותר מ-15 שידורים ליום בין הערוצים) הן נושא ולא סדרה: אין "לעקוב אחרי הסדרה" (rows: כל שידורי הכותרת בלוח)
+  function isGeneric(title, rows) {
+    if (GENERIC.indexOf(normT(seriesTitle(title))) >= 0) return true;
+    var days = {}, n = 0, seen = {};
+    (rows || []).forEach(function (r) { var k = r.start + "|" + r.title; if (seen[k]) return; seen[k] = 1; days[String(r.start).slice(0, 10)] = 1; n++; }); // תאומי SD/HD נספרים פעם אחת
+    var d = Object.keys(days).length;
+    return d > 0 && n / d > 15;
+  }
   function dowOf(stamp) { return new Date(Date.UTC(+stamp.slice(0, 4), +stamp.slice(5, 7) - 1, +stamp.slice(8, 10))).getUTCDay(); }
+  function minOf(stamp) { return Date.UTC(+stamp.slice(0, 4), +stamp.slice(5, 7) - 1, +stamp.slice(8, 10), +stamp.slice(11, 13), +stamp.slice(14, 16)) / 60000; }
+  // אותו שידור בערוצים תאומים (אותה שעה ואותה כותרת): התקציר של אחד משלים את השני (למשל "הכוורת": תקציר רק בערוץ אחד)
+  function fillTwins(rows) {
+    var by = {};
+    rows.forEach(function (r) { if (r.desc) by[r.start + "|" + r.title] = by[r.start + "|" + r.title] || r.desc; });
+    return rows.map(function (r) { if (r.desc) return r; var d = by[r.start + "|" + r.title]; if (!d) return r; var o = {}; for (var k in r) o[k] = r[k]; o.desc = d; return o; });
+  }
+  // airings: [{ch, start, title, desc?, rr?, lv?}] של סדרה אחת. מחזיר [{...airing, primary, why, epk}].
+  // כללים: ישיר -> ראשי · rr/"שידור חוזר" -> חוזר · "חדש"/"בכורה" -> ראשי · 00:00-06:00 -> חוזר (חוץ מישיר/חדש מפורש; לא נספר כ"פרק שכבר שודר") ·
+  // אותו פרק (מספר בכותרת, אחרת תקציר מנורמל; תקציר שחוזר 4+ פעמים ב-4+ ימים הוא גנרי) -> המוקדם ראשי, השאר חוזרים ·
+  // בלי מזהה פרק: ראשי רק במשבצת (ערוץ+שעה, ±20 דק׳) של ראשי מוכח; בלי ראיות: משבצת דומיננטית (שעה שכיחה, בלי יום בשבוע; ערב עדיף); 3+ שידורים בשעות שונות בלי שום תקציר = מרתון חוזרות
   function classify(airings) {
-    var out = airings.map(function (a) { var o = {}; for (var k in a) o[k] = a[k]; o.primary = true; o.why = ""; return o; });
+    var out = airings.map(function (a) { var o = {}; for (var k in a) o[k] = a[k]; o.primary = true; o.why = ""; o.epk = ""; return o; });
     var order = out.map(function (_, i) { return i; }).sort(function (i, j) { return out[i].start < out[j].start ? -1 : out[i].start > out[j].start ? 1 : 0; });
     var descN = {}, descDays = {};
     out.forEach(function (a) { var d = normT(a.desc).slice(0, 60); if (d.length >= 12) { descN[d] = (descN[d] || 0) + 1; (descDays[d] = descDays[d] || {})[a.start.slice(0, 10)] = 1; } });
@@ -42,60 +80,88 @@
     var seen = {}, pending = [];
     order.forEach(function (i) {
       var a = out[i], txt = a.title + " " + (a.desc || ""), ep = epOf(a);
+      a.epk = ep;
       if (a.lv === 1 || LIVE_RX.test(a.title)) { a.primary = true; a.why = "live"; if (ep && !seen[ep]) seen[ep] = a.start; return; }
       if (a.rr || RERUN_RX.test(txt)) { a.primary = false; a.why = "rr"; return; }
       if (NEW_RX.test(txt)) { a.primary = true; a.why = "new"; if (ep && !seen[ep]) seen[ep] = a.start; return; }
+      if (+a.start.slice(11, 13) < 6) { a.primary = false; a.why = "night"; return; }
       if (ep) { if (seen[ep] != null && seen[ep] < a.start) { a.primary = false; a.why = "seen"; } else { a.primary = true; a.why = "first"; seen[ep] = a.start; } return; }
       pending.push(i);
     });
     if (pending.length) {
-      var slot = function (a) { return a.ch + "|" + dowOf(a.start) + "|" + a.start.slice(11, 16); };
-      var proven = {}, nProven = 0;
-      out.forEach(function (a) { if (a.primary && (a.why === "live" || a.why === "new" || a.why === "first")) { var s = slot(a); if (!proven[s]) { proven[s] = 1; nProven++; } } });
+      var proven = out.filter(function (a) { return a.primary && (a.why === "live" || a.why === "new" || a.why === "first"); });
+      var near = function (a) { var m = minOf(a.start) % 1440; return proven.some(function (p) { if (p.ch !== a.ch) return false; var d = Math.abs(minOf(p.start) % 1440 - m); return Math.min(d, 1440 - d) <= NEAR_MIN; }); };
+      var slot = function (a) { return a.ch + "|" + a.start.slice(11, 16); };
       var cnt = {}; pending.forEach(function (i) { var s = slot(out[i]); cnt[s] = (cnt[s] || 0) + 1; });
-      var score = function (s) { return cnt[s] + (+s.split("|")[2].slice(0, 2) >= 19 ? 0.5 : 0); };
-      var keys = Object.keys(cnt), best = Math.max.apply(null, keys.map(score)), maxCnt = Math.max.apply(null, keys.map(function (s) { return cnt[s]; }));
-      var daily = function (a) { return a.ch + "|" + a.start.slice(11, 16); }, dn = {};
-      pending.forEach(function (i) { var s = daily(out[i]); dn[s] = (dn[s] || 0) + 1; });
-      var dBest = Math.max.apply(null, Object.keys(dn).map(function (s) { return dn[s]; }));
+      var score = function (s) { return cnt[s] + (+s.split("|")[1].slice(0, 2) >= 19 ? 0.5 : 0); };
+      var ks = Object.keys(cnt), best = Math.max.apply(null, ks.map(score)), maxCnt = Math.max.apply(null, ks.map(function (s) { return cnt[s]; }));
       pending.forEach(function (i) {
         var a = out[i];
-        if (nProven) { a.primary = !!proven[slot(a)]; a.why = a.primary ? "slot" : "slot-rr"; }
+        if (proven.length) { a.primary = near(a); a.why = a.primary ? "slot" : "slot-rr"; }
+        else if (pending.length < 3) { a.primary = true; a.why = "single"; }
         else if (maxCnt >= 2) { a.primary = score(slot(a)) >= best - 1e-9; a.why = a.primary ? "slot" : "slot-rr"; }
-        else if (dBest >= 2) { a.primary = dn[daily(a)] === dBest; a.why = a.primary ? "daily" : "daily-rr"; }
-        else { a.primary = true; a.why = "single"; }
-        if (a.primary && +a.start.slice(11, 13) < 6 && !proven[slot(a)]) { a.primary = false; a.why = "night"; }
+        else { a.primary = false; a.why = "marathon"; }
       });
     }
     return out;
   }
+  // תקרה ליום (שעון ישראל): ברירת מחדל שידור אחד ביום (הבולט: ישיר/חדש, אחר כך ערב, אחר כך המוקדם); שני רק אם שניהם ישיר/חדש מפורש, בהפרש 3 שעות ומפרקים שונים.
+  // mode "all" (גם שידורים חוזרים): עד 4 ביום. rows: [{start, why, epk}] (אחרי סינון ראשי/חוזר); מחזיר את הנבחרים לפי סדר זמן
+  function dayCap(rows, mode) {
+    var by = {}, out = [];
+    rows.forEach(function (r) { (by[r.start.slice(0, 10)] = by[r.start.slice(0, 10)] || []).push(r); });
+    var rank = function (r) { var h = +r.start.slice(11, 13); return ((r.why === "live" || r.why === "new") ? 0 : (r.why === "first" || r.why === "slot" || r.why === "single") ? 2 : 4) + (h >= 19 ? 0 : 1); };
+    Object.keys(by).forEach(function (d) {
+      var arr = by[d].slice().sort(function (a, b) { return rank(a) - rank(b) || (a.start < b.start ? -1 : a.start > b.start ? 1 : 0); });
+      var pick = [arr[0]];
+      for (var i = 1; i < arr.length; i++) {
+        var r = arr[i];
+        if (mode === "all") { if (pick.length < MAX_PER_DAY_ALL && pick.every(function (p) { return Math.abs(minOf(p.start) - minOf(r.start)) >= 30; })) pick.push(r); continue; }
+        var f = pick[0];
+        if (pick.length < 2 && (r.why === "live" || r.why === "new") && (f.why === "live" || f.why === "new") && Math.abs(minOf(f.start) - minOf(r.start)) >= 180 && (!r.epk || r.epk !== f.epk)) pick.push(r);
+      }
+      pick.forEach(function (p) { out.push(p); });
+    });
+    return out.sort(function (a, b) { return a.start < b.start ? -1 : a.start > b.start ? 1 : 0; });
+  }
+  // </core>
 
   // ---------------- שידורי הסדרה בלוח (הלקוח: TVG.by, אחרי איחוד ערוצים) ----------------
   function stamp(d) { return dstr(d) + "T" + hhmm(d); }
-  // title: כותרת הסדרה (או תוכנית ממנה); ch: מזהה ערוץ (מאוחד) או "" לכל הערוצים. מחזיר שידורים עתידיים מסווגים: [{c, p, ts, primary, why}]
-  function airingsOf(title, ch) {
+  function group(ch) { // כל מזהי הערוצים הגולמיים של ערוץ מאוחד (השרת מסנן לפיהם)
+    var ids = Object.keys(TVG.IDMAP || {}).filter(function (id) { return TVG.IDMAP[id] === ch; });
+    if (ids.indexOf(ch) < 0) ids.push(ch);
+    return ids;
+  }
+  function leadSet(f) { // chs גולמיים -> קבוצת ערוצים מאוחדים (או null = כל הערוצים)
+    if (!f || !f.chs || !f.chs.length) return null;
+    var s = {}; f.chs.forEach(function (id) { s[(TVG.IDMAP && TVG.IDMAP[id]) || id] = 1; });
+    return s;
+  }
+  function allRows(title) { // כל שידורי הכותרת (גם בעבר), לכל הערוצים: לזיהוי כותרת כללית
     var k = normT(seriesTitle(title)), rows = [];
-    if (!k || !TVG.by) return [];
-    TVG.G.channels.forEach(function (c) {
-      if (ch && c.id !== ch) return;
-      (TVG.by.get(c.id) || []).forEach(function (p) { if (normT(parseTitle(p.title).stem) === k) rows.push({ ch: c.id, start: stamp(p.s), title: p.title, desc: p.desc, rr: p.rr ? 1 : 0, lv: p.lv === 1 ? 1 : 0, _c: c, _p: p }); });
-    });
-    var now = Date.now();
-    return classify(rows).map(function (a) { return { c: a._c, p: a._p, ts: TVG.ilTs(a._p.s), primary: a.primary, why: a.why }; })
+    if (!k || !TVG.by) return rows;
+    TVG.G.channels.forEach(function (c) { (TVG.by.get(c.id) || []).forEach(function (p) { if (normT(parseTitle(p.title).stem) === k) rows.push({ ch: c.id, start: stamp(p.s), title: p.title, desc: p.desc, rr: p.rr ? 1 : 0, lv: p.lv === 1 ? 1 : 0, _c: c, _p: p }); }); });
+    return rows;
+  }
+  // title: כותרת הסדרה (או תוכנית ממנה); set: קבוצת ערוצים מאוחדים או null. מחזיר שידורים עתידיים מסווגים: [{c, p, ts, primary, why, start, epk}]
+  function airingsOf(title, set) {
+    var rows = allRows(title).filter(function (r) { return !set || set[r.ch]; }), now = Date.now();
+    return classify(fillTwins(rows)).map(function (a) { return { c: a._c, p: a._p, ts: TVG.ilTs(a._p.s), primary: a.primary, why: a.why, start: a.start, epk: a.epk }; })
       .filter(function (a) { return a.ts > now; }).sort(function (x, y) { return x.ts - y.ts; });
   }
-  // {n: שידורים עתידיים, prim: מתוכם ראשיים, chans: ערוצים שונים}
-  function info(title, ch) {
-    var a = airingsOf(title, ch || ""), cs = {};
+  // {n: שידורים עתידיים בכל הערוצים, chans: ערוצים שונים, generic: כותרת כללית (נושא, לא סדרה)}
+  function info(title, set) {
+    var a = airingsOf(title, set || null), cs = {};
     a.forEach(function (x) { cs[x.c.id] = 1; });
-    return { n: a.length, prim: a.filter(function (x) { return x.primary; }).length, chans: Object.keys(cs).length };
+    return { n: a.length, chans: Object.keys(cs).length, generic: isGeneric(title, allRows(title)) };
   }
-  function nextOf(f, limit) {
-    var seen = {}, out = [];
-    airingsOf(f.title, f.ch || "").forEach(function (a) {
-      if (f.mode !== "all" && !a.primary) return;
-      if (seen[a.ts]) return; seen[a.ts] = 1; out.push(a);
-    });
+  // ברירת המחדל לשידורים של מעקב: ראשיים בלבד (או הכול), שידור אחד לערוץ-זמן, תקרה ליום; skip = דילוגים (ts) שהמשתמש ביקש
+  function nextOf(f, limit, withSkipped) {
+    var seen = {}, rows = [], skip = f.skip || [];
+    airingsOf(f.title, leadSet(f)).forEach(function (a) { if ((f.mode === "all" || a.primary) && !seen[a.ts]) { seen[a.ts] = 1; rows.push(a); } });
+    var out = dayCap(rows, f.mode === "all" ? "all" : "new").map(function (a) { a.skipped = skip.indexOf(a.ts) >= 0; return a; });
+    if (!withSkipped) out = out.filter(function (a) { return !a.skipped; });
     return limit ? out.slice(0, limit) : out;
   }
   var SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "שבת"];
@@ -107,7 +173,7 @@
   function bd(s) { return "<bdi>" + esc(TVG.bidi(s)) + "</bdi>"; }
 
   // ---------------- מצב ----------------
-  var TOMB_MS = 30 * 86400000;
+  var TOMB_MS = 30 * 86400000, MAX = 30, MAX_SKIP = 40, MAX_CHS = 64;
   TVG.FOL = [];
   (function () {
     try {
@@ -122,23 +188,19 @@
   function save() { TVG.store("tvg.fol", JSON.stringify(TVG.FOL)); }
   function folFind(k) { for (var i = 0; i < TVG.FOL.length; i++) if (TVG.FOL[i].k === k && !TVG.FOL[i].x) return TVG.FOL[i]; return null; }
   function active() { return TVG.FOL.filter(function (x) { return !x.x; }); }
-  function put(f) { // upsert לפי מפתח
-    TVG.FOL = TVG.FOL.filter(function (x) { return x.k !== f.k; }); TVG.FOL.push(f); save();
-  }
-  var MAX = 30;
+  function put(f) { TVG.FOL = TVG.FOL.filter(function (x) { return x.k !== f.k; }); TVG.FOL.push(f); save(); }
+  function scopeOf(f) { return f.ch ? "ch" : f.chs && f.chs.length ? "mine" : "all"; }
+  function mineChs() { var out = []; TVG.chans().forEach(function (c) { group(c.id).forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); }); }); return out.slice(0, MAX_CHS); }
+  function hasSel() { return !!(TVG.sel && TVG.sel.size); }
 
   // ---------------- סנכרון ----------------
-  function chGroup(ch) { // כל מזהי הערוצים הגולמיים של הערוץ המאוחד (השרת מסנן לפיהם)
-    if (!ch) return [];
-    var ids = Object.keys(TVG.IDMAP || {}).filter(function (id) { return TVG.IDMAP[id] === ch; });
-    if (ids.indexOf(ch) < 0) ids.push(ch);
-    return ids.slice(0, 16);
-  }
   function wire() { // מה שנשלח לשרת: בלי שדות מקומיים
+    var now = Date.now();
     return TVG.FOL.map(function (f) {
       var o = { title: f.title, u: f.u };
       if (f.x) { o.x = 1; return o; }
-      o.mode = f.mode; o.lead = f.lead; o.ch = f.ch || ""; o.chn = f.chn || ""; o.chs = f.ch ? chGroup(f.ch) : [];
+      o.mode = f.mode; o.lead = f.lead; o.ch = f.ch || ""; o.chn = f.chn || ""; o.chs = (f.chs || []).slice(0, MAX_CHS);
+      o.skip = (f.skip || []).filter(function (t) { return t > now - 86400000; }).slice(-MAX_SKIP);
       if (f.dbl) o.dbl = 1;
       return o;
     });
@@ -153,14 +215,17 @@
       var n = { k: k, title: String(s.title).slice(0, 80), u: +s.u || Date.now() };
       if (s.x) n.x = 1;
       else {
-        n.mode = s.mode === "all" ? "all" : "new"; n.lead = Number.isFinite(+s.lead) ? +s.lead : 10; n.ch = s.ch || ""; n.chn = s.chn || "";
+        n.mode = s.mode === "all" ? "all" : "new"; n.lead = Number.isFinite(+s.lead) ? +s.lead : 10; n.ch = s.ch || ""; n.chn = s.chn || ""; n.chs = Array.isArray(s.chs) ? s.chs.slice(0, MAX_CHS) : []; n.skip = Array.isArray(s.skip) ? s.skip : [];
         if (s.dbl) n.dbl = 1;
-        if (n.ch && TVG.by && !TVG.by.has(n.ch)) n.ch = TVG.IDMAP && TVG.IDMAP[n.ch] || ""; // ערוץ שלא קיים אצלנו: לכל הערוצים
       }
       TVG.FOL = TVG.FOL.filter(function (x) { return x.k !== k; }); TVG.FOL.push(n); changed = true;
     });
     if (changed) save();
     return changed;
+  }
+  function newerLocal(list) { // יש אצלנו רשומה חדשה (u) ממה שבשרת?
+    var by = {}; (list || []).forEach(function (s) { if (s && typeof s.title === "string") by[seriesKey(s.title)] = +s.u || 0; });
+    return TVG.FOL.some(function (x) { return by[x.k] == null || by[x.k] < (+x.u || 0); });
   }
   // POST של כל הרשימה. מחזיר Promise<{ok, status}>. בלי פוש אין תזכורות אוטומטיות: נשמר מקומית ויעלה כשיופעלו התראות (folSync נקרא מ-push.js)
   function folSync() {
@@ -178,32 +243,43 @@
       })
       .catch(function (e) { TVG.store("tvg.folDirty", "1"); return { ok: false, status: +e || 0 }; });
   }
-  function folPull() { // בעליית האפליקציה: מביאים את הרשימה מהשרת וממזגים (דו-כיווני לפי u)
+  function folPull() { // בעליית האפליקציה: מביאים את הרשימה מהשרת (השרת גם גוזר מחדש אם הלוח התעדכן) וממזגים דו-כיוונית לפי u
     if (!TVG.pushOn || !TVG.calTok) return;
     fetch(API + "/api/follow?t=" + encodeURIComponent(TVG.calTok), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !Array.isArray(j.follows)) return;
-      var ch = mergeIn(j.follows);
+      var local = newerLocal(j.follows), ch = mergeIn(j.follows);
       if (ch && TVG.G) TVG.render();
-      if (TVG.store("tvg.folDirty") === "1" || (TVG.FOL.length && !j.follows.length)) folSync();
+      if (TVG.store("tvg.folDirty") === "1" || local || (TVG.FOL.length && !j.follows.length)) folSync();
     }).catch(function () {});
   }
   if (TVG.store("tvg.folDirty") === "1" && TVG.pushOn) setTimeout(folSync, 4500);
   else if (TVG.pushOn) setTimeout(folPull, 3500);
 
   // ---------------- החלון התחתון ----------------
-  var FS = null; // {title, ch, chn, mode, lead, dbl, existing, origin: מזהה ערוץ שממנו הגענו}
+  var FS = null; // {title, scope: mine|all|ch, ch, mode, lead, dbl, skip, existing, origin}
   function show(html) { $("#remBody").innerHTML = html; $("#rem").hidden = false; $("#scrim2").hidden = false; }
+  function fakeF() { return { title: FS.title, mode: FS.mode, ch: FS.scope === "ch" ? FS.ch : "", chs: FS.scope === "ch" ? group(FS.ch) : FS.scope === "mine" ? mineChs() : [], skip: FS.skip || [] }; }
   function openFol(title, origin) {
     var k = seriesKey(title), ex = folFind(k);
     TVG.rem = null; TVG.LP = null;
-    FS = ex ? { title: ex.title, ch: ex.ch || "", chn: ex.chn || "", mode: ex.mode, lead: ex.lead, dbl: !!ex.dbl, existing: true, origin: ex.ch || origin || "" }
-            : { title: seriesTitle(title), ch: "", chn: "", mode: "new", lead: TVG.lead != null ? TVG.lead : 10, dbl: false, existing: false, origin: origin || "" };
+    if (ex) FS = { title: ex.title, scope: scopeOf(ex), ch: ex.ch || origin || "", mode: ex.mode, lead: ex.lead, dbl: !!ex.dbl, skip: (ex.skip || []).slice(), existing: true, origin: ex.ch || origin || "" };
+    else {
+      FS = { title: seriesTitle(title), scope: "all", ch: origin || "", mode: "new", lead: TVG.lead != null ? TVG.lead : 10, dbl: false, skip: [], existing: false, origin: origin || "" };
+      // ברירת מחדל: הערוצים שבחרתי (אם יש בחירה ולסדרה יש בהם שידורים), אחרת כל הערוצים
+      if (hasSel()) { FS.scope = "mine"; if (!nextOf(fakeF(), 1, true).length) FS.scope = "all"; }
+    }
     draw();
   }
-  function leadChips() {
-    var L = [[0, "בהתחלה"], [10, "10 דק׳"], [30, "30 דק׳"], [60, "שעה"]];
-    return '<div class="lbl">מתי להזכיר?</div><div class="chips lp" role="group" aria-label="מתי להזכיר">' + L.map(function (l) {
-      return '<button type="button" class="chip" data-folead="' + l[0] + '" aria-pressed="' + (FS.lead === l[0]) + '">' + l[1] + "</button>"; }).join("") + "</div>";
+  function leadChips() { // אותן אפשרויות ואותו ניסוח כמו בחלון התזכורת (reminder-sheet.js), כולל "בתחילת השידור" ו"וגם בתחילת השידור"
+    var O = TVG.leadOpts, cur = FS.lead, inMore = O.more.indexOf(cur) >= 0, std = O.std(cur);
+    var h = '<div class="lbl">מתי להזכיר?</div><div class="chips lp" role="group" aria-label="מתי להזכיר">' + O.main.map(function (m) {
+      return '<button type="button" class="chip" data-folead="' + m + '" aria-pressed="' + (cur === m) + '">' + esc(O.name(m).replace(" לפני", "")) + "</button>";
+    }).join("");
+    if (!std) h += '<button type="button" class="chip" data-folead="' + cur + '" aria-pressed="true">' + cur + " דק׳</button>";
+    h += '<label class="lpsel' + (inMore ? " on" : "") + '"><select data-folsel aria-label="עוד אפשרויות"><option value=""' + (inMore ? "" : " selected") + ">עוד</option>" +
+      O.more.map(function (m) { return '<option value="' + m + '"' + (cur === m ? " selected" : "") + ">" + esc(O.short(m)) + "</option>"; }).join("") + "</select></label></div>";
+    if (cur > 0) h += '<div class="chips lp"><button type="button" class="chip" data-foldbl aria-pressed="' + !!FS.dbl + '">🔔 וגם בתחילת השידור</button></div>';
+    return h;
   }
   function pushNote() {
     if (TVG.pushOn) return "";
@@ -211,43 +287,45 @@
     if (TVG.canPush) return '<p class="credit">כדי שנזכיר לך גם כשהאפליקציה סגורה צריך התראות.</p><button type="button" class="ghost sm" data-pushon>🔔 הפעלת התראות</button>';
     return '<p class="credit">המכשיר הזה לא תומך בהתראות, ולכן לא נוכל להזכיר אוטומטית.</p>';
   }
+  function scopeChips() {
+    var opts = [];
+    if (hasSel()) opts.push(["mine", "הערוצים שלי"]);
+    opts.push(["all", "כל הערוצים"]);
+    if (FS.origin && TVG.chName(FS.origin)) opts.push(["ch", "רק ב־" + bd(TVG.chName(FS.origin))]);
+    if (opts.length < 2) return "";
+    return '<div class="lbl">באילו ערוצים?</div><div class="chips lp" role="group" aria-label="באילו ערוצים">' + opts.map(function (o) {
+      return '<button type="button" class="chip" data-folscope="' + o[0] + '" aria-pressed="' + (FS.scope === o[0]) + '">' + (o[0] === "ch" ? o[1] : esc(o[1])) + "</button>"; }).join("") + "</div>";
+  }
   function draw() {
-    var f = FS, nx = nextOf(f, 3), inf = info(f.title, f.ch), first = nx[0];
-    var h = "<h2>📺 " + bd(f.title) + "</h2>";
-    h += '<div class="meta">' + (first ? "<span>הפרק הבא: " + esc(when(first.p)) + "</span><span>" + bd(TVG.chName(first.c.id)) + "</span>" : "<span>אין עכשיו שידורים בלוח</span>") + "</div>";
+    var f = fakeF(), nx = nextOf(f, 3, true), first = nextOf(f, 1)[0];
+    var h = "<h2>📺 " + bd(FS.title) + "</h2>";
+    h += '<div class="meta">' + (first ? "<span>הפרק הבא: " + esc(when(first.p)) + " · " + bd(TVG.chName(first.c.id)) + "</span>" : "<span>אין עכשיו שידורים בלוח</span>") + "</div>";
     h += '<div class="lbl">אילו שידורים?</div><div class="chips lp" role="group" aria-label="אילו שידורים">' +
-      '<button type="button" class="chip" data-folmode="new" aria-pressed="' + (f.mode !== "all") + '">רק פרקים חדשים</button>' +
-      '<button type="button" class="chip" data-folmode="all" aria-pressed="' + (f.mode === "all") + '">גם שידורים חוזרים</button></div>';
-    var oc = f.origin || f.ch;
-    if (oc && (info(f.title, "").chans >= 2 || f.ch)) {
-      var cn = TVG.chName(oc);
-      h += '<div class="chips lp" role="group" aria-label="באיזה ערוץ">' +
-        '<button type="button" class="chip" data-folch="" aria-pressed="' + (!f.ch) + '">בכל הערוצים</button>' +
-        '<button type="button" class="chip" data-folch="' + esc(oc) + '" aria-pressed="' + (f.ch === oc) + '">רק ב־' + bd(cn) + "</button></div>";
-    }
-    h += leadChips();
+      '<button type="button" class="chip" data-folmode="new" aria-pressed="' + (FS.mode !== "all") + '">רק פרקים חדשים</button>' +
+      '<button type="button" class="chip" data-folmode="all" aria-pressed="' + (FS.mode === "all") + '">גם שידורים חוזרים</button></div>';
+    h += scopeChips() + leadChips();
     if (nx.length) {
       h += '<div class="lbl">הפרקים הקרובים</div><ul class="folnext">' + nx.map(function (a) {
-        return "<li><span class=\"fw\">" + esc(when(a.p)) + '</span><span class="fc">' + bd(TVG.chName(a.c.id)) + '</span><span class="ft">' + (a.primary ? "✨ חדש" : "🔁 חוזר") + "</span></li>";
-      }).join("") + "</ul>";
-    } else if (inf.n === 0) h += '<p class="remnote">אין כרגע שידורים קרובים. נזכיר לך ברגע שיעלו ללוח.</p>';
-    else h += '<p class="remnote">אין כרגע ' + (f.mode === "all" ? "שידורים" : "פרקים חדשים") + " בלוח. נזכיר לך ברגע שיעלו.</p>";
+        return '<li><button type="button" class="fskip' + (a.skipped ? " off" : "") + '" data-folskip="' + a.ts + '" aria-label="' + (a.skipped ? "החזרת הפרק" : "דילוג על הפרק הזה") + ": " + esc(when(a.p)) + '"><span class="fw">' + esc(when(a.p)) + '</span><span class="fc">' + bd(TVG.chName(a.c.id)) + '</span><span class="ft">' + (a.skipped ? "דילגנו" : a.primary ? "✨ חדש" : "🔁 חוזר") + "</span></button></li>";
+      }).join("") + '</ul><p class="credit">הקשה על פרק מדלגת עליו (ועוד הקשה מחזירה אותו).</p>';
+    } else h += '<p class="remnote">אין כרגע ' + (FS.mode === "all" ? "שידורים" : "פרקים חדשים") + " בלוח. נזכיר לך ברגע שיעלו.</p>";
     h += pushNote();
-    h += f.existing
+    // הכפתורים נצמדים לתחתית החלון (הרשימה מעליהם גוללת): כפתור ראשי אחד תמיד בהישג אגודל
+    h += '<div class="folbar">' + (FS.existing
       ? '<button type="button" class="btn" data-remclose>סיום</button><button type="button" class="ghost" data-folstop>הפסק לעקוב</button>'
-      : '<button type="button" class="btn" data-folgo>📺 לעקוב אחרי הסדרה</button><button type="button" class="ghost" data-remclose>ביטול</button>';
+      : '<button type="button" class="btn" data-folgo>📺 לעקוב אחרי הסדרה</button><button type="button" class="ghost" data-remclose>ביטול</button>') + "</div>";
     show(h);
   }
+  function applyTo(f) { var x = fakeF(); f.mode = FS.mode; f.lead = FS.lead; f.dbl = FS.dbl && FS.lead > 0 ? 1 : 0; if (!f.dbl) delete f.dbl; f.ch = x.ch; f.chn = x.ch ? TVG.chName(x.ch) : ""; f.chs = x.chs; f.skip = FS.skip.slice(-MAX_SKIP); f.u = Date.now(); }
   function applyChange() { // שינוי הגדרה בסדרה שכבר במעקב: נשמר מיד
     if (!FS.existing) return;
     var f = folFind(seriesKey(FS.title)); if (!f) return;
-    f.mode = FS.mode; f.lead = FS.lead; f.ch = FS.ch; f.chn = FS.ch ? TVG.chName(FS.ch) : ""; f.u = Date.now(); save(); folSync(); TVG.render();
+    applyTo(f); save(); folSync(); TVG.render();
   }
   function go() {
-    var f = FS, k = seriesKey(f.title);
-    if (active().length >= MAX && !folFind(k)) { TVG.pill("אפשר לעקוב אחרי עד " + MAX + " סדרות", 2400); return; }
-    put({ k: k, title: f.title, mode: f.mode, lead: f.lead, ch: f.ch, chn: f.ch ? TVG.chName(f.ch) : "", u: Date.now() });
-    var title = f.title;
+    var k = seriesKey(FS.title), title = FS.title;
+    if (active().length >= MAX && !folFind(k)) { TVG.pill("הגעת למקסימום " + MAX + " סדרות. אפשר להפסיק מעקב אחרי סדרה אחרת", 4000); return; }
+    var f = { k: k, title: title }; applyTo(f); put(f);
     TVG.closeRem(); TVG.render();
     folSync().then(function (r) { toastAdded(title, r); });
   }
@@ -255,7 +333,8 @@
   // הודעה אחרי "לעקוב": בלי פוש לא כותבים "נזכיר לך" (זה לא נכון) אלא הסבר ישר
   function toastAdded(title, r) {
     var k = seriesKey(title), undo = function () { undoAdd(k); TVG.pill("בוטל", 1200); };
-    if (r && r.ok) { TVG.pill("📺 נזכיר לך על כל פרק חדש" + (r.capped ? "" : ""), 4500, "ביטול", undo); return; }
+    if (r && r.ok && r.capped) { undoAdd(k); TVG.pill("הגעת למקסימום " + MAX + " סדרות, אז הסדרה הזו לא נוספה", 5000); return; }
+    if (r && r.ok) { TVG.pill("📺 נזכיר לך על כל פרק חדש", 4500, "ביטול", undo); return; }
     if (TVG.pushOn && r && r.status === 403) { TVG.pill("נשמר, אבל ההתראות לא פעילות במכשיר הזה, אז לא נוכל להזכיר", 6500, "ביטול", undo); return; }
     if (TVG.pushOn) { TVG.pill("נשמר. יסונכרן כשיהיה חיבור", 4500, "ביטול", undo); return; }
     if (TVG.isIOS && !TVG.isStandalone) { TVG.pill("נשמר, אבל התראות אוטומטיות עובדות רק מהאפליקציה שבמסך הבית", 6500, "ביטול", undo); return; }
@@ -264,20 +343,31 @@
   }
   function stop() {
     var k = seriesKey(FS.title), f = folFind(k); if (!f) { TVG.closeRem(); return; }
-    var back = { k: f.k, title: f.title, mode: f.mode, lead: f.lead, ch: f.ch, chn: f.chn, dbl: f.dbl };
+    var back = JSON.parse(JSON.stringify(f));
     put({ k: k, title: f.title, x: 1, u: Date.now() });
     TVG.closeRem(); TVG.render(); folSync();
     TVG.pill("הפסקת לעקוב אחרי " + f.title, 5000, "החזר", function () {
       if (folFind(k)) return;
-      back.u = Date.now(); put(back); folSync(); TVG.render(); TVG.pill("חזרנו לעקוב ✓", 1400);
+      back.u = Date.now(); delete back.x; put(back); folSync(); TVG.render(); TVG.pill("חזרנו לעקוב ✓", 1400);
+    });
+  }
+  function toggleSkip(ts) { // דילוג על פרק אחד (או החזרתו), עם ביטול
+    var i = FS.skip.indexOf(ts), adding = i < 0;
+    if (adding) FS.skip.push(ts); else FS.skip.splice(i, 1);
+    applyChange(); draw();
+    TVG.pill(adding ? "דילגנו על הפרק הזה" : "הפרק חזר לרשימה", 4500, "ביטול", function () {
+      var j = FS.skip.indexOf(ts); if (adding && j >= 0) FS.skip.splice(j, 1); else if (!adding && j < 0) FS.skip.push(ts);
+      applyChange(); if (!$("#rem").hidden && FS) draw();
     });
   }
 
   // ---------------- נקודות כניסה ----------------
-  // בחלון התזכורת של תוכנית: אפשרות משנית כשהתוכנית שייכת לסדרה עם 2+ שידורים קרובים
+  function eligible(title) { if (!TVG.by || !seriesKey(title)) return false; var i = info(title, null); return i.n >= 2 && !i.generic; }
+  TVG.folEligible = eligible;
+  // בחלון התזכורת של תוכנית: אפשרות משנית כשהתוכנית שייכת לסדרה עם 2+ שידורים קרובים (לא כותרת כללית)
   function folOpt(p, cid) {
-    if (!p || !TVG.by || info(p.title, "").n < 2) return "";
-    var k = seriesKey(p.title); if (!k) return "";
+    if (!p || !eligible(p.title)) return "";
+    var k = seriesKey(p.title);
     return folFind(k) ? '<button type="button" class="ghost" data-folopen="' + esc(k) + '">✓ במעקב · ניהול</button>'
       : '<button type="button" class="ghost" data-folnew="' + esc(seriesTitle(p.title)) + '" data-folch0="' + esc(cid || "") + '">📺 לעקוב אחרי כל הפרקים</button>';
   }
@@ -292,11 +382,16 @@
   }
   // תזכורת שנגזרה (f|סדרה|ערוץ|ts) לחלון הנודניק: מוצאים את התוכנית בלוח
   function folRem(k) {
-    var m = /^f\|[^|]*\|(\d{1,6})\|(\d{10,14})$/.exec(String(k || "")); if (!m || !TVG.by) return null;
+    var m = /^f\|[^|]*\|([^|]+)\|(\d{10,14})$/.exec(String(k || "")); if (!m || !ID_RE.test(m[1]) || !TVG.by) return null;
     var id = (TVG.IDMAP && TVG.IDMAP[m[1]]) || m[1], ts = +m[2], p = (TVG.by.get(id) || []).filter(function (x) { return TVG.ilTs(x.s) === ts; })[0];
     return p ? { k: k, ts: ts, end: TVG.ilTs(p.e), title: p.title, ch: TVG.chName(id), id: id } : null;
   }
 
+  document.addEventListener("change", function (e) {
+    var t = e.target; if (!t || !t.matches || !t.matches("[data-folsel]") || !FS || $("#rem").hidden) return;
+    var v = t.value; if (v === "") return;
+    FS.lead = +v; if (!(FS.lead > 0)) FS.dbl = false; applyChange(); draw();
+  });
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t.closest) return;
     var nw = t.closest("[data-folnew]");
@@ -305,8 +400,10 @@
     if (op) { var f = folFind(op.getAttribute("data-folopen")); if (f) openFol(f.title, f.ch); return; }
     if (!FS || $("#rem").hidden) return;
     var md = t.closest("[data-folmode]"); if (md) { FS.mode = md.getAttribute("data-folmode") === "all" ? "all" : "new"; applyChange(); draw(); return; }
-    var ld = t.closest("[data-folead]"); if (ld) { FS.lead = +ld.getAttribute("data-folead"); applyChange(); draw(); return; }
-    var ch = t.closest("[data-folch]"); if (ch) { FS.ch = ch.getAttribute("data-folch") || ""; FS.chn = FS.ch ? TVG.chName(FS.ch) : ""; applyChange(); draw(); return; }
+    var ld = t.closest("[data-folead]"); if (ld) { FS.lead = +ld.getAttribute("data-folead"); if (!(FS.lead > 0)) FS.dbl = false; applyChange(); draw(); return; }
+    if (t.closest("[data-foldbl]")) { FS.dbl = !FS.dbl; applyChange(); draw(); return; }
+    var sc = t.closest("[data-folscope]"); if (sc) { FS.scope = sc.getAttribute("data-folscope"); if (FS.scope === "ch" && !FS.ch) FS.ch = FS.origin; applyChange(); draw(); return; }
+    var sk = t.closest("[data-folskip]"); if (sk) { toggleSkip(+sk.getAttribute("data-folskip")); return; }
     if (t.closest("[data-folgo]")) { go(); return; }
     if (t.closest("[data-folstop]")) { stop(); return; }
   });

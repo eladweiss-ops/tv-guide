@@ -5,7 +5,7 @@ import { okToken, load } from "./_store.js";
 import { readJson, writeJson, getSubs, reschedule } from "./_push.js";
 import { delJson } from "./_db.js";
 import { mergeFollows, folPath } from "./_fol.js";
-import { refreshUser } from "./_fcheck.js";
+import { refreshUser, rederive, guideNewer } from "./_fcheck.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
 export const MAX_BODY = 32768;
@@ -14,8 +14,16 @@ export const MAX_BODY = 32768;
 export async function handleFollow(method, input, d = {}) {
   const rj = d.readJson || readJson, wj = d.writeJson || writeJson, dj = d.delJson || delJson, gs = d.getSubs || getSubs;
   if (!okToken(input.t)) return { status: 400, json: { error: "bad token" } };
+  const deps = () => ({ ...d, readJson: rj, writeJson: wj, load: d.load || load, reschedule: d.reschedule || ((t, rems, o) => reschedule(t, rems, o)) });
   if (method === "GET") {
-    const cur = await rj(folPath(input.t), null);
+    let cur = await rj(folPath(input.t), null);
+    // פתיחת אפליקציה: אם הלוח התעדכן מאז הגזירה האחרונה, גוזרים מחדש (מי שיש לו מנוי פוש וסדרות פעילות)
+    if (cur && Array.isArray(cur.follows) && cur.follows.some((f) => f && !f.x) && d.refresh !== false) {
+      try {
+        const subs = await gs(input.t);
+        if (Array.isArray(subs) && subs.length && (await guideNewer(cur, d))) { await rederive(input.t, deps()); cur = (await rj(folPath(input.t), null)) || cur; }
+      } catch (e) { console.error("follow GET refresh", e && e.message); }
+    }
     return { status: 200, json: { follows: (cur && Array.isArray(cur.follows) ? cur.follows : []) } };
   }
   // כתיבה רק למי שיש לו מנוי פוש: בלי פוש אין תזכורות אוטומטיות, וזה גם חוסם יצירת מסמכים ע"י טוקנים אקראיים
@@ -27,11 +35,11 @@ export async function handleFollow(method, input, d = {}) {
   const active = follows.filter((f) => !f.x).length;
   if (!follows.length) { // אין כלום (גם לא מחיקות אחרונות): מוחקים את המסמך ומבטלים תזמונים
     if (cur.follows && cur.follows.length) await dj(folPath(input.t));
-    let sch; try { sch = await (d.reschedule || ((t, rems) => reschedule(t, rems)))(input.t, await (d.load || load)(input.t)); } catch (e) { sch = { error: "schedule failed" }; }
+    let sch; try { sch = await (d.reschedule || ((t, rems, o) => reschedule(t, rems, o)))(input.t, await (d.load || load)(input.t), {}); } catch (e) { sch = { error: "schedule failed" }; }
     return { status: 200, json: { ok: true, n: 0, follows: [], sch } };
   }
   const doc = { v: 1, follows, derived: Array.isArray(cur.derived) ? cur.derived : [], at: now, chk: cur.chk || 0 };
-  const r = await refreshUser(input.t, doc, { ...d, readJson: rj, writeJson: wj, load: d.load || load, reschedule: d.reschedule || ((t, rems) => reschedule(t, rems)) });
+  const r = await refreshUser(input.t, doc, { ...deps(), create: true });
   const out = { ok: true, n: active, follows, next: r.n };
   if (capped) out.capped = capped;
   if (r.stale) out.stale = true;

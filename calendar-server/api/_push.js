@@ -4,7 +4,7 @@ import { readJson, writeJson } from "./_db.js";
 import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
 import { wantedSchedule, START_SUFFIX } from "./_rems.js";
-import { withDerived, isDerKey, folPath } from "./_fol.js";
+import { withDerived, isDerKey, folPath, pruneDerived } from "./_fol.js";
 export { remPayload };
 
 export { readJson, writeJson }; // נשארים מיוצאים מכאן (snooze.js, בדיקות); המימוש ב-_db.js
@@ -48,7 +48,7 @@ export async function reschedule(t, rems, d = {}) {
   if (!q || q.d !== day) q = { d: day, n: 0 };
   // תזכורות שנגזרו ממעקב אחרי סדרות (fol/<t>) מצטרפות לאותו תקציב (60 מתוזמנות, 300 פרסומים ביום); של המשתמש קודמות
   let fol = null; if (subs.length) { try { fol = await rj(folPath(t), null); } catch (e) { console.error("reschedule fol", e && e.message); } }
-  if (fol && Array.isArray(fol.derived) && fol.derived.length) rems = withDerived(rems, fol.derived, now);
+  if (fol && Array.isArray(fol.derived) && fol.derived.length) rems = withDerived(rems, pruneDerived(fol.derived, fol.follows), now); // רק של מעקבים פעילים
   let want = subs.length ? wantedSchedule(rems, now) : {}; // כולל הודעות k#s (תחילת שידור)
   const noNew = new Set(rems.filter((r) => r.stOnly).map((r) => r.k + START_SUFFIX)); // stOnly: רק משאירים k#s קיימת, לא מפרסמים
   for (const k of Object.keys(want)) if (fired[k] && Math.abs(fired[k].at - want[k]) < 60000) delete want[k];
@@ -70,9 +70,10 @@ export async function reschedule(t, rems, d = {}) {
     if (noNew.has(k)) continue;
     if (q.n >= MAX_PUBLISH_DAY) { limited = true; break; }
     if (isDerKey(k) && q.n >= MAX_PUBLISH_DAY - DER_RESERVE) { limited = true; continue; }
+    if (d.deadline && Date.now() > d.deadline) { limited = "time"; break; } // ההמשך יתוזמן בהרצה/שמירה הבאה
     q.n++;
     const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
-      method: "POST",
+      method: "POST", signal: !d.fetch && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
       headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2" },
       body: JSON.stringify(k.endsWith(START_SUFFIX) ? { t, k: k.slice(0, -START_SUFFIX.length), at, st: 1 } : { t, k, at }), // st: התראת תחילת שידור
     });
@@ -84,7 +85,7 @@ export async function reschedule(t, rems, d = {}) {
   await wj(`sched/${t}.json`, sched);
   const out = { added, removed, total: Object.keys(sched).filter((k) => !k.startsWith("__")).length };
   if (capped) out.capped = capped;
-  if (limited) out.limited = "daily";
+  if (limited) out.limited = limited === "time" ? "time" : "daily";
   return out;
 }
 const FIRED_MS = 120000;

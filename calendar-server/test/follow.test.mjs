@@ -9,14 +9,15 @@ delete process.env.FIREBASE_SERVICE_ACCOUNT;
 console.error = () => {};
 console.log = () => {};
 
+import fs from "node:fs";
 import { memBackend } from "./helpers/fakedb.mjs";
 const be = memBackend();
 (await import("../api/_db.js"))._setBackend(be);
-const { classify, parseTitle, seriesKey, seriesTitle, seriesAirings, ilToMs, normT } = await import("../api/_series.js");
-const { cleanOne, mergeFollows, deriveItems, withDerived, dupOfManual, MAX_FOLLOWS, MAX_PER_FOLLOW } = await import("../api/_fol.js");
+const { classify, parseTitle, seriesKey, seriesTitle, seriesAirings, ilToMs, normT, chDisplay, isGeneric, genericTitle, dayCap, ID_RE } = await import("../api/_series.js");
+const { cleanOne, mergeFollows, deriveItems, withDerived, dupOfManual, pruneDerived, MAX_FOLLOWS, MAX_PER_FOLLOW, MAX_PER_USER_DAY } = await import("../api/_fol.js");
 const { handleFollow, default: followH, MAX_BODY } = await import("../api/follow.js");
 const { reschedule, MAX_SCHED, MAX_PUBLISH_DAY, DER_RESERVE, writeJson, readJson } = await import("../api/_push.js");
-const { runFollowCheck, refreshUser, _resetGuide } = await import("../api/_fcheck.js");
+const { runFollowCheck, refreshUser, rederive, derivedStillAired, _resetGuide } = await import("../api/_fcheck.js");
 const { default: cronH, listFol } = await import("../api/watch-check.js");
 const { handleFire } = await import("../api/fire.js");
 const { handleSnooze, remPayload } = await import("../api/_snz.js");
@@ -124,9 +125,9 @@ test("seriesAirings: התאמת כותרת מדויקת בלבד, סינון ק�
 
 // ---------- מיזוג מעקבים ----------
 test("cleanOne: מפתח נגזר מהכותרת, ערוץ/קבוצה/lead/mode מנוקים, מחיקה = tombstone", () => {
-  const c = cleanOne({ k: "evil|key", title: "הנדר 4 - פרק 130", ch: "13", chs: ["13", "99", "bad", "<x>"], chn: "רשת 13", mode: "weird", lead: 9999, dbl: 1 }, NOW);
+  const c = cleanOne({ k: "evil|key", title: "הנדר 4 - פרק 130", ch: "13", chs: ["13", "99", "bad", "<x>"], chn: "רשת 13", mode: "weird", lead: 99999, dbl: 1 }, NOW);
   assert.equal(c.k, seriesKey("הנדר 4")); assert.equal(c.title, "הנדר 4");
-  assert.deepEqual(c.chs, ["13", "99"]); assert.equal(c.mode, "new"); assert.equal(c.lead, 180); assert.equal(c.dbl, 1);
+  assert.deepEqual(c.chs, ["13", "99"]); assert.equal(c.mode, "new"); assert.equal(c.lead, 10080, "אותה תקרה כמו ברשימת התזכורות הרגילה"); assert.equal(c.dbl, 1);
   assert.deepEqual(cleanOne({ title: "הנדר 4", x: 1, u: 5 }, NOW), { k: seriesKey("הנדר 4"), title: "הנדר 4", u: 5, x: 1 });
   assert.equal(cleanOne({ title: "א" }, NOW), null); assert.equal(cleanOne(null), null); assert.equal(cleanOne({ title: "" }), null);
   assert.equal(cleanOne({ title: "abc", lead: 0, dbl: 1 }, NOW).dbl, undefined, "dbl דורש lead>0");
@@ -171,9 +172,10 @@ test("deriveItems: תקרה לסדרה, שידור שהתחיל לא נגזר, l
   const f = cleanOne(fol("יומית"), NOW);
   const out = deriveItems([f], g, NOW);
   assert.equal(out.length, MAX_PER_FOLLOW);
-  const soonG = { channels: guide.channels, programs: [P("12", "2026-11-01T10:05", "בקרוב", { lv: 1 }), P("12", "2026-11-01T10:01", "בקרוב", { lv: 1 })] };
+  assert.equal(deriveItems([cleanOne(fol("בקרוב"), NOW)], { channels: guide.channels, programs: [P("12", "2026-11-01T10:01", "בקרוב", { lv: 1 })] }, NOW).length, 0, "שידור בעוד דקה אחת: מדלגים");
+  const soonG = { channels: guide.channels, programs: [P("12", "2026-11-01T10:05", "בקרוב", { lv: 1 })] };
   const soon = deriveItems([cleanOne(fol("בקרוב"), NOW)], soonG, NOW);
-  assert.equal(soon.length, 1, "שידור בעוד דקה אחת: מדלגים");
+  assert.equal(soon.length, 1);
   assert.equal(soon[0].lead, 4, "התחלה בעוד 5 דק׳ עם lead=10: ההתראה בעוד כדקה");
   // יציבות: גזירה חוזרת מאוחר יותר לא משנה lead של פריט קיים (מונע פוש כפול)
   const again = deriveItems([cleanOne(fol("בקרוב"), NOW)], soonG, NOW + 90000, soon);
@@ -187,7 +189,7 @@ test("dupOfManual / withDerived: אין כפילות עם תזכורת ידני�
   const manual2 = { k: `9999|${der[1].ts}`, title: "הזמר במסכה", ts: der[1].ts, end: der[1].end, lead: 10 }; // ערוץ תאום ממוזג: מפתח שונה
   assert.equal(dupOfManual(der[0], [manual1]), true); assert.equal(dupOfManual(der[1], [manual2]), true);
   assert.equal(dupOfManual(der[0], [manual2]), false);
-  assert.equal(deriveItems([f], guide, NOW, [], [manual1]).length, 1);
+  assert.equal(deriveItems([f], guide, NOW, []).length, 2, "הגזירה לא תלויה בתזכורות ידניות (ביטול ידנית מחזיר את התזכורת מיד)");
   assert.equal(withDerived([manual1, manual2], der, NOW).length, 2, "שתי הנגזרות כפולות לידניות: לא מתווספות");
   assert.equal(withDerived([], der, NOW).length, 2);
   assert.equal(withDerived([{ k: der[0].k, title: "x", ts: der[0].ts }], der, NOW).length, 2, "אותו מפתח לא נכפל");
@@ -272,7 +274,7 @@ const derivedAt = (i, o = {}) => ({ k: `f|abc|12|${NOW + (i + 1) * 60000}`, c: "
 test("reschedule: תזכורות שנגזרו נספרות באותה תקרת 60, ושל המשתמש קודמות גם אם רחוקות יותר", async () => {
   const sch = mkSched();
   const der = Array.from({ length: 50 }, (_, i) => ({ ...derivedAt(i), k: `f|abc|12|${NOW + (i + 1) * 300000}` }));
-  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [], derived: der });
+  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [{ k: "abc", title: "אבג", u: NOW }], derived: der });
   const rems = Array.from({ length: 30 }, (_, i) => manualRem(i, { k: `u${i}`, ts: NOW + (100 + i) * 3600000, end: NOW + (101 + i) * 3600000 }));
   const out = await reschedule(TOK, rems, sch);
   assert.equal(out.total, MAX_SCHED); assert.equal(out.capped, 20);
@@ -284,7 +286,7 @@ test("reschedule: תזכורות שנגזרו נספרות באותה תקרת 6
 test("reschedule: תקציב יומי - נגזרות לא נוגעות ב-DER_RESERVE האחרונים", async () => {
   const sch = mkSched();
   await writeJson(`sched/${TOK}.json`, { __q: { d: Math.floor(NOW / 86400000), n: MAX_PUBLISH_DAY - DER_RESERVE } });
-  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [], derived: [derivedAt(0), derivedAt(1)] });
+  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [{ k: "abc", title: "אבג", u: NOW }], derived: [derivedAt(0), derivedAt(1)] });
   let out = await reschedule(TOK, [manualRem(0)], sch);
   assert.equal(out.added, 1, "רק של המשתמש"); assert.equal(out.limited, "daily");
   assert.ok(!sch.calls.some((c) => c.init.body && JSON.parse(c.init.body).k.startsWith("f|")));
@@ -293,7 +295,7 @@ test("reschedule: תקציב יומי - נגזרות לא נוגעות ב-DER_RE
 test("reschedule: נגזרת כפולה לתזכורת ידנית באותו שידור לא מתוזמנת", async () => {
   const sch = mkSched();
   const d0 = derivedAt(0);
-  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [], derived: [d0] });
+  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [{ k: "abc", title: "אבג", u: NOW }], derived: [d0] });
   const out = await reschedule(TOK, [{ k: `12|${d0.ts}`, title: "נגזרת 0", ts: d0.ts, end: d0.end, lead: 5 }], sch);
   assert.equal(out.added, 1);
   assert.equal(JSON.parse(sch.calls[0].init.body).k, `12|${d0.ts}`);
@@ -302,12 +304,12 @@ test("reschedule: נגזרת כפולה לתזכורת ידנית באותו ש�
 // ---------- ירי ונודניק ----------
 test("fire: מפתח f| נמצא דרך loadAll ונשלח כ-📺, ו-snooze מוצא אותו", async () => {
   const d0 = { ...derivedAt(0), title: "הזמר במסכה", ts: NOW + 600000, lead: 10 };
-  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [], derived: [d0] });
+  await writeJson(`fol/${TOK}.json`, { v: 1, follows: [{ k: "abc", title: "אבג", u: NOW }], derived: [d0] });
   assert.equal((await load(TOK)).length, 0); assert.equal((await loadAll(TOK)).length, 1);
   const sent = [];
   const r = await handleFire({ t: TOK, k: d0.k, at: NOW }, { load: loadAll, sendTo: async (t, p) => { sent.push(p); return { ok: 1, total: 1 }; }, dropSched: async () => {}, reschedule: async () => ({}) }, NOW);
   assert.equal(r.json.ok, 1);
-  assert.equal(sent[0].title, "📺 הזמר במסכה"); assert.match(sent[0].body, /^(מתחיל|התחיל)/); assert.match(sent[0].body, / · קשת 12$/);
+  assert.equal(sent[0].title, "📺 הזמר במסכה"); assert.match(sent[0].body, /^קשת 12 · (מתחיל|התחיל)/, "אותה צורה כמו תזכורת רגילה: ערוץ · מתי");
   assert.equal(sent[0].url, "./?rem=" + encodeURIComponent(d0.k)); assert.equal(sent[0].tag, d0.k);
   assert.equal((await handleFire({ t: TOK, k: "f|nope|1|2", at: NOW }, { load: loadAll }, NOW)).json.skipped, "cancelled");
   const calls = [];
@@ -323,6 +325,7 @@ test("runFollowCheck: מרענן, מדלג בלי פוש ומי שנבדק לא�
   const sch = mkSched();
   const users = mkUsers(4);
   for (const u of users.slice(0, 3)) await setSubs(u.t);
+  for (const u of users) await writeJson(`fol/${u.t}.json`, u.doc);
   const base = { listFol: async () => users, getSubs: async (t) => (await readJson(`push/${t}.json`, [])), readJson, writeJson, load, reschedule: (t, rems) => reschedule(t, rems, sch), guide: gd, now: () => NOW };
   let out = await runFollowCheck({ ...base, deadline: Date.now() + 60000 });
   assert.deepEqual({ u: out.users, r: out.refreshed, s: out.skipped }, { u: 4, r: 3, s: 1 });
@@ -345,9 +348,10 @@ test("runFollowCheck: מרענן, מדלג בלי פוש ומי שנבדק לא�
 
 test("runFollowCheck: כשל בלוח (guide=null) לא מוחק נגזרות קיימות ולא נחשב בדיקה מוצלחת", async () => {
   const sch = mkSched();
-  const t = TOK, old = [derivedAt(0)];
+  const t = TOK, old = [{ ...derivedAt(0), k: `f|${seriesKey("הזמר במסכה")}|12|${NOW + 3600000}` }];
   await setSubs(t);
   const doc = { v: 1, follows: [cleanOne(fol("הזמר במסכה"), NOW)], derived: old, chk: 0 };
+  await writeJson(`fol/${t}.json`, doc);
   const out = await refreshUser(t, doc, { guide: async () => null, load, readJson, writeJson, reschedule: (tt, rems) => reschedule(tt, rems, sch), now: () => NOW });
   assert.equal(out.stale, true);
   const saved = await readJson(`fol/${t}.json`, null);

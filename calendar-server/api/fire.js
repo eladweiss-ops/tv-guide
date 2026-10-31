@@ -1,10 +1,13 @@
 // נקרא על ידי QStash בדיוק בזמן ההתראה. שולח פוש אם התזכורת עדיין קיימת ולא שונתה.
 // אימות: ?s=FIRE_SECRET (הודעות שכבר תוזמנו) או חתימת QStash (Upstash-Signature) כשהוגדרו מפתחות החתימה
-import { loadAll, okToken } from "./_store.js";
+import { loadAll, load, okToken } from "./_store.js";
 import { sendTo, remPayload, dropSched, reschedule } from "./_push.js";
 import { fireAuth, rawBodyOf } from "./_sig.js";
 import { fail } from "./_guard.js";
 import { START_SUFFIX } from "./_rems.js";
+import { isDerKey, folPath } from "./_fol.js";
+import { derivedStillAired, rederive } from "./_fcheck.js";
+import { readJson, writeJson } from "./_db.js";
 
 export const config = { api: { bodyParser: false } }; // צריך את הגוף הגולמי לאימות תקציר החתימה
 
@@ -13,6 +16,8 @@ export async function handleFire(b, d, now = Date.now()) {
   const rems = await d.load(b.t);
   const r = rems.find((x) => x.k === b.k);
   if (!r) return { status: 200, json: { skipped: "cancelled" } };
+  // תזכורת שנגזרה ממעקב: אם הלוח התעדכן והשידור כבר לא שם (זז/בוטל), לא יורים; גוזרים מחדש כך שהשידור החדש יתוזמן
+  if (isDerKey(b.k) && d.checkDerived && !b.snooze && !(await d.checkDerived(b.t, r))) return { status: 200, json: { skipped: "guide changed" } };
   if (b.snooze) { // נודניק: הודעה נפרדת, לא נוגעים בתזמון הרגיל (sched)
     return { status: 200, json: await d.sendTo(b.t, remPayload(r, { t: b.t, at: now, snooze: true })) };
   }
@@ -35,6 +40,15 @@ export async function handleFire(b, d, now = Date.now()) {
   return { status: 200, json: out };
 }
 
+// נגזרת עדיין בלוח? לא: גוזרים מחדש ומדלגים. הלוח לא זמין: ממשיכים לירות
+async function checkDerived(t, item) {
+  try {
+    if (await derivedStillAired(item, {})) return true;
+    await rederive(t, { readJson, writeJson, load, reschedule: (tt, rems, o) => reschedule(tt, rems, o) });
+    return false;
+  } catch (e) { console.error("checkDerived", e && e.message); return true; }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   try {
@@ -46,7 +60,7 @@ export default async function handler(req, res) {
     let b;
     try { b = JSON.parse(raw || "{}"); } catch (e) { return res.status(400).json({ error: "bad request" }); }
     if (!b || !okToken(b.t) || typeof b.k !== "string") return res.status(400).json({ error: "bad request" });
-    const r = await handleFire(b, { load: loadAll, sendTo, dropSched, reschedule });
+    const r = await handleFire(b, { load: loadAll, sendTo, dropSched, reschedule, checkDerived });
     return res.status(r.status).json(r.json);
   } catch (e) {
     return fail(res, e, "fire");

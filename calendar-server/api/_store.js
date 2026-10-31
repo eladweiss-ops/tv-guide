@@ -1,6 +1,6 @@
 // אחסון רשימת התזכורות לכל משתמש ב-Firestore (דרך _db.js), לפי מפתח אקראי שנוצר באפליקציה
 import { readJson, writeJson } from "./_db.js";
-import { folPath } from "./_fol.js";
+import { folPath, pruneDerived } from "./_fol.js";
 
 export const okToken = (t) => typeof t === "string" && /^[a-z0-9]{24,48}$/.test(t);
 const path = (t) => `rems/${t}.json`;
@@ -14,7 +14,7 @@ export async function load(t) {
 export async function loadAll(t) {
   const rems = await load(t);
   let fol = null; try { fol = await readJson(folPath(t), null); } catch (e) { console.error("loadAll fol", e && e.message); }
-  const der = fol && Array.isArray(fol.derived) ? fol.derived : [];
+  const der = fol && Array.isArray(fol.derived) ? pruneDerived(fol.derived, fol.follows) : []; // רק של מעקבים פעילים
   if (!der.length) return rems;
   const keys = new Set(rems.map((r) => r.k));
   return rems.concat(der.filter((d) => d && typeof d.k === "string" && !keys.has(d.k)));

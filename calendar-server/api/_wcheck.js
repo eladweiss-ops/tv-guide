@@ -125,6 +125,7 @@ export async function runCheck(d) {
     prov: (it) => { if (!provC.has(it.k)) provC.set(it.k, providersIL(it.type, it.k.slice(1), tm)); return provC.get(it.k); },
     detail: (it) => { if (!detC.has(it.k)) detC.set(it.k, tget("/tv/" + it.k.slice(1), { language: "he-IL" }, tm)); return detC.get(it.k); },
     guide: () => {
+      if (d.guide) return d.guide(); // הלוח נטען פעם אחת בהרצה ומשותף לשלב מעקב הסדרות (watch-check.js)
       if (!guideP) guideP = (async () => { try { const r = await (d.fetch || fetch)(GUIDE_URL, { signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined }); return r.ok ? await r.json() : null; } catch (e) { return null; } })();
       return guideP;
     },

@@ -3,3 +3,7 @@ node_modules/
 hot-local.log
 .claude/
 .vercel/
+
+# מפתחות שירות (Firebase וכו׳) – לעולם לא למאגר
+*adminsdk*.json
+*service-account*.json

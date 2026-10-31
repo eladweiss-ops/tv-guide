@@ -152,28 +152,30 @@
       return '<div class="remall follow"><span>' + (fol ? "✓ אתה עוקב אחרי הנושא \"" + esc(tt) + "\"" : "⭐ לעקוב אחרי הנושא \"" + esc(tt) + "\"? כל שידור שמזכיר את זה, בשם או בתקציר") + "</span>" +
         '<button type="button" class="' + (fol ? "ghost" : "btn") + ' sm" data-follow="' + esc(tt) + '">' + (fol ? "הפסק לעקוב" : "לעקוב") + "</button></div>";
     };
-    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) h += topicRow(TVG.qExact || TVG.q.trim());
+    // סדר המסך (לבקשת אלעד): קודם השידורים עצמם (עכשיו, ישירים, חדשים), ורק אחריהם מעקב/הצעות. aux1 = נושא+חיפושים אחרונים+הצעות, aux2 = מעקב סדרה/תזכורת לכולם
+    var aux1 = "", aux2 = "";
+    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) aux1 += topicRow(TVG.qExact || TVG.q.trim());
     if (!TVG.qExact) {
       var rmatch = TVG.RECENT.filter(function (r) { return r.t.toLowerCase().indexOf(term) === 0 && r.t.toLowerCase() !== term; }).slice(0, 3);
-      if (rmatch.length) h += '<div class="recent">' + rmatch.map(function (r) { return '<span class="rchip"><button type="button" data-recent="' + TVG.RECENT.indexOf(r) + '">🕘 ' + esc(r.t) + "</button></span>"; }).join("") + "</div>";
+      if (rmatch.length) aux1 += '<div class="recent">' + rmatch.map(function (r) { return '<span class="rchip"><button type="button" data-recent="' + TVG.RECENT.indexOf(r) + '">🕘 ' + esc(r.t) + "</button></span>"; }).join("") + "</div>";
       var sg = suggestions(term);
-      if (sg.length) h += '<h2 class="sech">הצעות</h2>' + sg.map(function (x) {
+      if (sg.length) aux1 += '<h2 class="sech">הצעות</h2>' + sg.map(function (x) {
         if (TVG.favPick) return '<div class="srow"><button type="button" class="go sg" data-favpick="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + '</span></span></button><button type="button" class="btn sm" data-favpick="' + esc(x.t) + '">' + (FAV.has(x.t) ? "★ כבר שם" : "☆ הוסף") + "</button></div>";
         return '<div class="srow sgrow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
       }).join("");
     }
-    if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
+    if (!hits.length) return h + aux1 + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
     if (series) h += '<div class="chips seg3" role="group" aria-label="סוג שידור">' + [["all", "הכל"], ["new", "✨ פרקים חדשים (" + nNew + ")"], ["rerun", "🔁 שידורים חוזרים (" + nRr + ")"]].map(function (w) { return '<button type="button" class="chip" data-kind="' + w[0] + '" aria-pressed="' + (TVG.sKind === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
     if (serFollow && !TVG.favPick) {
       var fk = TVG.folKey(exT), fl = TVG.folFind(fk);
-      h += '<div class="remall follow serfol"><span>' + (fl ? "✓ אתה עוקב אחרי הסדרה" : "נזכיר לך על כל פרק חדש") + "</span>" +
+      aux2 += '<div class="remall follow serfol"><span>' + (fl ? "✓ אתה עוקב אחרי הסדרה" : "נזכיר לך על כל פרק חדש") + "</span>" +
         (fl ? '<button type="button" class="ghost sm" data-folopen="' + esc(fk) + '">ניהול</button>' : '<button type="button" class="btn sm" data-folnew="' + esc(exT) + '" data-folch0="' + esc(hits[0] ? hits[0].c.id : "") + '">📺 לעקוב אחרי הסדרה</button>') + "</div>";
       // נושא (כל מה שמזכיר את השם): נשאר זמין. אם כבר עוקבים אחריו - השורה המלאה עם "הפסק לעקוב"; אחרת קישור משני קטן מתחת לשורה הראשית
-      h += isTopic(exT) ? topicRow(exT) : '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(exT) + '">⭐ או לעקוב אחרי כל מה שמזכיר את "' + esc(exT) + '"</button></div>';
+      aux2 += isTopic(exT) ? topicRow(exT) : '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(exT) + '">⭐ או לעקוב אחרי כל מה שמזכיר את "' + esc(exT) + '"</button></div>';
     } else if (series) {
       var todo = hits.filter(function (x) { return !TVG.hasRem(TVG.remKey(x.c.id, x.p.s)); }).length;
       var what = TVG.sKind === "new" ? "הפרקים החדשים" : TVG.sKind === "rerun" ? "השידורים החוזרים" : "השידורים";
-      h += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני " + (todo === 1 ? "השידור" : "כל " + todo + " " + what) + "?" : "✓ יש תזכורת לכל " + what) + "</span>" +
+      aux2 += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני " + (todo === 1 ? "השידור" : "כל " + todo + " " + what) + "?" : "✓ יש תזכורת לכל " + what) + "</span>" +
         (todo ? '<button type="button" class="btn sm" data-remlist>' + (TVG.srv() ? "כן, להזכיר" : "להקים תזכורות") + "</button>" : "") + "</div>";
     }
     TVG.LASTHITS = hits;
@@ -190,8 +192,9 @@
     if (g1.length) h += '<h2 class="sech">● משודר עכשיו (' + g1.length + ")</h2>" + g1.slice(0, cap).map(row).join("");
     if (gl.length) h += '<h2 class="sech">📡 שידורים ישירים (' + gl.length + ")</h2>" + gl.slice(0, cap).map(row).join("");
     if (g2.length) h += '<h2 class="sech">' + (g1.length || gl.length ? "עוד בהמשך" : "שידורים קרובים") + " (" + g2.length + ")</h2>" + g2.slice(0, cap).map(row).join("");
+    h += aux2;
     if (g3.length) h += '<h2 class="sech">🔁 חוזרים ומוקלטים (' + g3.length + ")</h2>" + g3.slice(0, cap).map(row).join("");
-    return h;
+    return h + aux1;
   }
   function startSearch(text, exact) {
     TVG.closeFavs(); $("#qwrap").hidden = false; $("#qx").hidden = !text; $("#q").value = text || ""; TVG.q = text || ""; TVG.qExact = exact ? text : null;

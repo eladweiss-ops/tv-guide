@@ -2,6 +2,7 @@
 // הרצה: node enrich13.mjs   (אחרי scrape.mjs). אם האתר לא נגיש, guide.json נשאר כמו שהוא.
 import { readFile, writeFile } from "node:fs/promises";
 import { fillGaps } from "./fill.mjs";
+import { sameShow } from "./enrich_hot.mjs";
 
 const URL13 = "https://13tv.co.il/tv-guide/";
 
@@ -40,13 +41,20 @@ export function descByTitle(week) {
   return map;
 }
 
-export function enrich(guide, map) {
+// items: [{start, title, desc}] מהלוח הרשמי. שלב 1: לפי שם התוכנית (כל השבוע). שלב 2: לתוכניות שנשארו –
+// משבצת באתר באותה שעה (עד 10 דקות) ששמה אותה תוכנית (sameShow), כדי ש"היום שהיה - עם טל שורר" יקבל את התקציר של "היום שהיה".
+export function enrich(guide, map, items = []) {
   const ids = new Set(guide.channels.filter((c) => /^רשת(\s|$)/.test(String(c.name).trim())).map((c) => String(c.id)));
+  const toMin = (s) => Date.parse(String(s).slice(0, 16) + ":00Z") / 60000;
+  const real = items.filter((x) => x.desc);
   let n = 0;
   for (const p of guide.programs) {
     if (!ids.has(String(p.ch)) || p.desc) continue;
     const d = map.get(norm(p.title));
-    if (d) { p.desc = d; n++; }
+    if (d) { p.desc = d; n++; continue; }
+    const t = toMin(p.start); let best = null, bd = 11;
+    for (const it of real) { const dd = Math.abs(toMin(it.start) - t); if (dd < bd && sameShow(p.title, it.title)) { bd = dd; best = it; } }
+    if (best) { p.desc = best.desc; n++; }
   }
   return { ids: [...ids], n };
 }
@@ -65,7 +73,7 @@ async function main() {
   }
   const ids = guide.channels.filter((c) => /^רשת(\s|$)/.test(String(c.name).trim())).map((c) => c.id);
   const filled = fillGaps(guide, ids, items);
-  const r = enrich(guide, map);
+  const r = enrich(guide, map, items);
   if (filled) console.log(`רשת 13: הושלמו ${filled} שידורים בימים שחסרו בוואלה`);
   console.log(`רשת 13: ${map.size} תקצירים באתר, ${r.n} תוכניות עודכנו (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
   if (r.n || filled) await writeFile("guide.json", JSON.stringify(guide));

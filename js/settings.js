@@ -23,6 +23,26 @@
   }
   function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); if (TVG.wlRender) TVG.wlRender(); }
 
+  // ---- שיתוף האפליקציה עם חברים: קישור ההזמנה join/ (תמונה ותיאור משלו בוואטסאפ) ----
+  var JOIN = "https://eladweiss-ops.github.io/tv-guide/join/";
+  var APPTXT = "היי! 👋 מצאתי אפליקציה ללוח שידורים: כל הערוצים במקום אחד, תזכורת לפני שהתוכנית מתחילה, מעקב אחרי סדרות ומה חדש בנטפליקס.\nחינם ובלי הרשמה. באייפון: פותחים בספארי ← שיתוף ← \"הוסף למסך הבית\".\n👇\n" + JOIN;
+  function appWa() {
+    var u = "https://wa.me/?text=" + encodeURIComponent(APPTXT), w = null;
+    try { w = window.open(u, "_blank"); } catch (e) {}
+    if (!w) location.href = u;
+    TVG.pill("📤 נשלח לוואטסאפ", 1800);
+  }
+  function appShare() {
+    if (navigator.share) { navigator.share({ title: "לוח שידורים", text: APPTXT.replace(JOIN, "").trim(), url: JOIN }).catch(function () {}); return; }
+    var ok = function () { TVG.pill("🔗 הקישור הועתק", 1800); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(APPTXT).then(ok, function () { TVG.pill(JOIN, 4000); });
+    else TVG.pill(JOIN, 4000);
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest && e.target.closest("#appWa, #appShare"); if (!t) return;
+    if (t.id === "appWa") appWa(); else appShare();
+  });
+
   var themeSel = "light";
   function setTheme(t) {
     if (t !== "dark" && t !== "auto") t = "light";

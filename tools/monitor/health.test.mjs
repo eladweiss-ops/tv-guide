@@ -152,3 +152,19 @@ test("המחשב בבית מחכה לאישור קוד", async () => {
   const p = evaluateHome({ status: "needs-approval", files: ["enrich_hot.mjs"] }).problems;
   assert.equal(p.length, 1); assert.ok(p[0].includes("enrich_hot.mjs") && p[0].includes("trust.ps1"));
 });
+
+test("תקצירים: רק 72 השעות הקרובות, ואחרי העתקה לפי שם באותו ערוץ (כמו באפליקציה)", () => {
+  const now = new Date("2026-10-31T18:00:00Z"); // 20:00 בישראל
+  const programs = [
+    { ch: "1", start: "2026-10-31T21:00", title: "חדשות", desc: "מהדורה" },
+    { ch: "1", start: "2026-11-01T21:00", title: "חדשות" },                 // מקבל מההעתקה
+    { ch: "2", start: "2026-11-01T21:00", title: "חדשות" },                 // ערוץ אחר: לא מקבל
+    { ch: "1", start: "2026-11-01T22:00", title: "סרט", desc: "א" },
+    { ch: "1", start: "2026-11-02T22:00", title: "סרט", desc: "ב" },
+    { ch: "1", start: "2026-11-02T23:00", title: "סרט" },                   // שני תקצירים שונים: לא מעתיקים
+    { ch: "1", start: "2026-11-06T21:00", title: "בעוד שבוע" },             // מחוץ ל-72 שעות: לא נספר
+  ];
+  const r = evaluateGuide({ updated: "2026-10-31T17:00:00Z", channels: [], programs }, now);
+  assert.equal(r.info.synopsisPct, Math.round((4 / 6) * 1000) / 10);
+  assert.equal(r.info.synopsisAllPct, Math.round((3 / 7) * 1000) / 10);
+});

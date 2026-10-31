@@ -55,7 +55,7 @@
 
 ## 4. צינור הנתונים (GitHub Action `update.yml`, כל לילה 03:00 UTC + הרצה ידנית)
 
-סדר: `scrape.mjs --all --range 3690 3850` → `enrich13` (רשת 13) → `enrich_sport1` → `enrich_sport5` → `enrich_kan` (כאן 11) → `enrich_one` → `enrich_keshet` (קשת/mako) → `extra_channels` (ערוץ 14, i24NEWS, כאן חינוכית, ערוץ הכנסת) → `enrich_hot --apply-cache` → `netflix` (אם יש `TMDB_API_KEY`) → commit.
+סדר: `scrape.mjs --all --range 3690 3850` → `enrich13` (רשת 13) → `enrich_sport1` → `enrich_sport5` → `enrich_kan` (כאן 11) → `enrich_one` → `enrich_keshet` (קשת/mako) → `extra_channels` (ערוץ 14, i24NEWS, כאן חינוכית, ערוץ הכנסת) → `enrich_hot --apply-cache` → `desc_memory` (זיכרון תקצירים: אותו ערוץ+שם, אותו תקציר ב-2 ימים לפחות, שם עם תקציר אחר נפסל; `desc-memory.json`, 30 יום) → `netflix` (אם יש `TMDB_API_KEY`) → commit.
 כל שלב העשרה `continue-on-error` ויוצא עם 0 בכישלון – אף פעם לא שובר את הלוח.
 
 ### מקורות ומלכודות ידועות (כל אחד מהם עלה לנו בבאג)

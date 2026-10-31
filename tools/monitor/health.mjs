@@ -15,7 +15,7 @@ export const T = {
   NETFLIX_MIN_ITEMS: 40,
   MIN_PROGRAMS: 20000,        // סה״כ תוכניות (בפועל ~29.7K)
   MIN_CHANNELS: 120,          // בפועל 169
-  MIN_SYNOPSIS_PCT: 35,       // % תוכניות עם תקציר (ראו פלט אמיתי בדוח)
+  MIN_SYNOPSIS_PCT: 38,       // % תוכניות עם תקציר ב-72 השעות הקרובות, אחרי העתקה לפי שם (31.10: 46.9%)
   EXTRA_CACHE_MAX_AGE_H: 48,  // extra-cache.json: x14 .at (המחשב בבית)
   HOT_SAMPLE: 8,              // כמה ערוצי HOT לדגום
   HOT_SAMPLE_MIN_OK: 0.5,     // חלק מהדגימה שחייב להיות עם תוכניות היום
@@ -61,9 +61,16 @@ export function evaluateGuide(guide, now = new Date()) {
   }
   if (progs.length < T.MIN_PROGRAMS) problems.push("מעט מדי תוכניות בלוח: " + progs.length + " (מינימום " + T.MIN_PROGRAMS + ")");
   if (chans.length < T.MIN_CHANNELS) problems.push("מעט מדי ערוצים: " + chans.length + " (מינימום " + T.MIN_CHANNELS + ")");
-  const withDesc = progs.filter((p) => p.desc).length;
-  info.synopsisPct = progs.length ? Math.round((withDesc / progs.length) * 1000) / 10 : 0;
-  if (info.synopsisPct < T.MIN_SYNOPSIS_PCT) problems.push("רק " + info.synopsisPct + "% מהתוכניות עם תקציר (מינימום " + T.MIN_SYNOPSIS_PCT + "%)");
+  // תקצירים "כמו שהמשתמש רואה": 72 השעות הקרובות (HOT נותן רק כ-3 ימים קדימה), אחרי ההעתקה לפי שם שהאפליקציה עושה (data.js: אותו ערוץ, רק כשלשם תקציר אחד)
+  const dt = {};
+  for (const p of progs) if (p.desc) { const k = p.ch + "|" + p.title, e = dt[k]; dt[k] = e === undefined ? p.desc : e === p.desc ? e : 1; }
+  const seen = (p) => !!(p.desc || (dt[p.ch + "|" + p.title] && dt[p.ch + "|" + p.title] !== 1));
+  const from = israelNow(now).replace(" ", "T"), to = israelNow(new Date(now.getTime() + 72 * 36e5)).replace(" ", "T");
+  const near = progs.filter((p) => p.start >= from && p.start < to);
+  const pct = (a, f) => (a.length ? Math.round((a.filter(f).length / a.length) * 1000) / 10 : 0);
+  info.synopsisPct = pct(near, seen);
+  info.synopsisAllPct = pct(progs, (p) => !!p.desc); // לוח שלם, כמו שנשמר (למידע בלבד)
+  if (info.synopsisPct < T.MIN_SYNOPSIS_PCT) problems.push("רק " + info.synopsisPct + "% מהתוכניות ב-72 השעות הקרובות עם תקציר (מינימום " + T.MIN_SYNOPSIS_PCT + "%)");
 
   const byCh = new Map();
   for (const p of progs) { let m = byCh.get(p.ch); if (!m) byCh.set(p.ch, m = {}); const d = p.start.slice(0, 10); m[d] = (m[d] || 0) + 1; }

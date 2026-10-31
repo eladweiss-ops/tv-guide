@@ -43,6 +43,9 @@ jobs:
       - name: Add HOT summaries from cache (filled by the home computer)
         continue-on-error: true
         run: node enrich_hot.mjs --apply-cache
+      - name: Fill missing summaries from summary memory (same channel, same title, same summary on 2+ days)
+        continue-on-error: true
+        run: node desc_memory.mjs
       - name: Fetch Netflix list from TMDB (+ ratings from OMDb)
         continue-on-error: true
         timeout-minutes: 8
@@ -57,6 +60,7 @@ jobs:
           git config user.email "guide-bot@users.noreply.github.com"
           git add guide.json
           if [ -f extra-cache.json ]; then git add extra-cache.json; fi
+          if [ -f desc-memory.json ]; then git add desc-memory.json; fi
           if [ -f netflix.json ]; then git add netflix.json; fi
           if [ -f ratings-cache.json ]; then git add ratings-cache.json; fi
           if git diff --cached --quiet; then

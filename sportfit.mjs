@@ -62,3 +62,13 @@ export function betterTitle(title, text) {
   if (!game || game.length < 5) return null;
   return live + league + ": " + game;
 }
+
+// האם האתר מפרסם לערוץ ליום הזה לוח מלא (ולא רק שידורים ישירים בודדים או יום שעוד לא הושלם):
+// לפחות `min` משבצות, אין פער של יותר מ-maxGap דקות (ברירת מחדל 6 שעות), ומתחיל בבוקר המוקדם ונגמר בערב. משלימים ימים חסרים רק מיום כזה.
+export function looksComplete(items, min = 12, maxGap = 360) {
+  const m = (hhmm) => { const [h, mm] = hhmm.split(":").map(Number); return h * 60 + mm; };
+  const t = [...new Set(items.map((x) => m(x.time)))].sort((a, b) => a - b);
+  if (t.length < min) return false;
+  for (let i = 1; i < t.length; i++) if (t[i] - t[i - 1] > maxGap) return false;
+  return t[0] < 360 && t[t.length - 1] > 1080;
+}

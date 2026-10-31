@@ -2,6 +2,7 @@
 // הרצה: node enrich_kan.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
 import { fillGaps, nextDays } from "./fill.mjs";
+import { sameShow } from "./enrich_hot.mjs";
 
 const API = "https://www.kan.org.il/umbraco/surface/LoadBroadcastSchedule/LoadSchedule";
 const KAN11 = "4444", PAGE = "1517";
@@ -18,7 +19,8 @@ function clean(s) {
 // שעה מקומית בישראל "YYYY-MM-DDTHH:MM" משעת UTC "DD.MM.YYYY HH:MM:SS"
 const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 export function localStart(utc) {
-  const m = String(utc).match(/(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})/); if (!m) return null;
+  // האתר כותב "1.11.2026 00:47:00" (יום בלי אפס מוביל) – בלי {1,2} כל ימים 1-9 בחודש נפלו
+  const m = String(utc).match(/(\d{1,2})\.(\d{1,2})\.(\d{4}) (\d{1,2}):(\d{2})/); if (!m) return null;
   const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]));
   return fmt.format(d).replace(" ", "T");
 }
@@ -31,7 +33,7 @@ export function parseKan(html) {
     const title = clean((b.match(/class="program-title">([\s\S]*?)<\/h3>/) || [])[1]);
     const desc = clean((b.match(/class="program-description">([\s\S]*?)<\/(?:div|p)>/) || [])[1]);
     const start = localStart(utc);
-    if (start && title) out.push({ start, title, desc });
+    if (start && title) out.push({ start, title, desc: desc.replace(/[^\p{L}\p{N}]/gu, "") === title.replace(/[^\p{L}\p{N}]/gu, "") ? "" : desc }); // תקציר שהוא רק שם התוכנית – לא תקציר
   }
   return out;
 }
@@ -48,6 +50,7 @@ export function enrich(guide, items) {
     let best = null, bd = 16;
     for (const it of items) { const d = Math.abs(toMin(it.start) - t); if (d < bd) { bd = d; best = it; } }
     if (!best || !best.desc || key(best.desc) === key(p.title)) continue;
+    if (!sameShow(p.title, best.title)) continue; // אף פעם לא תקציר לפי קרבת זמן בלבד
     p.desc = best.desc; n++;
   }
   return { ids: [...ids], n };
@@ -55,16 +58,18 @@ export function enrich(guide, items) {
 
 async function main() {
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
-  const days = [...new Set([...guide.programs.map((p) => p.start.slice(0, 10)), ...nextDays(8)])].sort().filter((d) => d >= nextDays(1)[0]).slice(0, 9);
+  const days = [...new Set([...guide.programs.map((p) => p.start.slice(0, 10)), ...nextDays(10)])].sort().filter((d) => d >= nextDays(1)[0]).slice(0, 10);
   const items = []; let ok = 0, fail = 0;
   for (const day of days) {
     const [y, m, d] = day.split("-");
     try {
       const res = await fetch(`${API}?day=${d}-${m}-${y}&channelId=${KAN11}&currentPageId=${PAGE}`, { headers: HEADERS });
       if (!res.ok) throw new Error(String(res.status));
-      items.push(...parseKan(await res.text())); ok++;
-    } catch (e) { fail++; if (fail === 1) console.error("kan:", e.message); }
-    await sleep(400);
+      const html = await res.text();
+      if (/Just a moment|cf-challenge|challenge-platform/.test(html)) throw new Error("challenge"); // מוגן בבדיקת בוט – לא ממשיכים ללחוץ
+      items.push(...parseKan(html)); ok++;
+    } catch (e) { fail++; if (fail === 1) console.error("kan:", e.message); if (/^(403|429|challenge)$/.test(e.message)) break; }
+    await sleep(800);
   }
   const kanIds = guide.channels.filter((c) => /^(HD )?כאן( 11)?( HD)?$/.test(String(c.name).trim())).map((c) => c.id);
   const filled = fillGaps(guide, kanIds, items);

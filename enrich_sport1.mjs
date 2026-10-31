@@ -2,8 +2,8 @@
 // וואלה כותבת למשל "ליגת ווינר 26/27", והאתר כותב "מכבי ת"א - הפועל חיפה · ליגת ווינר 2026/27".
 // הרצה: node enrich_sport1.mjs   (אחרי scrape.mjs). כישלון לא נוגע ב-guide.json.
 import { readFile, writeFile } from "node:fs/promises";
-import { fits, agreement, betterTitle } from "./sportfit.mjs";
-import { fillGaps } from "./fill.mjs";
+import { fits, agreement, betterTitle, looksComplete } from "./sportfit.mjs";
+import { fillGaps, nextDays } from "./fill.mjs";
 
 const BASE = "https://sport1.maariv.co.il/broadcast-schedule/";
 const SITE = { 1: "2", 2: "3", 3: "4", 4: "5", 6: "1" }; // מספר הערוץ → channel_id באתר
@@ -30,6 +30,7 @@ export function parseDay(html) {
 }
 
 const mins = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+const key = (x) => String(x).replace(/^ישיר!?\s*/, "").replace(/[^\p{L}\p{N}]/gu, "");
 
 // ערוץ בלוח של וואלה → מספר ספורט (1-4, 6), לפי השם
 export function sportNo(name) {
@@ -38,7 +39,7 @@ export function sportNo(name) {
 }
 
 // מצמיד לכל תוכנית את המשבצת באתר שמתחילה הכי קרוב אליה (עד 20 דקות הפרש)
-export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> items [{time, ...}]
+export function enrich(guide, sched, agr = new Map()) { // sched: Map "<channel>|YYYY-MM-DD" -> items [{time, ...}]
   const chOf = new Map(guide.channels.map((c) => [String(c.id), sportNo(c.name)]).filter((x) => x[1]));
   const key = (x) => String(x).replace(/^ישיר!?\s*/, "").replace(/[^\p{L}\p{N}]/gu, "");
   // התאמה אחד-לאחד: כל משבצת באתר הולכת לתוכנית הכי קרובה אליה בזמן (עד 20 דקות)
@@ -57,6 +58,7 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       if (bp && (!pick.has(bp) || pick.get(bp).d > bd)) pick.set(bp, { it, d: bd });
     }
     const ag = agreement([...pick].map(([p, { it }]) => ({ title: p.title, text: [it.name, it.desc].filter(Boolean).join(" · ") })));
+    { const ch = g.split("|")[0]; if (!agr.has(ch)) agr.set(ch, []); agr.get(ch).push(ag); } // הסכמה לכל ערוץ – משלימים ימים רק לערוץ שהלוח שלו מסכים עם האתר
     if (ag < 0.4) { console.log("ספורט 1: דילגתי על", g, Math.round(ag * 100) + "%"); continue; }
     for (const [p, { it: best }] of pick) {
       const text = [best.name, best.desc].filter(Boolean).join(" · ");
@@ -64,7 +66,12 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
       p.lv = best.live ? 1 : 0; // ישיר או מוקלט, לפי האתר
       const bt = betterTitle(p.title, best.name); if (bt) p.title = bt;
       if (p.desc) continue;
-      if (!text || key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) continue;
+      if (!text) continue;
+      if (key(best.name).startsWith(key(p.title)) || key(p.title).startsWith(key(best.name))) {
+        // הכותרת בוואלה זהה לשם באתר – התוספת שהאתר נותן היא המסגרת ("ליגה איטלקית 2026/27")
+        if (!best.desc || key(best.desc).startsWith(key(best.name)) || key(best.desc).startsWith(key(p.title))) continue;
+        p.desc = best.desc; n++; continue;
+      }
       p.desc = text; n++;
     }
   }
@@ -73,7 +80,8 @@ export function enrich(guide, sched) { // sched: Map "<channel>|YYYY-MM-DD" -> i
 
 async function main() {
   const guide = JSON.parse(await readFile("guide.json", "utf8"));
-  const days = [...new Set(guide.programs.map((p) => p.start.slice(0, 10)))].sort().slice(0, 8);
+  // כל הימים שבלוח + עד 9 ימים קדימה (האתר מפרסם לוח מלא רק ~4 ימים, ואחריהם רק שידורים ישירים גדולים)
+  const days = [...new Set([...guide.programs.map((p) => p.start.slice(0, 10)), ...nextDays(9)])].sort().filter((d) => d >= nextDays(1)[0]).slice(0, 10);
   const sched = new Map();
   let ok = 0, fail = 0;
   for (const [no, id] of Object.entries(SITE)) {
@@ -86,15 +94,21 @@ async function main() {
       await sleep(300);
     }
   }
-  // ימים שחסרים בוואלה לערוץ מסוים – משלימים מהלוח של האתר
+  const agr = new Map();
+  const n = enrich(guide, sched, agr);
+  // ימים שחסרים בוואלה לערוץ מסוים – משלימים מהלוח של האתר, רק ביום שהאתר מפרסם לו לוח מלא (10+ משבצות; אחרת זה רק שידורים ישירים בודדים)
+  // ורק לערוץ שהלוח שלו בוואלה מסכים עם האתר (ממוצע הסכמה 60%+), כדי לא להשלים ערוץ אחר עם שם דומה
   let filled = 0;
   for (const no of Object.keys(SITE)) {
-    const ids = guide.channels.filter((c) => sportNo(c.name) === no).map((c) => c.id);
+    const ids = guide.channels.filter((c) => sportNo(c.name) === +no).map((c) => c.id).filter((id) => { const a = agr.get(String(id)) || []; return a.length && a.reduce((x, y) => x + y, 0) / a.length >= 0.6; });
     const items = [];
-    for (const day of days) for (const it of sched.get(no + "|" + day) || []) items.push({ start: day + "T" + it.time, title: it.name, desc: it.desc || "", lv: it.live ? 1 : 0 });
+    for (const day of days) if (looksComplete(sched.get(no + "|" + day) || [], 10, 540)) for (const it of sched.get(no + "|" + day)) {
+      // "סיכום המחזור בגרמניה" + "סיכום המחזור בגרמניה 2026/27" – התוספת היא רק העונה, לא תקציר
+      const dd = it.desc && key(it.desc).startsWith(key(it.name)) ? "" : it.desc || "";
+      items.push({ start: day + "T" + it.time, title: it.name, desc: dd, lv: it.live ? 1 : 0 });
+    }
     filled += fillGaps(guide, ids, items);
   }
-  const n = enrich(guide, sched);
   console.log(`ספורט 1: ${ok} עמודים נקראו, ${fail} נכשלו, ${n} תוכניות קיבלו פירוט, ${filled} שידורים הושלמו בימים חסרים`);
   if (n || filled) await writeFile("guide.json", JSON.stringify(guide));
 }

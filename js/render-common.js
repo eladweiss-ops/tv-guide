@@ -20,7 +20,7 @@
   function synBox(v, p, cid) { return '<div class="syn" data-synbox="' + esc(v) + '" hidden>' + TVG.synText(p, cid) + (TVG.shareBtn ? TVG.shareBtn(p, cid) : "") + "</div>"; }
   function airRow(c, p, sub) {
     var v = c.id + "|" + p.s.getTime();
-    return '<div class="srow k-' + TVG.kindOf(c.id, p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + esc(p.title) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" + synBtn(v) +
+    return '<div class="srow k-' + TVG.kindOf(c.id, p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(p.s) + '</span><span class="ttl">' + TVG.ttlHtml(p) + '<br><span class="sub">' + esc(sub) + "</span></span></button>" + synBtn(v) +
       '<button type="button" class="rbt' + (TVG.hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(p.title) + '">' + (TVG.hasRem(v) ? "✓" : "⏰") + "</button></div>" + synBox(v, p, c.id);
   }
   function soonHtml(now) {

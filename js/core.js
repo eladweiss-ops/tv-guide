@@ -43,6 +43,20 @@
   TVG.isIOS = /iPhone|iPad|iPod/.test(UA);
   TVG.isAndroid = !TVG.isIOS && /Android/i.test(UA);
   TVG.isStandalone = !!((window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone);
+  // פתיחת וואטסאפ עם טקסט. בטלפון: ישר לאפליקציה (whatsapp://) – באייפון, wa.me מתוך אפליקציית מסך הבית נפתח בדפדפן פנימי
+  // שנשאר ריק (עם X) אחרי המעבר לוואטסאפ. אם וואטסאפ לא מותקן (הדף לא הוסתר תוך 1.5 שניות): wa.me כגיבוי. במחשב: wa.me בחלון חדש
+  TVG.openWa = function (text) {
+    var enc = encodeURIComponent(text), web = "https://wa.me/?text=" + enc;
+    if (TVG.isIOS || TVG.isAndroid) {
+      var left = false, onHide = function () { if (document.hidden) left = true; };
+      document.addEventListener("visibilitychange", onHide);
+      setTimeout(function () { document.removeEventListener("visibilitychange", onHide); if (!left && !document.hidden) location.href = web; }, 1500);
+      location.href = "whatsapp://send?text=" + enc;
+      return;
+    }
+    var w = null; try { w = window.open(web, "_blank"); } catch (e) {}
+    if (!w) location.href = web;
+  };
   if (TVG.isAndroid) document.documentElement.className += " android";
 
   TVG.G = null;

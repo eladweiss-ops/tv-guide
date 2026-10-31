@@ -27,9 +27,7 @@
   var JOIN = "https://eladweiss-ops.github.io/tv-guide/join/";
   var APPTXT = "היי! 👋 תכירו את זפזופ 📺 תזפזפו פחות, תראו יותר: כל הערוצים במקום אחד, תזכורת לפני שהתוכנית מתחילה, מעקב אחרי סדרות ומה חדש בנטפליקס.\nחינם ובלי הרשמה, ונפתח כמו אפליקציה:\n📱 אייפון: בספארי ← שיתוף ← \"הוסף למסך הבית\"\n🤖 אנדרואיד: בכרום ← ⋮ ← \"התקנת אפליקציה\"\n👇\n" + JOIN;
   function appWa() {
-    var u = "https://wa.me/?text=" + encodeURIComponent(APPTXT), w = null;
-    try { w = window.open(u, "_blank"); } catch (e) {}
-    if (!w) location.href = u;
+    TVG.openWa(APPTXT);
     TVG.pill("📤 נשלח לוואטסאפ", 1800);
   }
   function appShare() {

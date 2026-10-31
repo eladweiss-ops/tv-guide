@@ -36,7 +36,7 @@
     var col = j.collection && typeof j.collection === "object" ? { name: str(j.collection.name, 120), keys: keysOf(j.collection.keys) } : null;
     var br = j.brand && typeof j.brand === "object" ? { name: str(j.brand.name, 80), keys: keysOf(j.brand.keys) } : null;
     return {
-      collection: col && col.keys.length ? col : null, brand: br && br.keys.length ? br : null, titles: keysOf(j.titles),
+      via: str(j.via, 80), collection: col && col.keys.length ? col : null, brand: br && br.keys.length ? br : null, titles: keysOf(j.titles),
       persons: (Array.isArray(j.persons) ? j.persons : []).slice(0, 3).map(function (p) {
         return p && str(p.name, 80) ? { name: str(p.name, 80), photo: RE_IMG.test(p.photo || "") ? p.photo : "", dept: str(p.dept, 20), keys: keysOf(p.keys) } : null;
       }).filter(function (p) { return p && p.keys.length; })
@@ -162,7 +162,7 @@
       return { any: true, html: '<div class="nfload" role="status"><i class="nfsp" aria-hidden="true"></i>מחפשים בנטפליקס…</div>' };
     }
     var used = {}; (localKeys || []).forEach(function (k) { used[k] = 1; });
-    var h = "";
+    var h = r.via ? '<p class="nfvia">תוצאות עבור <bdi dir="ltr">' + esc(r.via) + "</bdi></p>" : "";
     if (r.collection) {
       r.collection.keys.forEach(function (k) { used[k] = 1; });
       h += section("סדרת סרטים", "<bdi>" + esc(r.collection.name) + "</bdi>", '<div class="nfxl">' + r.collection.keys.map(function (k, i) { return row(TVG.nfX[k], i + 1); }).join("") + "</div>");

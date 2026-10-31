@@ -162,5 +162,36 @@ export async function searchNf(q0, d = {}) {
   const used = new Set([...(collection ? collection.keys : []), ...(brand ? brand.keys : []), ...titles, ...outPersons.flatMap((p) => p.keys)]);
   order.forEach((k) => { if (used.has(k)) out.items[k] = items[k]; });
   if (partial) out.partial = true;
+  // שם בעברית שלא נמצא (TMDB לא תמיד מכיר את השם של נטפליקס ישראל): מנסים תעתיק לאנגלית ("אל מאיו" → "el mayo")
+  if (!d.noTr && !out.collection && !out.brand && !out.titles.length && !out.persons.length && /[א-ת]/.test(q)) {
+    for (const tq of translitCands(q)) {
+      const r = await searchNf(tq, { ...d, noTr: true });
+      if (r && (r.collection || r.brand || r.titles.length || r.persons.length)) { r.q = q; r.via = tq; if (partial) r.partial = true; return r; }
+      if (r && r.partial) out.partial = true;
+    }
+  }
   return out;
+}
+
+// תעתיק עברית → אנגלית, גס בכוונה: שתי הצעות לכל היותר (כל השאילתה, ושתי המילים האחרונות כשיש יותר משתיים)
+const TR = { "א": "a", "ב": "b", "ג": "g", "ד": "d", "ה": "h", "ז": "z", "ח": "h", "ט": "t", "כ": "k", "ך": "k", "ל": "l", "מ": "m", "ם": "m", "נ": "n", "ן": "n", "ס": "s", "ע": "a", "פ": "p", "ף": "f", "צ": "tz", "ץ": "tz", "ק": "k", "ר": "r", "ש": "sh", "ת": "t" };
+export function translitWord(w) {
+  if (w === "אל") return "el";
+  let o = "";
+  for (let i = 0; i < w.length; i++) {
+    const c = w[i], last = i === w.length - 1, vow = /[aeiou]$/.test(o);
+    if (c === "ו") o += i === 0 ? "v" : (w[i + 1] === "ו" ? "" : "o");
+    else if (c === "י") o += (i === 0 || vow || w[i + 1] === "ו") ? "y" : "i";
+    else if (c === "ה" && last) o += "a";
+    else if (c === "א") o += (i > 0 && vow) ? "" : "a";
+    else o += TR[c] || (/[a-z0-9]/i.test(c) ? c.toLowerCase() : "");
+  }
+  return o;
+}
+export function translitCands(q) {
+  const ws = q.split(/\s+/).filter(Boolean), out = [];
+  const full = ws.map(translitWord).join(" ").trim();
+  if (full.length >= 3) out.push(full);
+  if (ws.length > 2) { const tail = ws.slice(-2).map(translitWord).join(" "); if (tail.length >= 5 && !out.includes(tail)) out.push(tail); }
+  return out.slice(0, 2);
 }

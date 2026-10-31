@@ -214,3 +214,15 @@ test("אוסף: בלי שם עברי זהה, נלקח האוסף של הסרט �
   assert.equal(out.collection.id, 86311);
   assert.deepEqual(out.collection.keys, ["m24428", "m99861"]);
 });
+
+test("תעתיק: שם עברי שלא במאגר ('לכידתו של אל מאיו') נמצא דרך 'el mayo'", async () => {
+  const fx = tmdb({
+    "/search/multi": (u) => ({ results: u.searchParams.get("query") === "el mayo" ? [{ id: 338689, media_type: "tv", name: "The Fall of El Mayo", original_name: "The Fall of El Mayo", first_air_date: "2026-10-01", poster_path: "/abcde12345.jpg", vote_average: 7.5 }] : [] }),
+    "/tv/338689/watch/providers": { results: { IL: { flatrate: [{ provider_id: 8, provider_name: "Netflix" }] } } },
+  });
+  const out = await searchNf("לכידתו של אל מאיו", { fetch: fx });
+  assert.equal(out.q, "לכידתו של אל מאיו");
+  assert.equal(out.via, "el mayo");
+  assert.deepEqual(out.titles, ["t338689"]);
+  assert.equal(out.items.t338689.nf, true);
+});

@@ -2,6 +2,7 @@
 // POST /api/backup {t, data:{...}}   → שמירת ההגדרות (ערוצים, מועדפים, נושאים, תזכורות...)
 import { readJson, writeJson } from "./_db.js";
 import { okToken } from "./_store.js";
+import { notifyNewUser } from "./_notify.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
 const KEYS = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.recent", "tvg.topics", "tvg.wl", "tvg.fol", "tvg.parties", "tvg.gid", "tvg.name"]; // 🍿 ערב צפייה: parties/gid/name
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
       if (size > 200000) return res.status(413).json({ error: "too big" });
       const cur = await readJson(path(body.t), null); // גיבוי זהה לשמור: לא כותבים שוב (חוסך מכסת כתיבות)
       if (!cur || JSON.stringify(cur.data) !== JSON.stringify(data)) await writeJson(path(body.t), { at: Date.now(), data });
+      if (!cur) await notifyNewUser(body.src); // 👤 גיבוי ראשון לטוקן = משתמש חדש: התראת טלגרם לבעלים (לא זורק; עד 3 שניות)
       return res.status(200).json({ ok: true });
     }
     return res.status(405).end();

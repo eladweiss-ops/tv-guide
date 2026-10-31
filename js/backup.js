@@ -11,14 +11,40 @@
   var APP_URL = location.origin + location.pathname.replace(/index\.html$/, "");
   function myTok() { if (!TVG.calTok) { TVG.calTok = TVG.newTok(); TVG.store("tvg.calTok", TVG.calTok); } return TVG.calTok; }
   function myLink() { return APP_URL + "?r=" + myTok(); }
+  // ---- מקור ההגעה: נקבע פעם אחת למכשיר, בעלייה הראשונה (הכתובת עדיין לא נוקתה: ניקוי הפרמטרים ב-boot/nav.js). נשלח לשרת רק עם הגיבוי הראשון, בלי שום פרט אישי ----
+  var REFS = [["whatsapp", /(^|\.)(whatsapp\.com|wa\.me)$/], ["instagram", /(^|\.)instagram\.com$/], ["facebook", /(^|\.)(facebook\.com|fb\.com|fb\.me|messenger\.com)$/], ["telegram", /(^|\.)(t\.me|telegram\.org)$/], ["google", /(^|\.)google\./], ["twitter", /(^|\.)(t\.co|twitter\.com|x\.com)$/]];
+  function srcFrom(search, ref) {
+    var p; try { p = new URLSearchParams(search); } catch (e) { p = new URLSearchParams(""); }
+    if (p.get("r")) return "restore"; // קישור אישי: משחזר, לא משתמש חדש
+    if (p.get("w")) return "party";
+    if (p.get("p") != null) return "share";
+    var f = String(p.get("from") || "").toLowerCase();
+    if (/^[a-z0-9_-]{1,20}$/.test(f)) return f;
+    try { var h = new URL(ref).hostname.toLowerCase(); for (var i = 0; i < REFS.length; i++) if (REFS[i][1].test(h)) return REFS[i][0]; } catch (e) {} // רק משפחת הדומיין, לא הכתובת
+    return "direct";
+  }
+  function devClass() {
+    var ua = navigator.userAgent || "", app = TVG.isStandalone;
+    if (/iPad/.test(ua)) return "ipad";
+    if (TVG.isIOS) return app ? "iphone-app" : "iphone-safari";
+    if (TVG.isAndroid) return app ? "android-app" : "android-browser";
+    return "desktop";
+  }
+  var SRC = (function () {
+    var o = null; try { o = JSON.parse(TVG.store("tvg.src") || "null"); } catch (e) {}
+    if (o && o.s) return o;
+    o = { s: srcFrom(location.search, document.referrer), d: devClass(), at: Date.now() };
+    TVG.store("tvg.src", JSON.stringify(o));
+    return o;
+  })();
   var bkTimer = 0,
       bkBusy = false;
   function bkPush() {
     if (TVG.isSample || !TVG.store("tvg.sel") || TVG.store("tvg.sel") === "[]") return;
     var d = {}; BK.forEach(function (k) { if (BKSET[k]) { var v = TVG.store(k); if (v != null) d[k] = v; } });
     bkBusy = true;
-    fetch(CAL_API + "/api/backup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: myTok(), data: d }) })
-      .then(function (r) { if (!r.ok) throw 0; localStorage.setItem("tvg.bkAt", String(Date.now())); bkShow(); })
+    fetch(CAL_API + "/api/backup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(SRC.ok ? { t: myTok(), data: d } : { t: myTok(), data: d, src: { s: SRC.s, d: SRC.d } }) })
+      .then(function (r) { if (!r.ok) throw 0; localStorage.setItem("tvg.bkAt", String(Date.now())); bkShow(); if (!SRC.ok) { SRC.ok = 1; TVG.store("tvg.src", JSON.stringify(SRC)); } })
       .catch(function () {}).then(function () { bkBusy = false; });
   }
   window.__tvgBk = function (k) { if (!BKSET[k] || TVG.restoring) return; clearTimeout(bkTimer); bkTimer = setTimeout(bkPush, 2500); };

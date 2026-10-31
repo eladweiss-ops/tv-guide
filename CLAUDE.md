@@ -52,7 +52,7 @@
 `var VERSION = "1.33", BUILD = "2026-10-30.33"` ב-`index.html`. **בכל שינוי: להעלות את שניהם.** אותו BUILD נכנס אוטומטית כ-`?v=BUILD` לכל קובצי ה-css/js (מונע ערבוב קבצים ישנים/חדשים באייפון), ולכן אין עוד מקום לעדכן. `update.js` בודק את `BUILD = "…"` ב-`index.html` שבשרת. האפליקציה בודקת את BUILD ונטענת מחדש לבד. הגרסה מוצגת בהגדרות, ואחרי עדכון מופיעה הודעה "✨ עודכנת לגרסה…".
 
 ### localStorage
-`tvg.sel` ערוצים · `tvg.fav` מועדפים · `tvg.topics` נושאים · `tvg.rem` תזכורות · `tvg.lead` ברירת מחדל להתראה · `tvg.calmode` (`sub`/`ics`) · `tvg.calTok` המפתח האישי · `tvg.push` · `tvg.recent` · `tvg.theme` · `tvg.tab` · `tvg.bkAt`.
+`tvg.sel` ערוצים · `tvg.fav` מועדפים · `tvg.topics` נושאים · `tvg.rem` תזכורות · `tvg.lead` ברירת מחדל להתראה · `tvg.calmode` (`sub`/`ics`) · `tvg.calTok` המפתח האישי · `tvg.push` · `tvg.recent` · `tvg.theme` · `tvg.tab` · `tvg.bkAt` · `tvg.src` (מקור ההגעה והמכשיר, נקבע פעם אחת בעלייה הראשונה: `{s,d,at,ok}`; נשלח לשרת רק עם הגיבוי הראשון, לא מגובה).
 
 ## 4. צינור הנתונים (GitHub Action `update.yml`, כל לילה 03:00 UTC + הרצה ידנית)
 
@@ -98,7 +98,7 @@ GitHub Actions רץ בארה״ב. אתה רץ על המחשב של אלעד בי
   - `POST/GET /api/backup` – גיבוי אוטומטי. קישור אישי `?r=<token>` משחזר במכשיר חדש
   - `GET /api/nf-search?q=` חיפוש נטפליקס (TMDB) · `GET/POST /api/watch` רשימת מעקב 🔔 · `GET /api/watch-check` (cron יומי). משתנים חדשים: `TMDB_API_KEY`, `CRON_SECRET`. פרטים ב-`calendar-server/README.md`
   - `POST /api/push` – הרשמה לפוש / התראת בדיקה · `POST /api/fire` – נקרא מ-QStash בזמן ההתראה
-- **משתני סביבה (ב-Vercel בלבד, לא בקוד):** `FIREBASE_SERVICE_ACCOUNT` (JSON מלא של חשבון השירות; בלעדיו השרת מחזיר 500 ורושם `missing FIREBASE_SERVICE_ACCOUNT`), `VAPID_PUBLIC`, `VAPID_PRIVATE`, `FIRE_SECRET`, `QSTASH_TOKEN`, `QSTASH_URL` (EU). `BLOB_READ_WRITE_TOKEN` כבר לא בשימוש (נקרא רק בסקריפט ההעברה).
+- **משתני סביבה (ב-Vercel בלבד, לא בקוד):** `FIREBASE_SERVICE_ACCOUNT` (JSON מלא של חשבון השירות; בלעדיו השרת מחזיר 500 ורושם `missing FIREBASE_SERVICE_ACCOUNT`), `VAPID_PUBLIC`, `VAPID_PRIVATE`, `FIRE_SECRET`, `QSTASH_TOKEN`, `QSTASH_URL` (EU), `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (אותם ערכים כמו ב-GitHub secrets של הניטור; חסרים = השרת פשוט לא שולח התראות). **התראת משתמש חדש:** גיבוי ראשון לטוקן (`api/backup.js` → `api/_notify.js`) שולח לטלגרם "👤 משתמש חדש בזפזופ" עם מקור ההגעה (`join`/`party`/`share`/`?from=`/הפניה/ישיר), מחלקת מכשיר ומספר משתמשים כולל (`stats/users`). שחזור מקישור אישי לא נספר. תקרה: 10 התראות בשעה (`stats/alerts`), העודפים מצורפים להתראה הראשונה בשעה הבאה. קישור הזמנה: `join/` מעביר ל-`?from=join` (הפרמטר מתנקה ב-`nav.js`). `BLOB_READ_WRITE_TOKEN` כבר לא בשימוש (נקרא רק בסקריפט ההעברה).
 - **תזמון מדויק:** Upstash QStash (חשבון של אלעד). כל תזכורת = הודעה מתוזמנת. ביטול/שינוי → מחיקה ותזמון מחדש.
 - **מגבלות iOS (לא לנסות לעקוף):** אין כפתורים על התראה (לכן נודניק = הקשה → חלון באפליקציה), אין ווידג׳טים לאפליקציית רשת, Safari ואפליקציית מסך הבית לא חולקים אחסון, "from לוח שידורים"/"now" בהתראה הם טקסט מערכת בשפת הטלפון.
 - יומן מנוי מתעדכן לפי החלטת האייפון (לפעמים שעה+) – לכן פוש הוא הדרך הראשית.

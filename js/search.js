@@ -149,13 +149,13 @@
       '<div class="chips" role="group" aria-label="מתי">' + [["all", "הכל"], ["live", "● משודר עכשיו"], ["today", "הערב"], ["week", "השבוע"]].map(function (w) { return '<button type="button" class="chip" data-when="' + w[0] + '" aria-pressed="' + (TVG.sWhen === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
     var topicRow = function (tt) {
       var fol = isTopic(tt);
-      return '<div class="remall follow"><span>' + (fol ? "✓ אתה עוקב אחרי הנושא \"" + esc(tt) + "\"" : "⭐ לעקוב אחרי הנושא \"" + esc(tt) + "\"? כל שידור שמזכיר את זה, בשם או בתקציר") + "</span>" +
-        '<button type="button" class="' + (fol ? "ghost" : "btn") + ' sm" data-follow="' + esc(tt) + '">' + (fol ? "הפסק לעקוב" : "לעקוב") + "</button></div>";
+      return '<div class="remall follow"><span>' + (fol ? "★ במועדפים: כל מה שמזכיר את \"" + esc(tt) + "\"" : "⭐ להוסיף למועדפים כל מה שמזכיר את \"" + esc(tt) + "\"? בשם או בתקציר") + "</span>" +
+        '<button type="button" class="' + (fol ? "ghost" : "btn") + ' sm" data-follow="' + esc(tt) + '">' + (fol ? "הסרה" : "הוספה") + "</button></div>";
     };
     // סדר המסך (לבקשת אלעד): קודם השידורים עצמם (עכשיו, ישירים, חדשים), ורק אחריהם מעקב/הצעות. aux1 = נושא+חיפושים אחרונים+הצעות, aux2 = מעקב סדרה/תזכורת לכולם
     var aux1 = "", aux2 = "";
     // מעקב אחרי נושא: כפתור קטן בשורה אחת מעל התוצאות (לא נקבר בסוף הרשימה); התוצאות עצמן מיד אחריו
-    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) { var tq = TVG.qExact || TVG.q.trim(), tf = isTopic(tq); h += '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(tq) + '">' + (tf ? "✓ עוקבים אחרי \"" + esc(tq) + "\" · הפסקה" : "⭐ לעקוב אחרי כל מה שמזכיר את \"" + esc(tq) + "\"") + "</button></div>"; }
+    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) { var tq = TVG.qExact || TVG.q.trim(), tf = isTopic(tq); h += '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(tq) + '">' + (tf ? "★ במועדפים: \"" + esc(tq) + "\" · הסרה" : "⭐ להוסיף למועדפים כל מה שמזכיר את \"" + esc(tq) + "\"") + "</button></div>"; }
     if (!TVG.qExact) {
       var rmatch = TVG.RECENT.filter(function (r) { return r.t.toLowerCase().indexOf(term) === 0 && r.t.toLowerCase() !== term; }).slice(0, 3);
       if (rmatch.length) aux1 += '<div class="recent">' + rmatch.map(function (r) { return '<span class="rchip"><button type="button" data-recent="' + TVG.RECENT.indexOf(r) + '">🕘 ' + esc(r.t) + "</button></span>"; }).join("") + "</div>";
@@ -172,7 +172,7 @@
       aux2 += '<div class="remall follow serfol"><span>' + (fl ? "✓ אתה עוקב אחרי הסדרה" : "נזכיר לך על כל פרק חדש") + "</span>" +
         (fl ? '<button type="button" class="ghost sm" data-folopen="' + esc(fk) + '">ניהול</button>' : '<button type="button" class="btn sm" data-folnew="' + esc(exT) + '" data-folch0="' + esc(hits[0] ? hits[0].c.id : "") + '">📺 לעקוב אחרי הסדרה</button>') + "</div>";
       // נושא (כל מה שמזכיר את השם): נשאר זמין. אם כבר עוקבים אחריו - השורה המלאה עם "הפסק לעקוב"; אחרת קישור משני קטן מתחת לשורה הראשית
-      aux2 += isTopic(exT) ? topicRow(exT) : '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(exT) + '">⭐ או לעקוב אחרי כל מה שמזכיר את "' + esc(exT) + '"</button></div>';
+      aux2 += isTopic(exT) ? topicRow(exT) : '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(exT) + '">⭐ או להוסיף למועדפים כל מה שמזכיר את "' + esc(exT) + '"</button></div>';
     } else if (series) {
       var todo = hits.filter(function (x) { return !TVG.hasRem(TVG.remKey(x.c.id, x.p.s)); }).length;
       var what = TVG.sKind === "new" ? "הפרקים החדשים" : TVG.sKind === "rerun" ? "השידורים החוזרים" : "השידורים";

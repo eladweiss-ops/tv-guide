@@ -808,9 +808,9 @@ function nfFixtureData() {
     await step("fol-topic-link", async () => { // כותרת מדויקת של סדרה: גם "לעקוב אחרי הסדרה" וגם קישור משני לנושא; נושא שכבר במעקב מציג "הפסק לעקוב"
       await folSeed(true); await fresh(); await pushNow(); await folOpenSearch();
       assert(await vis(".serfol [data-folnew]"), "series follow row"); assert(await vis(".foltopic [data-follow]"), "secondary topic link");
-      assert(/או לעקוב אחרי כל מה שמזכיר/.test(await page.textContent(".foltopic")), "topic link text"); await snap("21_fol_topic_link");
+      assert(/או להוסיף למועדפים כל מה שמזכיר/.test(await page.textContent(".foltopic")), "topic link text"); await snap("21_fol_topic_link");
       await page.click(".foltopic [data-follow]"); await page.waitForTimeout(400);
-      assert(/אתה עוקב אחרי הנושא/.test(await page.textContent("#main")), "followed topic row shown"); assert(/הפסק לעקוב/.test(await page.textContent("#main")), "stop topic");
+      assert(/במועדפים: כל מה שמזכיר את/.test(await page.textContent("#main")), "followed topic row shown"); assert(/הסרה/.test(await page.textContent("#main")), "stop topic");
       await page.evaluate(() => { TVG.TOPICS = []; TVG.saveTopics(); });
     });
     await step("fol-generic-topic-only", async () => { // NBA / חדשות: כותרת כללית = נושא בלבד

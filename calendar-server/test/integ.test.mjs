@@ -7,10 +7,12 @@ process.env.FIRE_SECRET = "test-secret-not-real";
 process.env.QSTASH_TOKEN = "qs-test";
 process.env.QSTASH_URL = "https://qstash.example";
 process.env.QSTASH_CURRENT_SIGNING_KEY = "cur-key";
-delete process.env.BLOB_READ_WRITE_TOKEN;
+delete process.env.FIREBASE_SERVICE_ACCOUNT;
 delete process.env.QSTASH_STRICT;
 console.error = () => {};
 
+import { memBackend } from "./helpers/fakedb.mjs";
+(await import("../api/_db.js"))._setBackend(memBackend());
 const { reschedule, MAX_SCHED } = await import("../api/_push.js");
 const { START_SUFFIX } = await import("../api/_rems.js");
 const { default: fireH, handleFire } = await import("../api/fire.js");

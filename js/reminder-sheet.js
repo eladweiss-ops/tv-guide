@@ -116,7 +116,7 @@
       (TVG.srv() ? "" : TVG.isAndroid ? '<p class="credit">ייפתח יומן Google עם האירוע מוכן לשמירה. ההתראה שם לפי ברירת המחדל של היומן, לא בדיוק למועד שבחרת.</p>' : '<p class="credit">הקובץ נפתח ביומן של הטלפון, וההתראה תופיע בזמן שבחרת.</p>');
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
-  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = !$("#land").hidden ? false : true; TVG.rem = null; TVG.LP = null; }
+  function closeRem() { $("#rem").hidden = true; $("#scrim2").hidden = !$("#land").hidden || !$("#nflist").hidden ? false : true; TVG.rem = null; TVG.LP = null; }
   function saveIcs(text, name) {
     var url = URL.createObjectURL(new Blob([text], { type: "text/calendar;charset=utf-8" }));
     var a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();

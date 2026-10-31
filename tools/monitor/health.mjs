@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 export const T = {
   GUIDE_MAX_AGE_H: 30,        // guide.json.updated – הפעולה הלילית רצה כל 24 ש', 30 נותן מרווח לשעות איחור
   NETFLIX_MAX_AGE_H: 36,
-  NETFLIX_MIN_ITEMS: 40,
+  NETFLIX_MIN_ITEMS: 120, // אחרי הרחבת השורות (≈250); פחות מזה = שורות חסרות
   MIN_PROGRAMS: 20000,        // סה״כ תוכניות (בפועל ~29.7K)
   MIN_CHANNELS: 120,          // בפועל 169
   MIN_SYNOPSIS_PCT: 38,       // % תוכניות עם תקציר ב-72 השעות הקרובות, אחרי העתקה לפי שם (31.10: 46.9%)

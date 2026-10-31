@@ -78,6 +78,14 @@ function nfFixtureData() {
   j.items[j.hero].ratings = { imdb: 8.7, votes: 900000, rt: 94, mc: 81 };
   j.items.x_edge = { id: 1, type: "tv", title: "הסדרה הארוכה ביותר בעולם: Stranger Things 5 - הפרק האחרון והסופי של הכול", orig: "Stranger Things: The Final Chapter", year: 2026, date: "2026-10-01", overview: "", poster: "", backdrop: "", genres: ["מד״ב", "דרמה", "אימה", "מתח"], seasons: 5, imdb_id: "", link: "", trailer: "", ratings: { rt: 88 } };
   j.rows.popular.unshift("x_edge");
+  // כל השורות החדשות (מהמאגר האמיתי בסיבוב, 24 בכל אחת), כותרות ב-rowMeta, ופוסטרים מצוירים (fx_) כדי שהצילומים יציגו את השורות מלאות
+  const mk = keys.filter((k) => /^m/.test(k)), tk = keys.filter((k) => /^t/.test(k));
+  const take = (pool, n, off) => Array.from({ length: Math.min(n, pool.length) }, (_, i) => pool[(i + off) % pool.length]);
+  const mix = (n, off) => { const a = take(mk, n / 2, off), b = take(tk, n / 2, off); return a.flatMap((k, i) => [k, b[i]]).filter(Boolean); };
+  j.rows.israeli = mix(24, 3); j.rows.week = mix(24, 9); j.rows.series = take(tk, 24, 5); j.rows.movies = take(mk, 24, 2);
+  j.rows.comedy = mix(24, 14); j.rows.crime = mix(24, 20); j.rows.docu = mix(10, 1); j.rows.family = mix(24, 7);
+  j.rowMeta = { popular: { title: "הכי נצפים" }, recent: { title: "יצא לאחרונה" }, top: { title: "הכי מדורגים" }, israeli: { title: "🇮🇱 ישראלי בנטפליקס" }, week: { title: "🆕 יצא החודש" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, comedy: { title: "😂 קומדיה" }, crime: { title: "🔪 מתח ופשע" }, docu: { title: "🎙 דוקו" }, family: { title: "👨‍👩‍👧 לכל המשפחה" } };
+  Object.keys(j.items).forEach((k) => { if (k !== "x_edge") j.items[k].poster = "https://image.tmdb.org/t/p/w342/fx_" + k + ".jpg"; });
   return j;
 }
 
@@ -148,7 +156,7 @@ function nfFixtureData() {
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
     const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await audit(n); };
     let stepIdx = 0;
-    const step = (n, f) => { const i = stepIdx++; if (phase === "nfs" || Math.floor(i / CHUNK) !== phase) return Promise.resolve(); ran++; return runStep(n, f); };
+    const step = (n, f) => { const i = stepIdx++; if (process.env.TVG_STEPRE && !new RegExp(process.env.TVG_STEPRE).test(n)) return Promise.resolve(); /* הרצה ממוקדת בצעדים לפי שם: הכול בקבוצה 0 */ if (process.env.TVG_STEPRE) { if (phase !== 0) return Promise.resolve(); ran++; return runStep(n, f); } if (phase === "nfs" || Math.floor(i / CHUNK) !== phase) return Promise.resolve(); ran++; return runStep(n, f); };
     const runStep = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
     let nfFixture = false;
@@ -200,6 +208,125 @@ function nfFixtureData() {
     await step("nf-search", async () => { nfFixture = true; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(600); await page.click("#sBtn"); await page.fill("#q", "a"); await page.waitForTimeout(1200); await snap("17_nf_search"); });
     await step("nf-search-empty", async () => { nfFixture = true; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(600); await page.click("#sBtn"); await page.fill("#q", "zzzqqq"); await page.waitForTimeout(700); await snap("18_nf_search_empty"); });
     await step("nf-dark", async () => { nfFixture = true; await fresh(); await page.click("#setBtn"); await page.waitForTimeout(400); await page.click('[data-theme-set="dark"]'); await page.waitForTimeout(300); await page.click("[data-setclose]"); await page.waitForTimeout(300); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap("19_nf_dark_top"); await page.click(".nfhero"); await page.waitForTimeout(800); await snap("19_nf_dark_page"); await page.evaluate(() => localStorage.setItem("tvg.theme", "light")); });
+
+    // ---- נטפליקס: שורות חדשות (rowMeta), 'עוד ›', ⭐ שמורים ----
+    const nfChk = (c, m) => { if (!c) throw new Error("assert: " + m); };
+    const nfShown = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
+    const nfFavs = () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem("tvg.nffav") || "[]"); } catch (e) { return null; } });
+    const nfClean = async (favs) => { // מצב נקי ל-tvg.nffav (favs = מספר שמורים להכנה מראש מפריטי הפיקסטורה)
+      nfFixture = true; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(500);
+      await page.evaluate((n) => { try { localStorage.removeItem("tvg.nffav"); if (n) { const NF = TVG.NF; const ks = Object.keys(NF.items).filter((k) => k !== "x_edge").slice(0, n); localStorage.setItem("tvg.nffav", JSON.stringify(ks.map((k, i) => ({ k, title: NF.items[k].title, type: NF.items[k].type, poster: NF.items[k].poster, y: NF.items[k].year, at: 1700000000000 - i * 1000 })))); } } catch (e) {} }, favs || 0);
+      await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(900);
+    };
+    await step("nf-rows-all", async () => { // כל 11 השורות לפי הסדר, בנייה עצלה מתחת לקפל
+      await nfClean(0);
+      const names = () => page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("#main [data-nfrow]"), (s) => s.getAttribute("data-nfrow")));
+      nfChk((await names()).join() === "popular,israeli,week,recent,series,movies,top,comedy,crime,docu,family", "rows order " + (await names()).join());
+      const lazy0 = await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length);
+      nfChk(lazy0 >= 6, "rows below the fold are not built yet (" + lazy0 + ")");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfhero").length === 1 && document.querySelector("#main .nfhero").nextElementSibling.getAttribute("data-nfrow") === "popular"), "hero then popular");
+      await snap("20_nf_rows_top");
+      await page.evaluate(() => window.scrollTo(0, 1000)); await page.waitForTimeout(800); await snap("20_nf_rows_mid");
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await page.waitForTimeout(700);
+      nfChk(await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length) === 0, "all rows built after scrolling");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfmore").length) === 11, "a 'more' chip on every row");
+      nfChk(await page.evaluate(() => document.querySelectorAll('#main [data-nfrow="docu"] .nfc').length) === 10, "docu row has 10 cards");
+      const tx = await page.textContent("#main"); ["🇮🇱 ישראלי בנטפליקס", "🆕 יצא החודש", "📺 סדרות", "🎬 סרטים", "😂 קומדיה", "🔪 מתח ופשע", "🎙 דוקו", "👨‍👩‍👧 לכל המשפחה"].forEach((t) => nfChk(tx.indexOf(t) >= 0, "title " + t));
+      await snap("20_nf_rows_bottom");
+      await page.evaluate(() => { const r = document.querySelector('[data-nfrow="family"] .nfrow'); r.scrollLeft = -2000; }); await page.waitForTimeout(500); await snap("20_nf_row_end_chip");
+    });
+    await step("nf-more-list", async () => { // 'עוד ›' -> רשימה מלאה; כרטיס פותח דף מעליה; Escape/חזרה סוגרים שכבה אחת בכל פעם
+      await nfClean(0);
+      await page.locator('[data-nfmore="israeli"]').click(); await page.waitForTimeout(700);
+      nfChk(await nfShown("#nflist"), "list open"); nfChk(await nfShown("#scrim2"), "scrim on");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#nflist .nfc").length) === 24, "24 cards in list");
+      nfChk((await page.textContent("#nflT")).indexOf("ישראלי בנטפליקס") >= 0, "list title");
+      nfChk(await page.evaluate(() => !!(history.state && history.state.tvgLayer)), "list is a nav layer");
+      await snap("21_nf_list");
+      await page.evaluate(() => { document.querySelector("#nflBody").scrollTop = 99999; }); await page.waitForTimeout(400); await snap("21_nf_list_bottom");
+      await page.evaluate(() => { document.querySelector("#nflBody").scrollTop = 0; });
+      await page.click("#nflist .nfc"); await page.waitForTimeout(700);
+      nfChk(await nfShown("#nfsheet") && await nfShown("#nflist"), "page opens over the list"); nfChk(await page.evaluate(() => { const a = document.querySelector("#nfsheet"), b = document.querySelector("#nflist"); return !!(b.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING); }), "page above list");
+      await snap("22_nf_list_page");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(500);
+      nfChk(!(await nfShown("#nfsheet")) && await nfShown("#nflist") && await nfShown("#scrim2"), "Escape closes only the page; list and scrim stay");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(500);
+      nfChk(!(await nfShown("#nflist")) && !(await nfShown("#scrim2")), "second Escape closes the list and the scrim"); nfChk(await page.evaluate(() => !history.state), "history clean");
+      const url0 = page.url();
+      await page.locator('[data-nfmore="popular"]').click(); await page.waitForTimeout(500); nfChk(await nfShown("#nflist"), "reopen");
+      await page.goBack(); await page.waitForTimeout(500); nfChk(!(await nfShown("#nflist")) && page.url() === url0, "back closes the list, stays in app");
+      await page.locator('[data-nfmore="series"]').click(); await page.waitForTimeout(500);
+      await page.click("#nflist [data-nflclose]"); await page.waitForTimeout(500); nfChk(!(await nfShown("#nflist")) && await page.evaluate(() => !history.state), "close button");
+      await page.locator('[data-nfmore="series"]').click(); await page.waitForTimeout(500);
+      await page.mouse.click(10, 40); await page.waitForTimeout(500); nfChk(!(await nfShown("#nflist")), "scrim tap closes the list");
+    });
+    await step("nf-fav-save", async () => { // ⭐ שמירה בדף התוכן: הודעה עם ביטול, כפתור ★ שמור, שורה "השמורים שלי" אחרי הכרטיס הראשי, כוכב על הפוסטר
+      await nfClean(0);
+      nfChk(await page.evaluate(() => !document.querySelector('[data-nfrow="fav"]')), "no fav row when empty");
+      await page.click(".nfhero"); await page.waitForTimeout(700);
+      nfChk((await page.textContent("[data-nffav]")).trim() === "⭐ שמירה", "button text before save");
+      nfChk(await page.evaluate(() => { const b = document.querySelector("#nfsBar [data-nffav]"); return b.getBoundingClientRect().height >= 44 && !b.classList.contains("btn"); }), "secondary 44px button");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#nfsBar .btn").length) === 1, "one primary button");
+      await snap("23_nf_page_fav_btn");
+      await page.click("#nfsBar [data-nffav]"); await page.waitForTimeout(400);
+      nfChk((await page.textContent("#pill")).indexOf("נשמר") >= 0 && (await page.textContent("#pill")).indexOf("ביטול") >= 0, "save toast with undo");
+      nfChk((await page.textContent("#nfsBar [data-nffav]")).trim() === "★ שמור" && (await page.getAttribute("#nfsBar [data-nffav]", "aria-pressed")) === "true", "button state after save");
+      await snap("24_nf_fav_saved");
+      const f = await nfFavs(); nfChk(f && f.length === 1 && /^[A-Za-z0-9_]+$/.test(f[0].k) && f[0].title && (f[0].type === "movie" || f[0].type === "tv") && /^https:\/\/image\.tmdb\.org\//.test(f[0].poster) && typeof f[0].y === "number" && f[0].at > 0, "stored snapshot " + JSON.stringify(f));
+      await page.click("[data-nfclose]"); await page.waitForTimeout(500);
+      nfChk(await page.evaluate(() => { const s = document.querySelector('[data-nfrow="fav"]'); return !!s && s.previousElementSibling.classList.contains("nfhero") && s.textContent.indexOf("השמורים שלי") >= 0 && s.querySelectorAll(".nfc").length === 1; }), "fav row right after the hero");
+      nfChk(await page.evaluate((k) => !!document.querySelector('#main [data-nfrow="popular"] [data-nfopen="' + k + '"] .nfsv') || !document.querySelector('#main [data-nfrow="popular"] [data-nfopen="' + k + '"]'), (await nfFavs())[0].k), "saved poster has the star badge");
+      await snap("25_nf_fav_row");
+      await page.reload({ waitUntil: "networkidle" }); await page.waitForTimeout(900);
+      nfChk(await page.evaluate(() => !!document.querySelector('[data-nfrow="fav"]')), "fav row survives reload");
+      await page.click('[data-nfrow="fav"] .nfc'); await page.waitForTimeout(600); nfChk((await page.textContent("#nfsBar [data-nffav]")).trim() === "★ שמור", "state after reload");
+      await page.click("[data-nfclose]"); await page.waitForTimeout(300);
+    });
+    await step("nf-fav-undo", async () => { // הסרה עם 'החזר' (מהדף ובלחיצה ארוכה), שורה ריקה נעלמת, 'עוד' בשמורים
+      await nfClean(3);
+      nfChk(await page.evaluate(() => document.querySelectorAll('[data-nfrow="fav"] .nfc').length) === 3 && !(await page.evaluate(() => !!document.querySelector('[data-nfrow="fav"] .nfmore'))), "3 saved, no chip under the cap");
+      await snap("26_nf_fav_row3");
+      const first = await page.evaluate(() => document.querySelector('[data-nfrow="fav"] .nfc').getAttribute("data-nfopen"));
+      await page.click('[data-nfrow="fav"] .nfc'); await page.waitForTimeout(600);
+      nfChk((await page.textContent("#nfsBar [data-nffav]")).trim() === "★ שמור", "saved state on page");
+      await page.click("#nfsBar [data-nffav]"); await page.waitForTimeout(400);
+      nfChk((await page.textContent("#pill")).indexOf("הוסר") >= 0 && (await page.textContent("#pill")).indexOf("החזר") >= 0, "remove toast with undo");
+      nfChk((await nfFavs()).length === 2 && (await page.textContent("#nfsBar [data-nffav]")).trim() === "⭐ שמירה", "removed");
+      await snap("27_nf_fav_removed_toast");
+      await page.click("#pill [data-pillact]"); await page.waitForTimeout(400);
+      nfChk((await nfFavs()).length === 3 && (await nfFavs())[0].k === first && (await page.textContent("#nfsBar [data-nffav]")).trim() === "★ שמור", "undo restores in place (newest first)");
+      await page.click("[data-nfclose]"); await page.waitForTimeout(400);
+      nfChk(await page.evaluate(() => document.querySelectorAll('[data-nfrow="fav"] .nfc').length) === 3, "row has 3 again");
+      const press = async (sel, ms) => { const b = await page.locator(sel).first().boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(ms); await page.mouse.up(); await page.waitForTimeout(400); };
+      await press('[data-nfrow="fav"] .nfc', 800);
+      nfChk((await nfFavs()).length === 2 && !(await nfShown("#nfsheet")), "long press removes without opening the page");
+      nfChk((await page.textContent("#pill")).indexOf("הוסר") >= 0, "long press toast");
+      await page.click("#pill [data-pillact]"); await page.waitForTimeout(400); nfChk((await nfFavs()).length === 3, "long press undo");
+      await press('[data-nfrow="fav"] .nfc', 120); await page.waitForTimeout(300);
+      nfChk(await nfShown("#nfsheet") && (await nfFavs()).length === 3, "short press opens the page"); await page.click("[data-nfclose]"); await page.waitForTimeout(300);
+      await nfClean(1);
+      await press('[data-nfrow="fav"] .nfc', 800);
+      nfChk((await nfFavs()).length === 0 && await page.evaluate(() => !document.querySelector('[data-nfrow="fav"]')), "empty row is hidden"); await snap("28_nf_fav_empty");
+      await page.click("#pill [data-pillact]"); await page.waitForTimeout(400); nfChk(await page.evaluate(() => !!document.querySelector('[data-nfrow="fav"]')), "undo brings the row back");
+    });
+    await step("nf-fav-list", async () => { // יותר מ-16 שמורים: 'עוד' בשורת השמורים פותח את כולם
+      await nfClean(20);
+      nfChk(await page.evaluate(() => document.querySelectorAll('[data-nfrow="fav"] .nfc').length) === 16 && await page.evaluate(() => !!document.querySelector('[data-nfrow="fav"] .nfmore')), "16 cards + chip");
+      await page.locator('[data-nfmore="fav"]').click(); await page.waitForTimeout(700);
+      nfChk(await page.evaluate(() => document.querySelectorAll("#nflist .nfc").length) === 20, "all 20 in the list"); nfChk((await page.textContent("#nflT")).indexOf("השמורים שלי") >= 0, "title");
+      await snap("29_nf_fav_list");
+      await page.click("#nflist .nfc"); await page.waitForTimeout(600); await page.click("#nfsBar [data-nffav]"); await page.waitForTimeout(500);
+      nfChk(await page.evaluate(() => document.querySelectorAll("#nflist .nfc").length) === 19, "list refreshes behind the page");
+      await page.click("[data-nfclose]"); await page.waitForTimeout(300); await page.click("#nflist [data-nflclose]"); await page.waitForTimeout(300);
+    });
+    await step("nf-rows-dark", async () => {
+      await nfClean(3);
+      await page.evaluate(() => localStorage.setItem("tvg.theme", "dark")); await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1000); await snap("30_nf_dark_rows_top");
+      await page.evaluate(() => window.scrollTo(0, 900)); await page.waitForTimeout(800); await snap("30_nf_dark_rows_mid");
+      await page.locator('[data-nfmore="israeli"]').click(); await page.waitForTimeout(700); await snap("30_nf_dark_list");
+      await page.click("#nflist .nfc"); await page.waitForTimeout(700); await snap("30_nf_dark_list_page");
+      await page.evaluate(() => { localStorage.setItem("tvg.theme", "light"); localStorage.removeItem("tvg.nffav"); });
+    });
     nfFixture = false;
     // ---- חיפוש מלא בנטפליקס + התראות + תזכורת צפייה (כל השרת מדומה) ----
     const nfsStep = (n, f) => (phase !== "nfs" || process.env.TVG_NO_NFS || (process.env.TVG_SKIP && new RegExp(process.env.TVG_SKIP).test(n)) ? Promise.resolve() : runStep(n, f));

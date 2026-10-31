@@ -12,7 +12,18 @@
   TVG.nfIsNf = isNf;
   TVG.nfReopen = reopen;
 
-  var ROWS = [["popular", "הכי נצפים"], ["recent", "יצא לאחרונה"], ["top", "הכי מדורגים"]];
+  TVG.nfAfterRender = afterRender;
+  TVG.nfFavs = function () { return FAVS.slice(); };
+  TVG.nfIsFav = isFav;
+  TVG.openNfList = openNfList;
+  TVG.closeNfList = closeNfList;
+
+  // סדר השורות במסך (שורה שלא בנתונים נדלגת; שורה לא מוכרת עם כותרת ב-rowMeta באה בסוף). 'recent' ליד 'week' כי הן קרובות
+  var ORDER = ["popular", "israeli", "week", "recent", "series", "movies", "top", "comedy", "crime", "docu", "family"];
+  var TITLES = { popular: "הכי נצפים", recent: "יצא לאחרונה", top: "הכי מדורגים" }; // ברירת מחדל כשאין rowMeta (נתונים ישנים)
+  var FAV_TITLE = "⭐ השמורים שלי", FAV_MAX = 200, FAV_ROW = 16, LAZY_FIRST = 3;
+  var RE_NAME = /^[a-z][a-z0-9]{0,15}$/;
+  function cleanTitle(s) { return typeof s === "string" ? s.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 40) : ""; }
 
   // ---- נתונים: בדיקת סכמה v2 ונרמול. מחזיר null כשאין מה להציג (הלשונית נשארת מוסתרת) ----
   var RE_LINK = /^https:\/\/www\.netflix\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_TR = /^[A-Za-z0-9_-]{11}$/;
@@ -33,19 +44,54 @@
       Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k]); });
     }
     if (!j || typeof j !== "object" || !(j.v >= 2) || !j.items || typeof j.items !== "object") return null;
-    var rows = {}, any = false, seen = {};
-    ROWS.forEach(function (r) {
-      var src = j.rows && j.rows[r[0]], out = [];
+    var rows = {}, titles = {}, names = [], seen = {}, flat = [], meta = j0 && j0.rowMeta && typeof j0.rowMeta === "object" ? j0.rowMeta : {};
+    var src0 = j.rows && typeof j.rows === "object" ? j.rows : {};
+    ORDER.concat(Object.keys(src0).filter(function (n) { return ORDER.indexOf(n) < 0; }).slice(0, 12)).forEach(function (n) {
+      if (!RE_NAME.test(n)) return;
+      var src = src0[n], out = [], title = cleanTitle(meta[n] && meta[n].title) || TITLES[n] || "";
+      if (!title) return;
       (Array.isArray(src) ? src : []).forEach(function (k) { if (j.items[k] && j.items[k].title && out.indexOf(k) < 0) out.push(k); });
-      rows[r[0]] = out; if (out.length) any = true;
+      if (!out.length) return;
+      rows[n] = out; titles[n] = title; names.push(n); flat = flat.concat(out);
     });
-    if (!any) return null;
+    if (!names.length) return null;
     var hero = j.hero && j.items[j.hero] && j.items[j.hero].title ? j.hero : null;
-    if (!hero) rows.popular.concat(rows.recent, rows.top).some(function (k) { if (j.items[k].backdrop) { hero = k; return true; } return false; });
-    if (!hero) hero = rows.popular[0] || rows.recent[0] || rows.top[0];
+    if (!hero) flat.some(function (k) { if (j.items[k].backdrop) { hero = k; return true; } return false; });
+    if (!hero) hero = flat[0];
     var all = [];
-    rows.popular.concat(rows.recent, rows.top, Object.keys(j.items)).forEach(function (k) { if (!seen[k] && j.items[k] && j.items[k].title) { seen[k] = 1; all.push(k); } });
-    return { v: j.v, updated: j.updated, hero: hero, rows: rows, items: j.items, all: all };
+    flat.concat(Object.keys(j.items)).forEach(function (k) { if (!seen[k] && j.items[k] && j.items[k].title) { seen[k] = 1; all.push(k); } });
+    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all };
+  }
+
+  // ---- ⭐ שמורים (tvg.nffav): תמונת מצב של הפריט, כדי שיעבוד גם לתוצאות חיפוש. נפרד מ-tvg.fav (מועדפי שידור) ----
+  var RE_KEY = /^[A-Za-z0-9_]{1,24}$/;
+  var FAVS = loadFavs();
+  function loadFavs() {
+    var a = [], seenK = {};
+    try { a = JSON.parse(TVG.store("tvg.nffav") || "[]"); } catch (e) { a = []; }
+    if (!Array.isArray(a)) a = [];
+    return a.filter(function (f) {
+      if (!f || typeof f !== "object" || !RE_KEY.test(f.k || "") || typeof f.title !== "string" || !f.title || seenK[f.k]) return false;
+      seenK[f.k] = 1; return true;
+    }).map(function (f) {
+      return { k: f.k, title: f.title.slice(0, 120), type: f.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(f.poster || "") ? f.poster : "", y: +f.y > 0 ? +f.y : 0, at: +f.at || 0 };
+    }).sort(function (a2, b2) { return b2.at - a2.at; }).slice(0, FAV_MAX);
+  }
+  function saveFavs() { TVG.store("tvg.nffav", JSON.stringify(FAVS)); }
+  function favIdx(k) { for (var i = 0; i < FAVS.length; i++) if (FAVS[i].k === k) return i; return -1; }
+  function isFav(k) { return favIdx(k) >= 0; }
+  function favAdd(k, x, at) {
+    if (!RE_KEY.test(k) || !x || !x.title || favIdx(k) >= 0) return;
+    FAVS.unshift({ k: k, title: String(x.title).slice(0, 120), type: x.type === "tv" ? "tv" : "movie", poster: RE_IMG.test(x.poster || "") ? x.poster : "", y: +x.year > 0 ? +x.year : 0, at: at || Date.now() });
+    FAVS.sort(function (a, b) { return b.at - a.at; }); if (FAVS.length > FAV_MAX) FAVS.length = FAV_MAX;
+    saveFavs();
+  }
+  function favDel(k) { var i = favIdx(k); if (i < 0) return null; var f = FAVS.splice(i, 1)[0]; saveFavs(); return f; }
+  function favRestore(f) { if (!f || favIdx(f.k) >= 0) return; FAVS.push(f); FAVS.sort(function (a, b) { return b.at - a.at; }); if (FAVS.length > FAV_MAX) FAVS.length = FAV_MAX; saveFavs(); }
+  // פריט (כמו ב-NF.items) מתמונת המצב: לפתיחת הדף. nfEnsure (nfsearch.js) משלים תקציר וזמינות מהחיפוש
+  function favItem(k) {
+    var i = favIdx(k); if (i < 0) return null; var f = FAVS[i];
+    return { k: f.k, type: f.type, title: f.title, orig: "", year: f.y, poster: f.poster, genres: [], link: "https://www.netflix.com/search?q=" + encodeURIComponent(f.title), others: [], _wl: true };
   }
 
   // ---- עזרים ----
@@ -71,13 +117,26 @@
   }
 
   // ---- כרטיסים ----
-  function poster(x) {
+  function poster(x, k) {
     var u = imgUrl(x.poster);
-    return '<span class="nfp' + (u ? "" : " er") + '">' + (u ? '<img loading="lazy" decoding="async" alt="פוסטר: ' + esc(x.title) + '" src="' + esc(u) + '">' : "") +
-      '<span class="nfph" aria-hidden="true">🎬</span>' + imdbChip(x, "onp") + "</span>";
+    return '<span class="nfp' + (u ? "" : " er") + '">' + (u ? '<img loading="lazy" decoding="async" draggable="false" alt="פוסטר: ' + esc(x.title) + '" src="' + esc(u) + '">' : "") +
+      '<span class="nfph" aria-hidden="true">🎬</span>' + imdbChip(x, "onp") + (k && isFav(k) ? '<span class="nfsv" title="שמור">★</span>' : "") + "</span>";
   }
   function card(k, x) {
-    return '<button type="button" class="nfc" data-nfopen="' + esc(k) + '">' + poster(x) + '<span class="nft"><bdi>' + esc(x.title) + "</bdi></span></button>";
+    return '<button type="button" class="nfc" data-nfopen="' + esc(k) + '">' + poster(x, k) + '<span class="nft"><bdi>' + esc(x.title) + "</bdi></span></button>";
+  }
+  // כרטיס של שמור (תמונת מצב): בלחיצה ארוכה מסירים
+  function favCard(f) {
+    var x = { title: f.title, poster: f.poster };
+    return '<button type="button" class="nfc" data-nfopen="' + esc(f.k) + '" data-nffc="' + esc(f.k) + '">' + poster(x) + '<span class="nft"><bdi>' + esc(f.title) + "</bdi></span></button>";
+  }
+  function moreChip(name) { return '<button type="button" class="nfmore" data-nfmore="' + esc(name) + '" aria-label="עוד"><i aria-hidden="true">›</i><span>עוד</span></button>'; }
+  function skelRow() { var s = ""; for (var i = 0; i < 4; i++) s += '<span class="nfc nfsk" aria-hidden="true"><span class="nfp"></span><span class="nft"></span></span>'; return s; }
+  function rowCards(name, NF) { return NF.rows[name].map(function (k) { return card(k, NF.items[k]); }).join("") + moreChip(name); }
+  function favRowHtml() {
+    if (!FAVS.length) return "";
+    return '<section class="nfsec" data-nfrow="fav"><h2 class="sech">' + FAV_TITLE + '<span class="nfsub">לחיצה ארוכה להסרה</span></h2><div class="nfrow">' +
+      FAVS.slice(0, FAV_ROW).map(favCard).join("") + (FAVS.length > FAV_ROW ? moreChip("fav") : "") + "</div></section>";
   }
   function heroHtml(k, x) {
     var u = imgUrl(x.backdrop) || imgUrl(x.poster);
@@ -104,9 +163,13 @@
         '<a class="ghost" href="https://www.netflix.com/search?q=' + encodeURIComponent(TVG.q.trim()) + '" target="_blank" rel="noopener">🔎 חיפוש בנטפליקס</a></div>';
     } else {
       if (NF.hero && NF.items[NF.hero]) h += heroHtml(NF.hero, NF.items[NF.hero]);
-      ROWS.forEach(function (r) {
-        var ks = NF.rows[r[0]]; if (!ks.length) return;
-        h += '<section class="nfsec"><h2 class="sech">' + r[1] + '</h2><div class="nfrow">' + ks.map(function (k) { return card(k, NF.items[k]); }).join("") + "</div></section>";
+      var fr = favRowHtml(), n = fr ? 1 : 0;
+      h += fr;
+      // שורות מתחת לקפל נבנות רק כשמתקרבים אליהן (afterRender), כדי שהלשונית תישאר מהירה באייפון
+      NF.names.forEach(function (name) {
+        var title = esc(NF.titles[name]);
+        if (n++ < LAZY_FIRST) h += '<section class="nfsec" data-nfrow="' + name + '"><h2 class="sech">' + title + '</h2><div class="nfrow">' + rowCards(name, NF) + "</div></section>";
+        else h += '<section class="nfsec" data-nfrow="' + name + '" data-nflz="' + name + '"><h2 class="sech">' + title + '</h2><div class="nfrow">' + skelRow() + "</div></section>";
       });
     }
     return h + tmdbCredit();
@@ -151,17 +214,20 @@
   // ev: "nf" (נפתח מהודעת "הגיע לנטפליקס") / "rem" (מתזכורת צפייה). לפריט שההודעה אמרה שהגיע: תמיד זמין עם קישור, גם אם החיפוש (במטמון) עדיין אומר אחרת
   function getItem(k) {
     var ev = TVG.nfOpenEv, x = (TVG.NF && TVG.NF.items && TVG.NF.items[k]) || (TVG.nfX && TVG.nfX[k]) || null, w = TVG.wlItem ? TVG.wlItem(k, ev) : null;
-    if (!x) return w;
+    if (!x) return w || favItem(k);
     if (ev === "nf" && x.nf === false) x = Object.assign({}, x, { nf: true, link: x.link || (w && w.link) || "" });
     return x;
   }
   // פריט מרשימות נטפליקס (netflix.json) זמין בנטפליקס מעצם היותו שם; בתוצאות חיפוש יש שדה nf מפורש
   function isNf(x) { return !x || x.nf !== false; }
-  function barHtml(x) {
-    // 💌 ו-🍿 יתווספו בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
+  function barHtml(x, k) {
+    // 💌 יתווסף בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
     var ok = isNf(x) && RE_LINK.test(x.link || "");
+    var sv = k && RE_KEY.test(k) ? isFav(k) : null;
+    // ⭐ שמירה ו-🍿 באותה שורה (משניים, 44px): הכתום נשאר אחד, למטה
+    var row = (sv === null ? "" : '<button type="button" class="ghost nffv' + (sv ? " on" : "") + '" data-nffav="' + esc(k) + '" aria-pressed="' + sv + '">' + (sv ? "★ שמור" : "⭐ שמירה") + "</button>") + (TVG.partyNfBtn ? TVG.partyNfBtn() : ""); /* 🍿 ערב צפייה */
     return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
-      (TVG.partyNfBtn ? TVG.partyNfBtn() : "") + /* 🍿 ערב צפייה */
+      (row ? '<div class="nfbar2">' + row + "</div>" : "") +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
   function openNf(k, ev) {
@@ -178,7 +244,7 @@
     }
     if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
     TVG.nfOpen = k;
-    $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = 0;
+    $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x, k); $("#nfsBody").scrollTop = 0;
     $("#nfsheet").hidden = false; $("#scrim2").hidden = false;
     if (TVG.nfEnsure) TVG.nfEnsure(x); // פריט בלי פרטים (נפתח מהודעה): משלימים מהחיפוש
     // היסטוריה: #nfsheet רשום ב-nav.js כשכבה (MutationObserver על hidden)
@@ -187,18 +253,116 @@
   function reopen() {
     var x = TVG.nfOpen && getItem(TVG.nfOpen); if (!x || $("#nfsheet").hidden) return;
     var sc = $("#nfsBody").scrollTop;
-    $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = sc;
+    $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x, TVG.nfOpen); $("#nfsBody").scrollTop = sc;
   }
   function closeNf() {
     if (!$("#nfsheet") || $("#nfsheet").hidden) return;
     $("#nfsheet").hidden = true; TVG.nfOpen = null;
-    if ($("#rem").hidden && $("#favs").hidden && $("#setsheet").hidden && $("#land").hidden) $("#scrim2").hidden = true;
+    scrimOff();
+  }
+  // הרקע הכהה נעלם רק כשאין אף חלון פתוח מתחתיו (רשימת 'עוד' יכולה להיות פתוחה מתחת לדף תוכן)
+  function scrimOff() {
+    var any = ["#rem", "#favs", "#setsheet", "#land", "#nflist", "#nfsheet"].some(function (s) { var e = $(s); return e && !e.hidden; });
+    if (!any) $("#scrim2").hidden = true;
   }
 
+  // ---- שורות מתחת לקפל: נבנות כשמתקרבים אליהן ----
+  var io = null;
+  function fillRow(sec) {
+    var name = sec.getAttribute("data-nflz"), NF = TVG.NF; sec.removeAttribute("data-nflz");
+    var r = sec.querySelector(".nfrow"); if (r && NF && NF.rows[name]) r.innerHTML = rowCards(name, NF);
+  }
+  function afterRender() {
+    if (io) { try { io.disconnect(); } catch (e) {} io = null; }
+    var secs = Array.prototype.slice.call(document.querySelectorAll("#main [data-nflz]")); if (!secs.length) return;
+    if (!("IntersectionObserver" in window)) { secs.forEach(fillRow); return; }
+    io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); fillRow(en.target); } }); }, { rootMargin: "0px 0px 700px 0px" });
+    secs.forEach(function (s) { io.observe(s); });
+  }
+
+  // ---- רשימה מלאה ('עוד ›'): חלון תחתון עם כל פריטי השורה ----
+  var listName = null;
+  function listData(name) {
+    var NF = TVG.NF;
+    if (name === "fav") return FAVS.length ? { title: FAV_TITLE, types: FAVS.map(function (f) { return f.type; }), cards: FAVS.map(favCard) } : null;
+    if (!NF || !NF.rows[name]) return null;
+    return { title: NF.titles[name], types: NF.rows[name].map(function (k) { return NF.items[k].type; }), cards: NF.rows[name].map(function (k) { return card(k, NF.items[k]); }) };
+  }
+  function listHtml(d) {
+    var tv = d.types.filter(function (t) { return t === "tv"; }).length, n = d.types.length;
+    var what = tv === n ? (n === 1 ? "סדרה" : "סדרות") : tv === 0 ? (n === 1 ? "סרט" : "סרטים") : "סרטים וסדרות";
+    return '<div class="nfl-in"><h2 id="nflT">' + esc(d.title) + '</h2><p class="nfl-n">' + n + " " + what + (listName === "fav" ? " · לחיצה ארוכה להסרה" : "") + '</p><div class="nfgrid">' + d.cards.join("") + "</div></div>";
+  }
+  function openNfList(name) {
+    var d = listData(name); if (!d) return;
+    listName = name;
+    $("#nflBody").innerHTML = listHtml(d); $("#nflBody").scrollTop = 0;
+    $("#nflist").hidden = false; $("#scrim2").hidden = false;
+  }
+  function refreshList() {
+    if (!listName || $("#nflist").hidden) return;
+    var d = listData(listName); if (!d) { closeNfList(); return; }
+    var sc = $("#nflBody").scrollTop; $("#nflBody").innerHTML = listHtml(d); $("#nflBody").scrollTop = sc;
+  }
+  function closeNfList() {
+    if (!$("#nflist") || $("#nflist").hidden) return;
+    $("#nflist").hidden = true; listName = null;
+    scrimOff();
+  }
+
+  // ---- שמירה/הסרה: מעדכנים רק את מה שהשתנה (שורת השמורים, כוכבים על פוסטרים, הכפתור, הרשימה), בלי לצייר מחדש ולקפוץ ----
+  function patchMain() {
+    var main = $("#main"); if (TVG.tab !== "nf" || !TVG.NF || TVG.q.trim() || !main) return;
+    var cur = main.querySelector('[data-nfrow="fav"]'), html = favRowHtml(), h0 = document.documentElement.scrollHeight;
+    if (!html) { if (cur) cur.parentNode.removeChild(cur); }
+    else {
+      var tmp = document.createElement("div"); tmp.innerHTML = html; var nu = tmp.firstChild;
+      if (cur) cur.parentNode.replaceChild(nu, cur);
+      else { var hero = main.querySelector(".nfhero"); if (hero && hero.nextSibling) main.insertBefore(nu, hero.nextSibling); else if (hero) main.appendChild(nu); else main.insertBefore(nu, main.firstChild); }
+    }
+    Array.prototype.forEach.call(main.querySelectorAll("[data-nfopen]"), function (c) {
+      var p = c.querySelector(".nfp"); if (!p || c.hasAttribute("data-nffc")) return;
+      var on = isFav(c.getAttribute("data-nfopen")), b = p.querySelector(".nfsv");
+      if (on && !b) p.insertAdjacentHTML("beforeend", '<span class="nfsv" title="שמור">★</span>'); else if (!on && b) p.removeChild(b);
+    });
+    var d = document.documentElement.scrollHeight - h0;
+    if (d && window.scrollY > 4) window.scrollBy(0, d); // השורה נוספה/הוסרה מעל מה שרואים: משאירים את התצוגה במקום
+  }
+  function favChanged() { patchMain(); refreshList(); if (TVG.nfOpen && !$("#nfsheet").hidden) reopen(); }
+  function toggleFav(k) {
+    if (!RE_KEY.test(k)) return;
+    if (isFav(k)) {
+      var f = favDel(k); favChanged();
+      TVG.pill("הוסר מהשמורים", 4500, "החזר", function () { favRestore(f); favChanged(); });
+    } else {
+      var x = getItem(k); if (!x) return;
+      favAdd(k, x); favChanged();
+      TVG.pill("⭐ נשמר בשמורים", 4000, "ביטול", function () { favDel(k); favChanged(); });
+    }
+  }
+
+  // לחיצה ארוכה על שמור = הסרה (עם 'החזר'). ההקשה שאחריה לא פותחת את הדף
+  var lp = null, lpSuppress = false;
+  function lpClear() { if (lp) { clearTimeout(lp.t); lp = null; } }
+  document.addEventListener("pointerdown", function (e) {
+    lpSuppress = false;
+    var c = e.target.closest && e.target.closest("[data-nffc]"); if (!c || (e.pointerType === "mouse" && e.button !== 0)) return;
+    lpClear();
+    var k = c.getAttribute("data-nffc");
+    lp = { x: e.clientX, y: e.clientY, t: setTimeout(function () { lp = null; lpSuppress = true; if (isFav(k)) { try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) {} toggleFav(k); } }, 550) };
+  });
+  document.addEventListener("pointermove", function (e) { if (lp && Math.abs(e.clientX - lp.x) + Math.abs(e.clientY - lp.y) > 8) lpClear(); });
+  ["pointerup", "pointercancel"].forEach(function (n) { document.addEventListener(n, lpClear); });
+  document.addEventListener("contextmenu", function (e) { if (e.target.closest && e.target.closest("[data-nffc]")) e.preventDefault(); });
+  document.addEventListener("click", function (e) { if (lpSuppress) { lpSuppress = false; e.preventDefault(); e.stopPropagation(); } }, true);
+
   document.addEventListener("click", function (e) {
-    var t = e.target;
-    var o = t.closest && t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen")); return; }
-    if (t.closest && t.closest("[data-nfclose]")) closeNf();
+    var t = e.target; if (!t.closest) return;
+    var fv = t.closest("[data-nffav]"); if (fv) { toggleFav(fv.getAttribute("data-nffav")); return; }
+    var mo = t.closest("[data-nfmore]"); if (mo) { openNfList(mo.getAttribute("data-nfmore")); return; }
+    var o = t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen")); return; }
+    if (t.closest("[data-nfclose]")) closeNf();
+    if (t.closest("[data-nflclose]")) closeNfList();
   });
   // Escape וכפתור "חזור": nav.js סוגר את השכבה העליונה
 })(window.TVG);

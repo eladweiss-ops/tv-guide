@@ -31,6 +31,7 @@ window.TVG = { VERSION: VERSION, BUILD: BUILD, files: {}, failed: [], list: [] }
 var BUST = (location.search.match(/[?&]r2=(\d+)/) || [])[1];
 TVG.v = BUILD + (BUST ? "&r2=" + BUST : "");
 document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
+document.write('<link rel="stylesheet" href="css/party.css?v=' + TVG.v + '">'); // 🍿 ערב צפייה
 </script>
 </head>
 <body>
@@ -104,11 +105,14 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <section class="sheet land" id="land" hidden role="dialog" aria-label="פרטי התוכנית"><div class="lnd-scroll" id="landBody"></div><div class="lnd-bar" id="landBar"></div><div class="lnd-isheet" id="lndInst" hidden></div></section>
 <section class="sheet" id="rem" hidden aria-label="תזכורת"><div class="sheet-in" id="remBody"></div></section>
 <section class="sheet nfs" id="nfsheet" hidden role="dialog" aria-labelledby="nfsT"><div class="nfs-scroll" id="nfsBody"></div><div class="nfs-bar" id="nfsBar"></div></section>
+<!-- 🍿 ערב צפייה (js/party.js): אחרי #nfsheet בכוונה, כדי שייפתחו מעליו -->
+<section class="sheet" id="party" hidden role="dialog" aria-label="ערב צפייה"><div class="sheet-in" id="ptyBody"></div></section>
+<section class="sheet land" id="ptyL" hidden role="dialog" aria-label="הזמנה לערב צפייה"><div class="lnd-scroll" id="ptyLBody"></div><div class="lnd-bar" id="ptyLBar"></div></section>
 
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","series","render-rems","render-common","render-now","render-grid","netflix","nfsearch","nfwatch","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","landing","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","series","render-rems","render-common","render-now","render-grid","netflix","nfsearch","nfwatch","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","landing","party","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

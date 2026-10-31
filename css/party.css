@@ -1,0 +1,64 @@
+/* css/party.css - 🍿 ערב צפייה (js/party.js). נטען אחרי app.css (index.html). משתמש באותם משתנים ובאותן מחלקות של דף הנחיתה (.lnd-*) ושל חלון השיתוף (.shbub). */
+.pty-fix { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 16px; border-radius: 22px; background: var(--soft); line-height: 1.45; }
+.pty-fix > span:first-child { font-size: 1.2rem; flex: none; }
+.pty-fix small { color: var(--muted); font-weight: 500; }
+.ghost.wag { background: color-mix(in srgb, #25D366 20%, transparent); color: #0b6b35; font-weight: 700; }
+:root[data-theme="dark"] .ghost.wag { background: color-mix(in srgb, #25D366 24%, transparent); color: #6ff0a4; }
+#party .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#party .confirm span { flex: 1 1 100%; font-weight: 700; }
+#party .confirm .btn, #party .confirm .ghost { flex: 1 1 0; width: auto; min-width: 0; }
+
+/* ----- דף נחיתה לאורח ----- */
+.pty-hero { gap: 12px; justify-content: flex-end; }
+.pty-hero .lnd-em { font-size: 120px; }
+.pty-pos { position: relative; width: 92px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 16px; background: rgba(255,255,255,.18); box-shadow: 0 8px 22px rgba(0,0,0,.35); align-self: flex-start; }
+.pty-inv { position: relative; font-weight: 800; font-size: 1.05rem; line-height: 1.4; }
+.pty-open { margin-inline-start: auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--soft); color: var(--ink); font-weight: 700; text-decoration: none; }
+.pty-who, .pty-ask { padding: 14px 18px; gap: 10px; }
+.pty-h { font-weight: 800; font-size: 1.05rem; }
+.pty-grp { display: flex; flex-direction: column; gap: 6px; }
+.pty-grp > b { font-size: .95rem; color: var(--muted); }
+.pty-nms { display: flex; flex-wrap: wrap; gap: 8px; }
+.pty-nm { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.pty-who .none, .pty-who .credit { margin: 0; }
+.pty-chips { display: flex; flex-wrap: nowrap; gap: 8px; }
+.pty-ans { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 0 4px; font-size: .92rem; line-height: 1.2; text-align: center; white-space: nowrap; }
+.pty-ask .pin { width: 100%; box-sizing: border-box; }
+.pty-ask .credit { margin: 0; }
+.pty-note { margin: 0 4px; color: var(--muted); font-size: .92rem; line-height: 1.55; }
+
+/* ----- 3, 2, 1… פליי ----- */
+#ptyGo { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px)); color: #fff; text-align: center; background: radial-gradient(circle at 50% 38%, #3a1a0a 0%, #120805 62%, #050302 100%); }
+#ptyGo[hidden] { display: none; }
+.pty-go-in { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.pty-pop { font-size: 64px; line-height: 1; }
+.pty-big { font-family: var(--font-display); font-weight: 800; font-size: 9rem; line-height: 1; min-height: 9rem; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; text-shadow: 0 6px 40px rgba(255,122,26,.55); }
+.pty-big.pty-play { font-size: 4.2rem; min-height: 0; color: #FF9A4A; }
+.pty-go-t { margin: 0; font-size: 1.2rem; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.pty-go-ch { margin: 0; font-size: 1.25rem; font-weight: 700; }
+#ptyGo .btn, #ptyGo .ghost { width: 100%; min-height: 52px; }
+#ptyGo .ghost { background: rgba(255,255,255,.16); color: #fff; }
+#ptyGo a.btn { color: var(--accent-ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .pty-big.tick { animation: ptyTick .9s ease-out; }
+  .pty-pop { animation: ptyPop 1.6s ease-in-out infinite; }
+}
+@keyframes ptyTick { from { transform: scale(1.45); opacity: .2; } to { transform: scale(1); opacity: 1; } }
+@keyframes ptyPop { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8px) rotate(6deg); } }
+
+/* ----- עדכון: דף אורח קומפקטי (התשובה על המסך בלי גלילה), רשימת מארח עם הסרה ----- */
+.pty-hero { flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; min-height: 0; padding: 16px 18px; }
+.pty-hero .lnd-em { font-size: 72px; }
+.pty-pos { width: 56px; flex: none; align-self: center; border-radius: 12px; }
+.pty-ht { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pty-hero .lnd-ttl { font-size: 1.55rem; line-height: 1.15; }
+.pty-inv { font-size: .98rem; }
+label.pty-h { display: block; }
+.pty-hint { margin: -4px 2px 0; color: var(--accent); font-weight: 700; font-size: .95rem; }
+.pty-hint[hidden] { display: none; }
+.pty-cnt { font-weight: 800; font-size: 1.05rem; }
+.pty-rr { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; border-bottom: 1px solid var(--line); }
+.pty-rn { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.pty-rr .ghost.sm { flex: none; }
+#ptyL .lnd-scroll > * { flex-shrink: 0; }
+#ptyL .lnd-bar { position: sticky; bottom: 0; } /* שכבה נפרדת מהתוכן שנגלל מתחתיה (כמו .nfs-bar) */

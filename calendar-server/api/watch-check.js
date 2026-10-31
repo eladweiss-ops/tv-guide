@@ -9,6 +9,7 @@ import { load } from "./_store.js";
 import { reschedule } from "./_push.js";
 import { SEARCH_TTL } from "./_nfs.js";
 import { fail } from "./_guard.js";
+import { cleanParties } from "./_party.js"; // 🍿 ערב צפייה
 
 // כל המשתמשים עם רשימת מעקב: אוסף wl ב-Firestore (מזהה המסמך = הטוקן). הערכים כבר נקראו: אין קריאה שנייה לכל משתמש
 export async function listUsers(list = listJson) {
@@ -47,6 +48,7 @@ export function cronAuth(req, secret = process.env.CRON_SECRET) {
 // d (לבדיקות): תלויות של runCheck
 export default async function handler(req, res, d = {}) {
   if (req.method !== "GET") return res.status(405).end();
+  const t0 = Date.now(); // 🍿 ערב צפייה: deadline משותף לניקוי, מתחילת הריצה
   const au = cronAuth(req);
   if (au !== 200) return res.status(au).json({ error: au === 503 ? "not configured" : "unauthorized" });
   try {
@@ -58,8 +60,10 @@ export default async function handler(req, res, d = {}) {
     try {
       fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems, o) => reschedule(t, rems, o), deadline: t0 + FOLLOW_BUDGET_MS + 10000, ...d, ...(d.follow || {}), guide: guideOnce });
     } catch (e) { console.error("follow-check", e && e.message); fo = { error: true }; }
-    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 60000, ...d, guide: guideOnce });
+    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 52000, ...d, guide: guideOnce }); // משאיר זמן לניקוי ערבי הצפייה לפני maxDuration 60
     r.follow = fo;
+    // 🍿 ערב צפייה: ניקוי קטן (עד 100 ערבים שעברו יומיים), מכבד את הזמן שנשאר. כישלון כאן לא פוגע בבדיקה היומית
+    try { r.parties = await (d.cleanParties || cleanParties)(Date.now(), { deadline: t0 + 55000 }); } catch (e) { r.parties = -1; console.error("party cleanup failed"); }
     console.log("watch-check", JSON.stringify(r));
     res.setHeader("cache-control", "no-store");
     return res.status(200).json(r);

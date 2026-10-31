@@ -11,7 +11,7 @@
   TVG.handleUrl = handleUrl;
   TVG.afterBoot = afterBoot;
 
-  var URL_PARAMS = ["tab", "rem", "nf", "e", "p", "q"];
+  var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q"]; // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -85,7 +85,7 @@
   // ---- פרמטרים בכתובת ----
   // לשונית: נקבעת לפני שהאפליקציה עולה, כדי שתיפתח ישר בלשונית הנכונה
   var P0 = new URLSearchParams(location.search), bootTab = P0.get("tab");
-  if (bootTab && TABS[bootTab] && !P0.get("rem") && !P0.get("nf") && P0.get("p") == null && !P0.has("q")) TVG.store("tvg.tab", bootTab); // קדימות: ?tab= רק כשאין rem/nf/p/q
+  if (bootTab && TABS[bootTab] && !P0.get("rem") && !P0.get("nf") && !P0.get("w") && P0.get("p") == null && !P0.has("q")) TVG.store("tvg.tab", bootTab); // קדימות: ?tab= רק כשאין rem/nf/p/q
 
   function cleanUrl(drop) {
     try {
@@ -111,12 +111,14 @@
     var p;
     try { p = new URL(u || location.href, location.href).searchParams; } catch (e) { return; }
     if (!TVG.G) { TVG.pendingUrl = u || location.href; return; }
-    // קדימות (מקום אחד): rem > nf > p > q > tab. rem: נודניק; nf: דף תוכן נטפליקס מהודעת התראה (netflix.js openNf); p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
-    var tab = p.get("tab"), rem = p.get("rem"), nfk = p.get("nf"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
-    if (tab && !isBoot && !rem && !nfk && pp == null) switchTab(tab);
-    if (rem && /^nf\|[mt][0-9]{1,9}\|/.test(rem)) { if (TVG.openNf) TVG.openNf(rem.split("|")[1], "rem"); } // תזכורת צפייה בנטפליקס: דף התוכן, לא חלון הנודניק של שידור
+    // קדימות (מקום אחד): rem > nf > w > p > q > tab. w: ערב צפייה (party.js). rem: נודניק; nf: דף תוכן נטפליקס מהודעת התראה (netflix.js openNf); p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
+    var tab = p.get("tab"), rem = p.get("rem"), nfk = p.get("nf"), pw = p.get("w"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
+    if (tab && !isBoot && !rem && !nfk && !pw && pp == null) switchTab(tab);
+    if (rem && /^w\|[A-Za-z0-9_-]{22}\|/.test(rem)) { if (TVG.openParty) TVG.openParty(rem.split("|")[1]); } // 🍿 ערב צפייה: הקשה על תזכורת לערב (party.js)
+    else if (rem && /^nf\|[mt][0-9]{1,9}\|/.test(rem)) { if (TVG.openNf) TVG.openNf(rem.split("|")[1], "rem"); } // תזכורת צפייה בנטפליקס: דף התוכן, לא חלון הנודניק של שידור
     else if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
     else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk, p.get("e") === "nf" ? "nf" : null); }
+    else if (pw) { if (TVG.openParty) TVG.openParty(pw, p.get("go") === "1"); } // 🍿 ערב צפייה: ?w=<id>[&go=1]
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);
     if (isBoot) cleanUrl(URL_PARAMS);

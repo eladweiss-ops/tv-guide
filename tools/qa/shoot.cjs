@@ -18,6 +18,7 @@ const path = require("path");
 const http = require("http");
 const { chromium } = require("playwright-core");
 const { audit: runAudit } = require("./audit.cjs");
+const touch = require("./touch.cjs"); // מגע אמיתי (CDP) לצעדי fluid-*
 
 const OUT = path.resolve(process.argv[2] || "shots");
 const REPO = path.resolve(__dirname, "..", "..");
@@ -349,6 +350,65 @@ function nfFixtureData() {
       await page.click(".nfhero"); await page.waitForTimeout(500); await snap("19_nf_layer_open");
     });
     await page.evaluate(() => { try { localStorage.removeItem("tvg.tab"); } catch (e) {} });
+
+    // ---- תחושת אצבע נוזלית (js/sheetdrag.js, js/swipe.js, css נגישות): מגע אמיתי דרך CDP. פירוט מלא + הקלטות: tools/qa/fluid.cjs ----
+    const fluidSt = (sel) => page.evaluate((s) => { const e = document.querySelector(s), r = e.getBoundingClientRect(); return { hidden: e.hidden, top: r.top, h: r.height, tr: e.style.transform, hist: history.state, url: location.search }; }, sel);
+    const fluidOpen = async () => { await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(500); await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(600); };
+    await step("fluid-sheet-slow-back", async () => { // גרירה איטית של 30% ושחרור: חוזר פתוח, ההיסטוריה לא נגעה
+      const cdp = await ctx.newCDPSession(page); await fluidOpen(); const s0 = await fluidSt("#rem"), cx = d.w / 2;
+      await touch.drag(cdp, [[cx, s0.top + 14], [cx, s0.top + 14 + s0.h * 0.3]], 700, { hold: 250, release: false }); await snap("70_fluid_drag_mid");
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await page.waitForTimeout(900);
+      const s1 = await fluidSt("#rem"); if (s1.hidden || s1.tr !== "" || Math.abs(s1.top - s0.top) > 1 || !(s1.hist && s1.hist.tvgLayer)) throw new Error("assert: slow drag should spring back open: " + JSON.stringify(s1));
+    });
+    await step("fluid-sheet-flick-close", async () => { // זריקה מהירה: נסגר דרך שכבת הניווט, בלי רשומת היסטוריה יתומה, כתובת נקייה
+      const cdp = await ctx.newCDPSession(page); await fluidOpen(); const s0 = await fluidSt("#rem"), cx = d.w / 2;
+      await touch.drag(cdp, [[cx, s0.top + 14], [cx, s0.top + 14 + 130]], 100); await page.waitForTimeout(900);
+      const s1 = await fluidSt("#rem"); if (!s1.hidden || s1.hist || s1.url) throw new Error("assert: flick should close with clean history: " + JSON.stringify(s1));
+      if (!(await page.evaluate(() => document.querySelector("#scrim2").hidden && document.querySelector("#scrim2").style.opacity === ""))) throw new Error("assert: scrim not reset");
+      await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(500); await snap("70_fluid_reopen");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(400); if (!(await fluidSt("#rem")).hidden) throw new Error("assert: Escape still closes");
+    });
+    await step("fluid-sheet-inner-scroll", async () => { // תוכן גלול: הגרירה גוללת, לא מזיזה את החלון
+      const cdp = await ctx.newCDPSession(page); await fresh(); await page.click("#setBtn"); await page.waitForTimeout(700);
+      const i = await page.evaluate(() => { const s = document.querySelector("#setsheet"); s.scrollTop = 240; const r = s.getBoundingClientRect(); return { top: r.top, h: r.height }; }), cx = d.w / 2;
+      await touch.drag(cdp, [[cx, i.top + i.h * 0.55], [cx, i.top + i.h * 0.55 + 160]], 500, { hold: 100, release: false });
+      const m = await fluidSt("#setsheet"), sc = await page.evaluate(() => document.querySelector("#setsheet").scrollTop);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await page.waitForTimeout(600);
+      if (m.tr !== "" || sc >= 240) throw new Error("assert: inner scroll should scroll content, not move the sheet: " + m.tr + " scrollTop " + sc);
+    });
+    await step("fluid-day-swipe-edge", async () => { // יום אחרון: גומי וחוזר; כיוון RTL נשמר (dx>0 = היום הבא)
+      const cdp = await ctx.newCDPSession(page); await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(700);
+      const days = await page.evaluate(() => TVG.allDays()), y = d.h * 0.55;
+      await touch.drag(cdp, [[d.w * 0.25, y], [d.w * 0.7, y]], 120); await page.waitForTimeout(800);
+      if ((await page.evaluate(() => TVG.day)) !== days[1]) throw new Error("assert: dx>0 should go to the next day");
+      await page.evaluate((l) => { TVG.day = l; TVG.render(); }, days[days.length - 1]); await page.waitForTimeout(500);
+      await touch.drag(cdp, [[d.w * 0.25, y], [d.w * 0.85, y]], 250); await page.waitForTimeout(800);
+      const r = await page.evaluate(() => ({ day: TVG.day, tr: document.querySelector(".list").style.transform }));
+      if (r.day !== days[days.length - 1] || r.tr !== "") throw new Error("assert: last day should rubber-band and stay: " + JSON.stringify(r));
+      await snap("71_fluid_last_day");
+    });
+    await step("fluid-reduced-motion", async () => { // הפחתת תנועה: נסגר בדעיכה, בלי קפיץ
+      const cdp = await ctx.newCDPSession(page); await page.emulateMedia({ reducedMotion: "reduce" });
+      try { await fluidOpen(); const s0 = await fluidSt("#rem"), cx = d.w / 2;
+        await touch.drag(cdp, [[cx, s0.top + 14], [cx, s0.top + 14 + 110]], 90); await page.waitForTimeout(700);
+        const s1 = await fluidSt("#rem"); if (!s1.hidden || s1.hist) throw new Error("assert: reduced-motion flick should close cleanly: " + JSON.stringify(s1));
+        await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(500); await snap("72_reduced_motion_sheet");
+      } finally { await page.emulateMedia({ reducedMotion: "no-preference" }); }
+    });
+    await step("fluid-a11y-media", async () => { // ניגודיות גבוהה + שקיפות מופחתת (CDP) בשני הערכות, עם חלון תזכורת פתוח
+      const cdp = await ctx.newCDPSession(page);
+      for (const th of ["light", "dark"]) {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), th);
+        await page.emulateMedia({ contrast: "more" }); await fluidOpen().catch(() => {}); await page.evaluate((t) => TVG.setTheme(t), th); await snap("73_contrast_more_" + th);
+        await page.emulateMedia({ contrast: "no-preference" });
+        await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
+        const bf = await page.evaluate(() => getComputedStyle(document.querySelector("#rem")).backdropFilter);
+        if (bf !== "none") throw new Error("assert: sheet backdrop-filter should be none under reduced transparency: " + bf);
+        await snap("73_reduced_transparency_" + th);
+        await cdp.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "no-preference" }] });
+      }
+      await page.evaluate(() => TVG.setTheme("light"));
+    });
 
     // תרחישי אנדרואיד/יומן: בסוף, כדי שלא ישנו מצב (tab/calmode) לצילומים הקודמים; כל צעד מנקה אחריו
     await step("cal-ics-sheet", async () => { // יומן רגיל (באנדרואיד: יומן Google), חלון תזכורת אחרי בחירת מצב

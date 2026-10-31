@@ -34,6 +34,7 @@
 | &nbsp;&nbsp;`core` · `data` | עזרים+אחסון+מצב משותף · טעינת הלוח, סיווג, איחוד ערוצים, אינדקס |
 | &nbsp;&nbsp;`reminders` · `reminder-sheet` · `push` | מצב תזכורות/מועדפים, סנכרון, ICS · חלון התזכורת והיומן · פוש והגדרות אישיות |
 | &nbsp;&nbsp;`ui` · `render` · `events` | pill/scrim · render() ראשי · כל מאזיני המסמך (הקשה/גרירה/מקלדת) |
+| &nbsp;&nbsp;`motion` · `sheetdrag` | תחושת אצבע נוזלית: `TVG.spring` (קפיץ response 0.3 / damping 0.8, מכבד הפחתת תנועה), `TVG.project`/`rubber`/`velocity` · גרירה לסגירה של כל חלון תחתון (סוגר דרך `TVG.closeTop()` של nav.js, כמו Escape). בדיקה: `node tools/qa/fluid.cjs <outDir>` |
 | &nbsp;&nbsp;`render-now/-grid/-dial/-rems/-common` · `netflix` · `swipe` | מסכים |
 | &nbsp;&nbsp;`search` · `favs` · `channels` · `settings` · `backup` | חיפוש+נושאים · מועדפים · בחירת ערוצים · הגדרות/ערכה/התקנה · גיבוי וקישור אישי |
 | &nbsp;&nbsp;`update` · `boot` | עדכון אוטומטי · עליית האפליקציה (אחרון) |

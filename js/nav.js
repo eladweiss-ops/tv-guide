@@ -10,6 +10,8 @@
   TVG.navLayer = navLayer;
   TVG.handleUrl = handleUrl;
   TVG.afterBoot = afterBoot;
+  TVG.topLayerEl = function () { var L = order[order.length - 1]; return L ? $(L.sel) : null; }; // השכבה הפתוחה העליונה (גרירת חלון תחתון, sheetdrag.js)
+  TVG.closeTop = function () { return closeTop(); }; // אותה סגירה כמו Escape / "חזור": דרך ה-close של השכבה, וההיסטוריה מתנקה ב-sync
 
   var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q"]; // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };

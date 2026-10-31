@@ -121,7 +121,7 @@
     TVG.render();
     setTimeout(function () {
       var row = document.querySelector('[data-pts="' + pr.p.s.getTime() + '"]'); if (!row) return;
-      row.scrollIntoView({ block: "center", behavior: "smooth" }); row.classList.add("hl");
+      row.scrollIntoView({ block: "center", behavior: TVG.reducedMotion() ? "auto" : "smooth" }); row.classList.add("hl");
       setTimeout(function () { row.classList.remove("hl"); }, 2800);
     }, 80);
   }

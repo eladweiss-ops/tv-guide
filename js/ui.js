@@ -24,7 +24,7 @@
     if (vv) { vv.addEventListener("resize", setKb); vv.addEventListener("scroll", setKb); }
     document.addEventListener("focusin", function (e) {
       var t = e.target; if (!t || !t.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !t.closest(".sheet")) return;
-      setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (er) {} }, 350);
+      setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: TVG.reducedMotion() ? "auto" : "smooth" }); } catch (er) {} }, 350);
     });
   }
   window.addEventListener("scroll", function () { document.body.classList.toggle("scrolled", window.scrollY > 8); }, { passive: true });

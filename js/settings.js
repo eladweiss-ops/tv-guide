@@ -21,7 +21,7 @@
     $("#instBtn").textContent = TVG.isAndroid ? "התקנת האפליקציה" : "הוסף למסך הבית";
     $("#instTxt").textContent = TVG.dip ? "אפשר להתקין את הלוח כאפליקציה, והוא ייפתח במסך מלא." : ios ? "בספארי: לוחצים על כפתור השיתוף ואז על ״הוסף למסך הבית״." : "בתפריט הדפדפן: ״הוסף למסך הבית״ או ״התקן אפליקציה״.";
   }
-  function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); }
+  function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); if (TVG.wlRender) TVG.wlRender(); }
 
   var themeSel = "light";
   function setTheme(t) {

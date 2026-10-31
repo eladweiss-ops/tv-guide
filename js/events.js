@@ -87,6 +87,7 @@
     var sc2 = t.closest("[data-scope]"); if (sc2) { TVG.scope = sc2.getAttribute("data-scope"); TVG.render(); return; }
     if (t.closest("[data-clearx]")) { TVG.qExact = null; TVG.render(); return; }
     var jp = t.closest("[data-jump]");
+    if (jp && /^nf\|/.test(jp.getAttribute("data-jump"))) { TVG.openNf(jp.getAttribute("data-jump").split("|")[1]); return; } // תזכורת צפייה בנטפליקס: פותחת את דף התוכן
     if (jp && /^p\|/.test(jp.getAttribute("data-jump"))) { if (TVG.srv()) TVG.openLead([jp.getAttribute("data-jump")]); return; }
     if (jp) {
       if (TVG.q.trim()) TVG.addRecent(TVG.qExact || TVG.q, !!TVG.qExact);

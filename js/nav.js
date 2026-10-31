@@ -1,5 +1,5 @@
 /* js/nav.js - ניווט שכבות (כפתור "חזור" באנדרואיד / מחוות חזרה / Escape סוגרים את החלון העליון, בלי לצאת מהאפליקציה)
-   ופרמטרים בכתובת (?rem= ?tab= ?q=), גם בעליית האפליקציה וגם מהודעת ה-Service Worker.
+   ופרמטרים בכתובת (?rem= ?nf= ?tab= ?q=), גם בעליית האפליקציה וגם מהודעת ה-Service Worker.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core ... channels (לפני events).
    איך זה עובד: כל שכבה היא אלמנט שמוסתר/מוצג עם hidden. MutationObserver מזהה פתיחה -> history.pushState,
    סגירה מהממשק -> history.go(-n) (ההיסטוריה נשארת נקייה), ו-popstate -> סוגר את השכבה העליונה.
@@ -11,7 +11,7 @@
   TVG.handleUrl = handleUrl;
   TVG.afterBoot = afterBoot;
 
-  var URL_PARAMS = ["tab", "rem", "p", "q"];
+  var URL_PARAMS = ["tab", "rem", "nf", "p", "q"];
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -84,7 +84,7 @@
   // ---- פרמטרים בכתובת ----
   // לשונית: נקבעת לפני שהאפליקציה עולה, כדי שתיפתח ישר בלשונית הנכונה
   var P0 = new URLSearchParams(location.search), bootTab = P0.get("tab");
-  if (bootTab && TABS[bootTab] && !P0.get("rem") && P0.get("p") == null && !P0.has("q")) TVG.store("tvg.tab", bootTab); // קדימות: ?tab= רק כשאין rem/p/q
+  if (bootTab && TABS[bootTab] && !P0.get("rem") && !P0.get("nf") && P0.get("p") == null && !P0.has("q")) TVG.store("tvg.tab", bootTab); // קדימות: ?tab= רק כשאין rem/nf/p/q
 
   function cleanUrl(drop) {
     try {
@@ -110,10 +110,11 @@
     var p;
     try { p = new URL(u || location.href, location.href).searchParams; } catch (e) { return; }
     if (!TVG.G) { TVG.pendingUrl = u || location.href; return; }
-    // קדימות (מקום אחד): rem > p > q > tab. rem: נודניק; p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
-    var tab = p.get("tab"), rem = p.get("rem"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
-    if (tab && !isBoot && !rem && pp == null) switchTab(tab);
+    // קדימות (מקום אחד): rem > nf > p > q > tab. rem: נודניק; nf: דף תוכן נטפליקס מהודעת התראה (netflix.js openNf); p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
+    var tab = p.get("tab"), rem = p.get("rem"), nfk = p.get("nf"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
+    if (tab && !isBoot && !rem && !nfk && pp == null) switchTab(tab);
     if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
+    else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk); }
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);
     if (isBoot) cleanUrl(URL_PARAMS);

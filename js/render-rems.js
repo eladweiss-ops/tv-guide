@@ -18,7 +18,8 @@
       if (dl !== last) { h += '<h2 class="sech">' + dl + "</h2>"; last = dl; }
       var live = x.ts <= now;
       var fp = TVG.findProg(x.k), ds = (fp && fp.p.desc) || x.desc || "";
-      var syn = ds ? '<div class="rsyn"><p class="rclamp">' + esc(ds) + "</p>" + (ds.length > 90 ? '<button type="button" class="moreb" data-more data-l="הרחב">הרחב…</button>' : "") + "</div>" : "";
+      var nfl = /^nf\|/.test(x.k) ? (ds.match(/https:\/\/www\.netflix\.com\/[^\s"<>]+/) || [])[0] : ""; // תזכורת צפייה בנטפליקס: קישור במקום כתובת גולמית
+      var syn = nfl ? '<div class="rsyn"><a class="nfrl" href="' + esc(nfl) + '" target="_blank" rel="noopener">▶ פתיחה בנטפליקס</a></div>' : ds ?'<div class="rsyn"><p class="rclamp">' + esc(ds) + "</p>" + (ds.length > 90 ? '<button type="button" class="moreb" data-more data-l="הרחב">הרחב…</button>' : "") + "</div>" : "";
       h += '<div class="srow"><button type="button" class="go" data-jump="' + esc(x.k) + '"><span class="time">' + hhmm(d) + '</span><span class="ttl">' + esc(x.title) + '<br><span class="sub"><bdi>' + esc(x.ch) + "</bdi> · <bdi>" + (live ? (x.id ? "משודר עכשיו" : "עכשיו") : "🔔 " + esc(!x.id && !x.lead ? "בזמן" : TVG.leadTxt(x.lead, x.ts))) + "</bdi></span></span></button>" + syn +
         (live ? "</div>" : TVG.askK === x.k
           ? '</div><div class="confirm"><span>לבטל את התזכורת?</span><button type="button" class="btn sm danger" data-remcancel="' + esc(x.k) + '">כן, לבטל</button><button type="button" class="ghost sm" data-remkeep>להשאיר</button></div>'

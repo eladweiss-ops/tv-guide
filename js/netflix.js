@@ -7,6 +7,10 @@
   TVG.nfPrep = nfPrep;
   TVG.openNf = openNf;
   TVG.closeNf = closeNf;
+  TVG.nfNorm = normT;   // נרמול כותרות (גם להתאמה ללוח בחיפוש נטפליקס, nfsearch.js)
+  TVG.nfGet = getItem;
+  TVG.nfIsNf = isNf;
+  TVG.nfReopen = reopen;
 
   var ROWS = [["popular", "הכי נצפים"], ["recent", "יצא לאחרונה"], ["top", "הכי מדורגים"]];
 
@@ -93,8 +97,10 @@
         var x = NF.items[k];
         return x.title.toLowerCase().indexOf(t) >= 0 || (x.orig || "").toLowerCase().indexOf(t) >= 0 || (x.genres || []).join(" ").toLowerCase().indexOf(t) >= 0;
       });
-      h = res.length ? '<h2 class="sech">נמצאו ' + res.length + " ברשימות נטפליקס</h2>" + '<div class="nfgrid">' + res.map(function (k) { return card(k, NF.items[k]); }).join("") + "</div>"
-        : '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> בנטפליקס</b><span>מחפשים בשם בעברית, בשם המקורי או בז׳אנר. הרשימות כוללות רק את מה שפופולרי עכשיו.</span></div>';
+      // חיפוש מלא (שרת, nfsearch.js): מתחיל אחרי 400ms ו-2 תווים. תוצאות מקומיות מופיעות מיד.
+      var rem = TVG.nfRemote ? TVG.nfRemote(res) : { html: "", any: false };
+      h = (res.length ? '<h2 class="sech">נמצאו ' + res.length + " ברשימות נטפליקס</h2>" + '<div class="nfgrid">' + res.map(function (k) { return card(k, NF.items[k]); }).join("") + "</div>" : "") + rem.html;
+      if (!res.length && !rem.any) h = '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> בנטפליקס</b><span>מחפשים בשם בעברית, בשם המקורי, בשחקן או בבמאי.</span></div>';
     } else {
       if (NF.hero && NF.items[NF.hero]) h += heroHtml(NF.hero, NF.items[NF.hero]);
       ROWS.forEach(function (r) {
@@ -134,20 +140,35 @@
     h += '<p class="nfov">' + (x.overview ? esc(x.overview) : "אין עדיין תקציר בעברית לתוכן הזה.") + "</p>";
     // "חברים שראו": שלב 3. אין נתונים אמיתיים, לכן אין בלוק בכלל.
     if (RE_TR.test(x.trailer || "")) h += '<a class="ghost nftr" href="https://www.youtube.com/watch?v=' + esc(x.trailer) + '" target="_blank" rel="noopener">🎬 טריילר</a>';
+    // זמינות, 🔔 התראות, ⏰ תזכורת צפייה (nfsearch.js / nfwatch.js)
+    if (TVG.nfAvail) h += TVG.nfAvail(x);
+    if (TVG.nfAlerts) h += TVG.nfAlerts(x);
+    if (TVG.nfWatchRem) h += TVG.nfWatchRem(x);
     return h + "</div>";
   }
+  // פריט לפי מפתח: רשימות נטפליקס, תוצאות חיפוש מלא, או פריט ברשימת ההתראות (כשפותחים מהודעה)
+  function getItem(k) { return (TVG.NF && TVG.NF.items && TVG.NF.items[k]) || (TVG.nfX && TVG.nfX[k]) || (TVG.wlItem && TVG.wlItem(k)) || null; }
+  // פריט מרשימות נטפליקס (netflix.json) זמין בנטפליקס מעצם היותו שם; בתוצאות חיפוש יש שדה nf מפורש
+  function isNf(x) { return !x || x.nf !== false; }
   function barHtml(x) {
     // 💌 ו-🍿 יתווספו בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
-    var ok = RE_LINK.test(x.link || "");
+    var ok = isNf(x) && RE_LINK.test(x.link || "");
     return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
   function openNf(k) {
-    var x = TVG.NF && TVG.NF.items && TVG.NF.items[k]; if (!x) return;
+    var x = getItem(k); if (!x) { if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
     TVG.nfOpen = k;
     $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = 0;
     $("#nfsheet").hidden = false; $("#scrim2").hidden = false;
+    if (TVG.nfEnsure) TVG.nfEnsure(x); // פריט בלי פרטים (נפתח מהודעה): משלימים מהחיפוש
     // היסטוריה: #nfsheet רשום ב-nav.js כשכבה (MutationObserver על hidden)
+  }
+  // ציור מחדש של הדף הפתוח (אחרי שינוי התראה/תזכורת/נתונים), בלי לקפוץ לראש
+  function reopen() {
+    var x = TVG.nfOpen && getItem(TVG.nfOpen); if (!x || $("#nfsheet").hidden) return;
+    var sc = $("#nfsBody").scrollTop;
+    $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = sc;
   }
   function closeNf() {
     if (!$("#nfsheet") || $("#nfsheet").hidden) return;

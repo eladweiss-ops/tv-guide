@@ -4,7 +4,7 @@ import { put, list } from "@vercel/blob";
 import { okToken } from "./_store.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
-const KEYS = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.recent", "tvg.topics"];
+const KEYS = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.recent", "tvg.topics", "tvg.wl"];
 const path = (t) => `backup/${t}.json`;
 
 export default async function handler(req, res) {

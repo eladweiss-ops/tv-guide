@@ -70,6 +70,8 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
       <button type="button" data-theme-set="dark" aria-pressed="false">כהה</button>
       <button type="button" data-theme-set="auto" aria-pressed="false">לפי המכשיר</button>
     </div>
+    <h2>התראות נטפליקס</h2>
+    <div id="wlList"></div>
     <h2>גיבוי ושחזור</h2>
     <p class="none">כל מה שבחרתם (ערוצים, מועדפים, נושאים, תזכורות) נשמר אוטומטית בענן. שמרו לעצמכם את הקישור האישי, למשל בוואטסאפ לעצמכם. במכשיר חדש פותחים את האפליקציה ומדביקים אותו כאן.</p>
     <p class="none" id="bkState"></p>
@@ -93,7 +95,7 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","nfsearch","nfwatch","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

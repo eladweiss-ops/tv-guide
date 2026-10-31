@@ -5,6 +5,7 @@
   var $ = TVG.$, esc = TVG.esc, hhmm = TVG.hhmm, CAL_API = TVG.CAL_API;
   TVG.calCard = calCard;
   TVG.enablePush = enablePush;
+  TVG.addRec = addRec;
   TVG.openPersonal = openPersonal;
   TVG.pChips = pChips;
   TVG.pushCard = pushCard;
@@ -78,6 +79,13 @@
       b.setAttribute("aria-pressed", String(TVG.pLead === m));
     });
   }
+  // הוספת תזכורת אישית לרשימה (גם מדף נטפליקס): בלי פוש/יומן מציעים להפעיל התראות קודם ("pending"; ההוספה תושלם בסיום ההפעלה)
+  function addRec(rec, d) {
+    if (!TVG.srv() && TVG.canPush) { pendRec = rec; enablePush(); return "pending"; }
+    TVG.REMS.push(rec); TVG.saveRems();
+    if (TVG.srv()) TVG.syncRems(); else TVG.calAdd({ id: "personal", p: { title: rec.title, s: d, e: new Date(rec.end), desc: rec.desc || "" }, lead: rec.lead });
+    return "ok";
+  }
   function savePersonal() {
     var title = ($("#pTitle").value || "").trim(), v = $("#pWhen").value, d = v ? new Date(v) : null;
     if (!title) { TVG.pill("כתבו מה להזכיר", 1500); $("#pTitle").focus(); return; }
@@ -85,9 +93,7 @@
     var ts = d.getTime();
     if (ts < Date.now() + 60000) { TVG.pill("בחרו זמן עתידי", 1500); return; }
     var rec = { k: "p|" + ts + "|" + Math.random().toString(36).slice(2, 7), id: "", ts: ts, end: ts + 3600000, title: title, ch: "תזכורת אישית", desc: "", lead: TVG.fitLead(ts, TVG.pLead), at: Date.now() };
-    if (!TVG.srv() && TVG.canPush) { pendRec = rec; enablePush(); return; }
-    TVG.REMS.push(rec); TVG.saveRems();
-    if (TVG.srv()) TVG.syncRems(); else TVG.calAdd({ id: "personal", p: { title: title, s: d, e: new Date(rec.end), desc: "" }, lead: rec.lead });
+    if (addRec(rec, d) === "pending") return;
     TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח יומן Google. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
   function pushCard() {

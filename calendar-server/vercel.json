@@ -1,4 +1,15 @@
 {
+  "crons": [
+    {
+      "path": "/api/watch-check",
+      "schedule": "0 6 * * *"
+    }
+  ],
+  "functions": {
+    "api/watch-check.js": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/cal/:t.ics",

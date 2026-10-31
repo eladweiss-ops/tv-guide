@@ -77,6 +77,14 @@
 `@vercel/blob@1.1.1` (האחרון ב-1.x) תומך רק ב-`access:"public"`; גישה פרטית קיימת ב-2.x. תוכנית: לעבור ל-2.x, ליצור store פרטי, לכתוב `push/` ו-`sched/` לשם עם קריאה כפולה (פרטי ואז ציבורי) בתקופת מעבר, ואז למחוק את הציבוריים. `rems/` ו-`backup/` נשארים ציבוריים עד שהיומן המנוי עובר רק דרך `/api/cal`.
 `npm audit`: 3 פגיעויות (undici / @fastify/busboy דרך `@vercel/blob` <=2.0.0), לא נפתרות ב-1.x (1.1.1 הוא האחרון); נדרש 2.x.
 
+## חיפוש נטפליקס והתראות מעקב
+
+משתני סביבה חדשים (Vercel > tv-guide-cal > Settings > Environment Variables, Production): **`TMDB_API_KEY`** (v3 קצר, או Read Access Token ארוך שמשמש כ-Bearer) ו-**`CRON_SECRET`** (מחרוזת אקראית ארוכה; Vercel שולחת אותה אוטומטית ב-`Authorization: Bearer` לקריאת ה-cron). בלי `CRON_SECRET` הנקודה `/api/watch-check` סגורה (503); בלי `TMDB_API_KEY` החיפוש מחזיר 503.
+
+- `GET /api/nf-search?q=` (2-60 תווים): TMDB `search/multi` (he-IL עם נפילה לאנגלית), אוסף (סדרת סרטים לפי סדר יציאה), מותג/חברה (כינויים בעברית ב-`_nfs.js` `BRANDS`, ואז `discover` לפי `with_companies`), אנשים (known_for + קרדיטים מובילים). לכל כותרת: `nf` (flatrate של נטפליקס ישראל, provider 8), `link` (חיפוש בנטפליקס), `others` (שירותים אחרים, מידע בלבד). פלט ברשימה לבנה (תמונות רק `image.tmdb.org`). מטמון: זיכרון + Blob `cache/nf/<hash>.json` ל-12 שעות. קצב: 30 לדקה ל-IP. שגיאות: 400/429/502/503.
+- `GET /api/watch?t=` · `POST /api/watch {t, items}`: רשימת מעקב ב-`wl/<t>.json`, עד 50 פריטים, אימות כמו `/api/rems` (טוקן אישי; 60 ל-IP ו-30 לטוקן בדקה; גוף עד 32KB). פריט: `{k:"m603"|"t1396", title, orig?, poster?, on:["nf","season","tv"], bn?}`.
+- `GET /api/watch-check` (Vercel Cron, יומי 06:00 UTC, `vercel.json` `crons`; `maxDuration` 60): לכל משתמש עם מנוי פוש בודק נטפליקס ישראל (עבר מ"לא" ל"כן"), `number_of_seasons`/`next_episode_to_air` (עונה חדשה), ואת `guide.json` החי לשידורים ב-7 הימים הבאים. פוש אחד לכל אירוע חדש (`url: ./?nf=<key>`), עד 8 למשתמש בריצה. הבדיקה הראשונה של פריט רק קובעת בסיס (בלי פוש). אירועים שנשלחו נרשמים ב-`st.fired` (עונה: `s<N>`, נטפליקס: `nf`, שידור: `b:<זמן>`), כך שאין חזרות. משתמש בלי מנוי פוש מדולג בלי להתקדם. בדיקות: `node --test calendar-server/test/*.mjs`.
+
 ### ביטול נודניק ותזכורת כפולה
 - `POST /api/snooze` עם `{k, t, m:0, cancel:1}` (טוקן אישי בלבד): מוחק את הנודניק המתוזמן ל-`k` (`{ok:true, cancelled:bool}`). `m:0` נשלח בכוונה: שרת ישן ידחה אותו ב-400 במקום לתזמן נודניק חדש.
 - שדה `dbl:1` ברשומת התזכורת (`/api/rems`, רק כש-`lead>0`): "וגם בתחילת השידור". `reschedule` מתזמן הודעה נוספת ב-`ts` (מפתח `k#s`, גוף `{t,k,at,st:1}`), `/api/fire` שולח אותה רק אם `dbl` עדיין קיים והזמן לא השתנה. ביומן המנוי נוספת התראה שנייה `TRIGGER:PT0S`.

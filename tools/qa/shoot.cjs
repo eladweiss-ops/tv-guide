@@ -43,6 +43,29 @@ function serve() {
   });
 }
 
+// ---- חיפוש נטפליקס ושרת ההתראות: תשובות מדומות (בלי קריאות חיות). נתיבי תמונה fx_* נענים ב-SVG מקומי ----
+function fxItem(k, title, o = {}) {
+  return { k, id: +k.slice(1), type: k[0] === "t" ? "tv" : "movie", title, orig: o.orig || "", year: o.year || 2019, overview: o.ov || "תקציר לדוגמה של התוכן, כמה שורות כדי לבדוק גלישה ויישור בעברית.",
+    poster: "https://image.tmdb.org/t/p/w342/fx_" + k + ".jpg", backdrop: "", nf: !!o.nf, others: o.others || [], link: o.nf ? "https://www.netflix.com/search?q=" + encodeURIComponent(o.orig || title) : "" };
+}
+function nfSearchFixture(q) {
+  const base = { v: 1, q, collection: null, brand: null, titles: [], persons: [], items: {} };
+  const put = (it) => { base.items[it.k] = it; return it.k; };
+  if (q === "הנוקמים") {
+    base.collection = { id: 86311, name: "הנוקמים - אוסף", poster: "", keys: [
+      put(fxItem("m24428", "הנוקמים", { orig: "The Avengers", year: 2012, others: ["Disney Plus"] })), put(fxItem("m99861", "הנוקמים: עידן אולטרון", { orig: "Avengers: Age of Ultron", year: 2015, others: ["Disney Plus"] })),
+      put(fxItem("m299536", "הנוקמים: מלחמת האינסוף", { orig: "Avengers: Infinity War", year: 2018, nf: true })), put(fxItem("m299534", "הנוקמים: סוף המשחק", { orig: "Avengers: Endgame", year: 2019, nf: true }))] };
+    base.titles = [put(fxItem("t88001", "הזמר במסכה", { year: 2018 })), put(fxItem("m88002", "הכוורת", { year: 1976 })), put(fxItem("t88003", "הנוקמים: מועדון הנוקמים האגדי והמיוחד מכולם", { orig: "Avengers Assemble Forever", year: 2013, others: ["Disney Plus", "Prime Video"] }))];
+    base.persons = [{ id: 3223, name: "רוברט דאוני ג׳וניור", photo: "https://image.tmdb.org/t/p/w185/fx_p3223.jpg", dept: "משחק", keys: [put(fxItem("m1726", "איש הברזל", { orig: "Iron Man", year: 2008, others: ["Disney Plus"] })), put(fxItem("m299534", "הנוקמים: סוף המשחק", { orig: "Avengers: Endgame", year: 2019, nf: true })), put(fxItem("m27205", "ההתחלה", { orig: "Inception", year: 2010, nf: true }))] }];
+  } else if (q === "טום הנקס") {
+    base.persons = [{ id: 31, name: "טום הנקס", photo: "https://image.tmdb.org/t/p/w185/fx_p31.jpg", dept: "משחק", keys: ["m13", "m857", "m497", "m9800"].map((k, i) => put(fxItem(k, ["פורסט גאמפ", "להציל את טוראי ריאן", "הקו הירוק", "מחוץ לזמן"][i], { year: 1994 + i, nf: i === 0 }))) }];
+  } else if (q === "מארוול") {
+    base.brand = { name: "Marvel Studios", keys: ["m1726", "m10138", "m24428", "t88001", "m299534"].map((k, i) => put(fxItem(k, ["איש הברזל", "איש הברזל 2", "הנוקמים", "הזמר במסכה", "הנוקמים: סוף המשחק"][i], { year: 2008 + i, nf: i === 4, others: i < 3 ? ["Disney Plus"] : [] }))) };
+  }
+  return base;
+}
+const fxSvg = (path) => { const h = (path.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 360); return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 3"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${h},55%,38%)"/><stop offset="1" stop-color="hsl(${(h + 50) % 360},60%,22%)"/></linearGradient></defs><rect width="2" height="3" fill="url(#g)"/></svg>`; };
+
 // עותק של netflix.json עם ציונים לכמה פריטים + פריט קצה (שם ארוך מעורב, בלי תמונות) - לבדיקות בלבד
 function nfFixtureData() {
   const j = JSON.parse(fs.readFileSync(path.join(REPO, "netflix.json"), "utf8"));
@@ -59,20 +82,37 @@ function nfFixtureData() {
   let srv = null, base = process.argv[3];
   if (!base) { const s = await serve(); srv = s.srv; base = s.url; }
   if (!base.endsWith("/")) base += "/";
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  let browser = null; // דפדפן חדש לכל מכשיר: ריצה ארוכה של כמה מכשירים ברצף עלולה להפיל את הרנדרר (Target crashed)
   let total = 0, failed = 0; const allErrors = [];
   for (const d of DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0))) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
+    browser = await chromium.launch({ channel: "chrome", headless: true, args: process.env.TVG_CHROME_ARGS ? process.env.TVG_CHROME_ARGS.split(" ") : [] });
     const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem" });
     await ctx.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
     // TVG_NO_WRITES=1 (הניטור מול האתר החי): חוסם כל בקשה שאינה GET לשרת התזכורות, כדי שהבדיקה לא תכתוב גיבויים/תזכורות
     if (process.env.TVG_NO_WRITES) await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
+    // חיפוש נטפליקס / רשימת מעקב / סנכרון תזכורות: תמיד מדומה (אין קריאות חיות לשרת). wlPosts = גופי ה-POST לבדיקות
+    const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" };
+    const wlPosts = [], nfQueries = [];
+    await ctx.route(/image\.tmdb\.org\/t\/p\/\w+\/fx_/, (r) => r.fulfill({ status: 200, contentType: "image/svg+xml", body: fxSvg(r.request().url()) }));
+    await ctx.route(/\/api\/nf-search/, (r) => {
+      const q = new URL(r.request().url()).searchParams.get("q") || ""; nfQueries.push(q);
+      if (q === "שגיאה") return r.fulfill({ status: 502, contentType: "application/json", headers: CORS, body: '{"error":"upstream"}' });
+      return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: JSON.stringify(nfSearchFixture(q)) });
+    });
+    await ctx.route(/\/api\/watch/, (r) => {
+      if (r.request().method() === "POST") wlPosts.push(JSON.parse(r.request().postData() || "{}"));
+      return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":1}' });
+    });
+    await ctx.route(/\/api\/backup/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"at":0,"data":{}}' })); // גיבוי אוטומטי: לא כותבים לשרת החי מהבדיקות
+    await ctx.route(/\/api\/rems/,(r) => r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":0,"rems":[]}' }));
     const page = await ctx.newPage();
     const errs = [];
     page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
-    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/snooze$/.test(u) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); });
+    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); });
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
     const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); };
-    const step = async (name, fn) => { try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); } };
+    page.on("crash", () => console.log("  !! renderer crashed", d.name));
+    const step = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
     await page.clock.setFixedTime(new Date(FIXED_NOW));
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
     let nfFixture = false;
@@ -118,6 +158,102 @@ function nfFixtureData() {
     await step("nf-search-empty", async () => { nfFixture = true; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(600); await page.click("#sBtn"); await page.fill("#q", "zzzqqq"); await page.waitForTimeout(700); await snap("18_nf_search_empty"); });
     await step("nf-dark", async () => { nfFixture = true; await fresh(); await page.click("#setBtn"); await page.waitForTimeout(400); await page.click('[data-theme-set="dark"]'); await page.waitForTimeout(300); await page.click("[data-setclose]"); await page.waitForTimeout(300); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap("19_nf_dark_top"); await page.click(".nfhero"); await page.waitForTimeout(800); await snap("19_nf_dark_page"); await page.evaluate(() => localStorage.setItem("tvg.theme", "light")); });
     nfFixture = false;
+    // ---- חיפוש מלא בנטפליקס + התראות + תזכורת צפייה (כל השרת מדומה) ----
+    const nfsStep = process.env.TVG_NO_NFS ? async () => {} : step;
+    const A = (c, m) => { if (!c) throw new Error("assert: " + m); };
+    const shown = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
+    const nfSearch = async (q) => { await page.evaluate(() => { try { ["tvg.wl", "tvg.rem", "tvg.wlDirty"].forEach((k) => localStorage.removeItem(k)); } catch (e) {} }); await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(500); await page.click("#sBtn"); await page.fill("#q", q); await page.waitForTimeout(1600); };
+    await nfsStep("nfs-avengers", async () => {
+      nfQueries.length = 0; await nfSearch("הנוקמים");
+      const txt = await page.textContent("#main");
+      for (const s of ["סדרת סרטים", "הנוקמים - אוסף", "סרטים וסדרות", "אנשים", "▶בנטפליקס", "לא זמין כרגע", "משודר בערוץ", "קשת"]) A(txt.indexOf(s) >= 0, "missing text: " + s);
+      A(/היום 22:50/.test(txt), "airing today badge: " + txt.slice(0, 400)); A(/יום א׳ 19:15/.test(txt), "airing Sunday badge");
+      A(nfQueries.length === 1 && nfQueries[0] === "הנוקמים", "one debounced query: " + JSON.stringify(nfQueries));
+      A(await page.evaluate(() => [].map.call(document.querySelectorAll(".nfxn"), (e) => e.textContent).join() === "1,2,3,4"), "collection numbered in order");
+      await snap("20_nfs_avengers");
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(500); await snap("20_nfs_avengers_bottom");
+    });
+    await nfsStep("nfs-debounce", async () => { // הקלדה מהירה = בקשה אחת בלבד
+      nfQueries.length = 0; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(500); await page.click("#sBtn");
+      for (const q of ["ה", "הנ", "הנו", "הנוק"]) { await page.fill("#q", q); await page.waitForTimeout(120); }
+      await page.waitForTimeout(1300); A(nfQueries.length === 1 && nfQueries[0] === "הנוק", "debounce: " + JSON.stringify(nfQueries));
+    });
+    await nfsStep("nfs-person", async () => { await nfSearch("טום הנקס"); const txt = await page.textContent("#main"); A(txt.indexOf("אנשים") >= 0 && txt.indexOf("טום הנקס") >= 0 && txt.indexOf("פורסט גאמפ") >= 0, "person section"); await snap("21_nfs_person"); });
+    await nfsStep("nfs-brand", async () => { await nfSearch("מארוול"); const txt = await page.textContent("#main"); A(txt.indexOf("Marvel Studios") >= 0 && txt.indexOf("איש הברזל") >= 0, "brand section"); await snap("22_nfs_brand"); });
+    await nfsStep("nfs-empty", async () => { await nfSearch("zzzqqq"); const txt = await page.textContent("#main"); A(txt.indexOf("לא נמצא") >= 0, "empty state: " + txt.slice(0, 200)); await snap("23_nfs_empty"); });
+    await nfsStep("nfs-error", async () => { await nfSearch("שגיאה"); const txt = await page.textContent("#main"); A(txt.indexOf("החיפוש המלא לא זמין") >= 0, "error state"); await snap("24_nfs_error"); });
+    await nfsStep("nfs-sheet-alerts", async () => {
+      await nfSearch("הנוקמים"); wlPosts.length = 0;
+      await page.click('[data-nfopen="m24428"]'); await page.waitForTimeout(700); A(await shown("#nfsheet"), "sheet open from search result");
+      const sh = await page.textContent("#nfsheet");
+      for (const s of ["לא זמין כרגע בנטפליקס", "זמין גם ב:", "Disney Plus", "🔔 תודיע לי", "כשזה מגיע לנטפליקס", "כשזה משודר בערוץ", "⏰ להזכיר לי לצפות", "הערב 21:00", "מחר 21:00", "בחירת שעה"]) A(sh.indexOf(s) >= 0, "sheet text: " + s);
+      A(sh.indexOf("עונה חדשה") < 0, "no season chip for a movie");
+      A(await page.evaluate(() => !document.querySelector(".nfgo")), "no Netflix button for unavailable title");
+      await snap("25_nfs_sheet_alerts");
+      await page.click('[data-wlkind="nf"]'); await page.waitForTimeout(500);
+      A((await page.getAttribute('[data-wlkind="nf"]', "aria-pressed")) === "true", "chip pressed");
+      A(wlPosts.length === 1 && wlPosts[0].items[0].k === "m24428" && wlPosts[0].items[0].on.join() === "nf" && wlPosts[0].items[0].bn === false && /^[a-z0-9]{24,48}$/.test(wlPosts[0].t), "watch POST " + JSON.stringify(wlPosts));
+      A(/נודיע לך/.test(await page.textContent("#pill")), "alert toast");
+      await snap("26_nfs_alert_set");
+      await page.click("[data-pillact]"); await page.waitForTimeout(400); // ביטול
+      A((await page.getAttribute('[data-wlkind="nf"]', "aria-pressed")) === "false", "undo unpresses"); A(wlPosts.length === 2 && wlPosts[1].items.length === 0, "undo synced empty list");
+    });
+    await nfsStep("nfs-sheet-tv", async () => { // סדרה בנטפליקס: שלושת סוגי ההתראות לא כולם; עונה חדשה כן; כפתור ראשי כתום
+      await nfSearch("הנוקמים"); await page.click('[data-nfopen="t88001"]'); await page.waitForTimeout(600);
+      const sh = await page.textContent("#nfsheet"); A(sh.indexOf("עונה חדשה") >= 0 && sh.indexOf("כשזה מגיע לנטפליקס") >= 0, "tv chips"); A(/📺 משודר בערוץ/.test(sh), "airing badge in sheet");
+      await snap("27_nfs_sheet_tv");
+      await page.evaluate(() => { document.querySelector("#nfsBody").scrollTop = 9999; }); await page.waitForTimeout(300); await snap("27_nfs_sheet_tv_bottom");
+      await page.click("[data-nfclose]");
+    });
+    await nfsStep("nfs-sheet-nf", async () => {
+      await nfSearch("הנוקמים"); await page.click('[data-nfopen="m299534"]'); await page.waitForTimeout(600);
+      A(await page.evaluate(() => { const a = document.querySelector(".nfgo"); return !!a && /^https:\/\/www\.netflix\.com\/search\?q=/.test(a.href); }), "Netflix primary button");
+      A((await page.textContent("#nfsheet")).indexOf("כשזה מגיע לנטפליקס") < 0, "no arrive-on-Netflix chip when already there");
+      await snap("28_nfs_sheet_nf");
+    });
+    await nfsStep("nfs-watch-rem", async () => {
+      await nfSearch("הנוקמים"); await page.evaluate(() => { TVG.pushOn = true; }); await page.click('[data-nfopen="m299534"]'); await page.waitForTimeout(600);
+      await page.click('[data-nfrem="tomorrow"]'); await page.waitForTimeout(500);
+      const rec = await page.evaluate(() => TVG.REMS[0]);
+      A(rec && /^nf\|m299534\|\d+$/.test(rec.k) && rec.title === "הנוקמים: סוף המשחק" && rec.ch === "נטפליקס" && rec.lead === 0 && /netflix\.com\/search\?q=Avengers/.test(rec.desc), "reminder record " + JSON.stringify(rec));
+      A(new Date(rec.ts).getHours() === 21 && new Date(rec.ts).getMinutes() === 0 && rec.ts > Date.now(), "tomorrow 21:00 (frozen clock)");
+      const pill = await page.textContent("#pill"); A(/נזכיר לך מחר ב־21:00/.test(pill) && /ביטול/.test(pill), "toast: " + pill);
+      A((await page.textContent("#nfsheet")).indexOf("יש תזכורת") >= 0, "sheet shows the new reminder");
+      await snap("29_nfs_rem_created");
+      await page.click("[data-nfclose]"); await page.waitForTimeout(400); await page.click('[data-tab="rems"]'); await page.waitForTimeout(600);
+      const rt = await page.textContent("#main"); A(rt.indexOf("הנוקמים: סוף המשחק") >= 0 && rt.indexOf("פתיחה בנטפליקס") >= 0 && rt.indexOf("netflix.com") < 0, "reminders tab row with link, raw URL hidden");
+      await snap("30_nfs_rem_in_rems");
+      await page.click("[data-jump]"); await page.waitForTimeout(500); A(await shown("#nfsheet"), "tapping the reminder opens the content sheet");
+      await page.click("[data-nfclose]");
+    });
+    await nfsStep("nfs-watch-rem-undo", async () => {
+      await nfSearch("הנוקמים"); await page.evaluate(() => { TVG.pushOn = true; }); await page.click('[data-nfopen="m299534"]'); await page.waitForTimeout(500);
+      await page.click('[data-nfrem="pick"]'); await page.waitForTimeout(300); A(await shown("[data-nfremdt]"), "time picker shown"); await snap("31_nfs_rem_pick");
+      await page.click("[data-nfremset]"); await page.waitForTimeout(500); A(await page.evaluate(() => TVG.REMS.length === 1), "picked-time reminder");
+      A(await shown("#pill"), "toast visible: " + (await page.evaluate(() => document.querySelector("#pill").outerHTML)));
+      await page.click("[data-pillact]"); await page.waitForTimeout(400); A(await page.evaluate(() => TVG.REMS.length === 0), "undo removes the reminder");
+    });
+    await nfsStep("nfs-settings-list", async () => {
+      await nfSearch("הנוקמים"); await page.click('[data-nfopen="t88001"]'); await page.waitForTimeout(500);
+      await page.click('[data-wlkind="season"]'); await page.click('[data-wlkind="tv"]'); await page.waitForTimeout(300);
+      await page.click("[data-nfclose]"); await page.waitForTimeout(300);
+      await page.evaluate(() => { TVG.closeNf(); }); await page.click("#setBtn"); await page.waitForTimeout(600);
+      A((await page.textContent("#wlList")).indexOf("הזמר במסכה") >= 0, "watched item listed in settings");
+      await page.evaluate(() => { document.querySelector("#wlList").scrollIntoView({ block: "center" }); }); await page.waitForTimeout(300); await snap("32_settings_alerts");
+      await page.click("[data-wlrm]"); await page.waitForTimeout(400); A(/ההתראה הוסרה/.test(await page.textContent("#pill")), "remove toast");
+      A((await page.textContent("#wlList")).indexOf("עדיין אין התראות") >= 0, "list empty after remove"); await snap("32_settings_alerts_removed");
+      await page.click("[data-pillact]"); await page.waitForTimeout(400); A((await page.textContent("#wlList")).indexOf("הזמר במסכה") >= 0, "undo restores");
+    });
+    await nfsStep("nfs-open-from-push", async () => { // ?nf=<key> מהודעה: פותח את דף התוכן, מנקה את הכתובת, ומשלים פרטים מהשרת
+      await fresh(); await page.evaluate(() => { localStorage.setItem("tvg.wl", JSON.stringify([{ k: "m24428", title: "הנוקמים", orig: "The Avengers", type: "movie", poster: "", on: ["nf"], at: 1, bn: false }])); });
+      await page.goto(base + "index.html?nf=m24428&tab=rems", { waitUntil: "networkidle" }); await page.waitForTimeout(1500);
+      A(await shown("#nfsheet"), "?nf= opens the sheet"); A(!/[?&](nf|tab)=/.test(page.url()), "url cleaned: " + page.url());
+      A(await page.evaluate(() => TVG.tab !== "rems"), "nf takes precedence over tab");
+      A((await page.textContent("#nfsheet")).indexOf("הנוקמים") >= 0 && (await page.getAttribute('[data-wlkind="nf"]', "aria-pressed")) === "true", "item + pressed chip from watchlist");
+      await snap("33_nfs_from_push");
+      await page.goto(base + "index.html?nf=m1", { waitUntil: "networkidle" }); await page.waitForTimeout(800); A(!(await shown("#nfsheet")), "unknown key does not open"); A(/לא מצאנו/.test(await page.textContent("#pill")), "friendly toast");
+    });
+    await page.evaluate(() => { try { localStorage.removeItem("tvg.wl"); localStorage.removeItem("tvg.rem"); localStorage.removeItem("tvg.wlDirty"); localStorage.removeItem("tvg.calTok"); } catch (e) {} });
     await step("nf-back-closes", async () => { // חזרה/Escape סוגרים את דף התוכן ולא יוצאים מהאפליקציה; סגירה מהממשק לא משאירה היסטוריה
       const okv = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
       const chk = (c, m) => { if (!c) throw new Error("assert: " + m); };
@@ -296,9 +432,9 @@ function nfFixtureData() {
     const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     console.log(d.name, "scrollWidth/clientWidth", overflow.sw + "/" + overflow.cw, "errors:", errs.length);
     errs.forEach((e) => { console.log("   ", e); allErrors.push(d.name + " " + e); });
-    await ctx.close();
+    await ctx.close(); await browser.close(); browser = null;
   }
-  await browser.close(); if (srv) srv.close();
+  if (browser) await browser.close(); if (srv) srv.close();
   console.log("\nscreenshots:", total, "-> " + OUT, "| step failures:", failed, "| console/page errors:", allErrors.length);
   process.exit(allErrors.length ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

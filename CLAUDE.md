@@ -93,6 +93,7 @@ GitHub Actions רץ בארה״ב. אתה רץ על המחשב של אלעד בי
   - `POST/GET /api/rems` – רשימת התזכורות (מתזמן מחדש בכל שמירה)
   - `/cal/<token>.ics` – יומן מנוי "לוח שידורים" (בלי התראות כשיש פוש)
   - `POST/GET /api/backup` – גיבוי אוטומטי. קישור אישי `?r=<token>` משחזר במכשיר חדש
+  - `GET /api/nf-search?q=` חיפוש נטפליקס (TMDB) · `GET/POST /api/watch` רשימת מעקב 🔔 · `GET /api/watch-check` (cron יומי). משתנים חדשים: `TMDB_API_KEY`, `CRON_SECRET`. פרטים ב-`calendar-server/README.md`
   - `POST /api/push` – הרשמה לפוש / התראת בדיקה · `POST /api/fire` – נקרא מ-QStash בזמן ההתראה
 - **משתני סביבה (ב-Vercel בלבד, לא בקוד):** `BLOB_READ_WRITE_TOKEN`, `VAPID_PUBLIC`, `VAPID_PRIVATE`, `FIRE_SECRET`, `QSTASH_TOKEN`, `QSTASH_URL` (EU).
 - **תזמון מדויק:** Upstash QStash (חשבון של אלעד). כל תזכורת = הודעה מתוזמנת. ביטול/שינוי → מחיקה ותזמון מחדש.

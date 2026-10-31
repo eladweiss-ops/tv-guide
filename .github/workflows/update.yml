@@ -62,6 +62,7 @@ jobs:
           if [ -f extra-cache.json ]; then git add extra-cache.json; fi
           if [ -f desc-memory.json ]; then git add desc-memory.json; fi
           if [ -f netflix.json ]; then git add netflix.json; fi
+          if [ -f disney.json ]; then git add disney.json; fi
           if [ -f ratings-cache.json ]; then git add ratings-cache.json; fi
           if git diff --cached --quiet; then
             echo "No changes"

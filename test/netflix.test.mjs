@@ -337,3 +337,100 @@ test("run: שאילתת שורה חדשה שנכשלת לא מפילה את הש
   const out = await run({ tmdbKey: "k", dir });
   assert.ok(out && !out.rows.docu && out.rows.comedy);
 });
+
+// ---------- דיסני+: אותו בונה, הגדרת שירות אחרת ----------
+import { runAll, SERVICES, disneyRowSpecs, DISNEY_ORDER, DISNEY_META, resolveProvider } from "../netflix.mjs";
+
+// richMock + רשימת ספקים לישראל (לחיפוש "Disney Plus" לפי שם)
+function disneyMock(log, { providers } = {}) {
+  const inner = richMock(log);
+  return async (u, i) => {
+    const url = new URL(String(u));
+    if (url.pathname === "/3/watch/providers/movie") {
+      if (providers === "fail") return json({}, 500, { "retry-after": "0" });
+      return json({ results: providers || [{ provider_id: 8, provider_name: "Netflix" }, { provider_id: 2337, provider_name: "Disney Plus" }] });
+    }
+    return inner(u, i);
+  };
+}
+
+test("דיסני+: הגדרת שירות, שורות ושאילתות (מארוול/לוקאספילם/פיקסאר, ילדים)", () => {
+  assert.equal(SERVICES.disney.file, "disney.json"); assert.equal(SERVICES.netflix.file, "netflix.json");
+  const s = disneyRowSpecs(Date.UTC(2026, 9, 31));
+  assert.deepEqual(Object.keys(s), DISNEY_ORDER);
+  const has = (row, type, k, v) => s[row].some(([t, e]) => t === type && e[k] === v);
+  for (const [row, id] of [["marvel", "420"], ["starwars", "1"], ["pixar", "3"]]) for (const t of ["movie", "tv"]) assert.ok(has(row, t, "with_companies", id), row + " " + t);
+  assert.ok(has("kids", "movie", "with_genres", "10751|16") && has("kids", "tv", "with_genres", "10762|10751|16"));
+  assert.ok(has("week", "movie", "primary_release_date.gte", "2026-10-01"));
+  for (const n of [...SERVICES.disney.base, ...DISNEY_ORDER]) assert.ok(DISNEY_META[n].title, n);
+  assert.equal(DISNEY_META.popular.title, "🔥 הכי נצפים"); assert.equal(DISNEY_META.top.title, "🏆 הכי מדורגים");
+});
+
+test("resolveProvider: לפי שם בזמן ריצה, ונפילה ל-337", async () => {
+  const mk = (r) => async () => { if (r === "fail") throw new Error("down"); return { results: r }; };
+  assert.equal(await resolveProvider(mk([{ provider_id: 2337, provider_name: "Disney Plus" }]), SERVICES.disney), "2337");
+  assert.equal(await resolveProvider(mk([{ provider_id: 9, provider_name: "Hulu" }]), SERVICES.disney), "337");
+  console.error = () => {};
+  assert.equal(await resolveProvider(mk("fail"), SERVICES.disney), "337");
+  assert.equal(await resolveProvider(mk([]), SERVICES.netflix), "8"); // נטפליקס: בלי חיפוש
+});
+
+test("run disney: ספק מזוהה לפי שם, קישור דיסני+, שורות, כתיבה ל-disney.json בלבד", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ds-"));
+  const log = [];
+  globalThis.fetch = disneyMock(log);
+  const out = await run({ tmdbKey: "k", omdbKey: "", dir, service: "disney" });
+  assert.ok(out && out.v === 2 && out.hero);
+  assert.ok(log.length > 10);
+  for (const c of log) assert.equal(c.q.with_watch_providers, "2337");
+  for (const n of ["popular", "top", ...DISNEY_ORDER]) { assert.ok(out.rows[n] && out.rows[n].length >= 4, n); assert.equal(out.rowMeta[n].title, DISNEY_META[n].title); }
+  assert.ok(!out.rows.recent && !out.rows.israeli, "אין שורות נטפליקס");
+  assert.ok(Object.values(out.items).every((it) => it.link.startsWith("https://www.disneyplus.com/he-il/search?q=")));
+  const cnt = {}; for (const r of Object.values(out.rows)) for (const k of r) cnt[k] = (cnt[k] || 0) + 1;
+  assert.ok(Math.max(...Object.values(cnt)) <= 2); assert.deepEqual(new Set(Object.keys(out.items)), new Set(Object.keys(cnt)));
+  JSON.parse(await readFile(join(dir, "disney.json"), "utf8"));
+  await assert.rejects(readFile(join(dir, "netflix.json"), "utf8"));
+});
+
+test("run disney: זיהוי ספק נכשל משתמש ב-337", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ds-"));
+  const log = [];
+  globalThis.fetch = disneyMock(log, { providers: "fail" });
+  console.error = () => {};
+  const out = await run({ tmdbKey: "k", dir, service: "disney" });
+  assert.ok(out);
+  for (const c of log) assert.equal(c.q.with_watch_providers, "337");
+});
+
+test("runAll: שני הקבצים, מכסת OMDb אחת משותפת (לא יותר מ-300), וכשל בדיסני+ לא פוגע בנטפליקס", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "both-"));
+  const calls = [], inner = disneyMock([]);
+  globalThis.fetch = async (u, i) => { if (new URL(String(u)).hostname === "www.omdbapi.com") calls.push(String(u)); return inner(u, i); };
+  const out = await runAll({ tmdbKey: "k", omdbKey: "o", dir, omdbCap: 40 });
+  assert.ok(out.netflix && out.disney);
+  assert.equal(calls.length, 40, "התקרה משותפת: " + calls.length);
+  assert.equal(new Set(calls).size, calls.length, "אין בקשה כפולה לאותו imdb_id בין השירותים");
+  JSON.parse(await readFile(join(dir, "netflix.json"), "utf8")); JSON.parse(await readFile(join(dir, "disney.json"), "utf8"));
+  const cache = JSON.parse(await readFile(join(dir, "ratings-cache.json"), "utf8"));
+  assert.ok(Object.keys(cache).length >= 40);
+  // ברירת מחדל: 300
+  const calls2 = [], inner2 = disneyMock([]);
+  globalThis.fetch = async (u, i) => { if (new URL(String(u)).hostname === "www.omdbapi.com") calls2.push(1); return inner2(u, i); };
+  await runAll({ tmdbKey: "k", omdbKey: "o", dir: await mkdtemp(join(tmpdir(), "both-")) });
+  assert.ok(calls2.length <= 300 && calls2.length > 0, "בקשות OMDb: " + calls2.length);
+  // כשל בדיסני+ (תוצאות דלילות) משאיר נטפליקס
+  const dir3 = await mkdtemp(join(tmpdir(), "both-")), inner3 = disneyMock([]);
+  globalThis.fetch = async (u, i) => (new URL(String(u)).searchParams.get("with_watch_providers") === "2337" ? json({ results: [] }) : inner3(u, i));
+  console.error = () => {};
+  const o3 = await runAll({ tmdbKey: "k", dir: dir3 });
+  assert.ok(o3.netflix && o3.disney === null);
+  await assert.rejects(readFile(join(dir3, "disney.json"), "utf8"));
+});
+
+test("שני השירותים: אותה סכמה בדיוק", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "both-"));
+  globalThis.fetch = disneyMock([]);
+  const o = await runAll({ tmdbKey: "k", dir });
+  assert.deepEqual(Object.keys(o.netflix), Object.keys(o.disney));
+  assert.deepEqual(Object.keys(Object.values(o.netflix.items)[0]).sort(), Object.keys(Object.values(o.disney.items)[0]).sort());
+});

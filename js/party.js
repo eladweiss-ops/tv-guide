@@ -14,7 +14,7 @@
   var RLM = "‏", CTA = "👇 לאישור הגעה לחצו כאן:";
   var DS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "שבת"];
   var GO_BEFORE = 60 * 60000, GO_AFTER = 180 * 60000, HOUR = 3600000;
-  var RE_NF = /^https:\/\/www\.netflix\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_ID = /^[A-Za-z0-9_-]{22}$/;
+  var RE_NF = /^https:\/\/www\.(netflix|disneyplus)\.com\//, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_ID = /^[A-Za-z0-9_-]{22}$/;
 
   // ---- עזרים ----
   function bdi(s) { return "<bdi>" + esc(s) + "</bdi>"; }
@@ -99,8 +99,8 @@
     return '<button type="button" class="ghost shbtn" data-ptytv="' + esc(cid) + "|" + p.s.getTime() + '">🍿 קביעת ערב צפייה</button>';
   }
   function srcNf(x, key) {
-    var l = RE_NF.test(x.link || "") && TVG.nfIsNf(x) ? x.link : "";
-    return { kind: "nf", title: String(x.title || "").slice(0, 120), ref: key || x.k, link: l, img: RE_IMG.test(x.poster || "") ? x.poster : RE_IMG.test(x.backdrop || "") ? x.backdrop : "", ch: l ? "נטפליקס" : "", at: 0 };
+    var d = TVG.nfSvc(x) === "disney", lk = TVG.nfLinkOf(x), l = RE_NF.test(lk || "") && (d ? TVG.nfIsDs(x) : TVG.nfIsNf(x)) ? lk : "";
+    return { kind: "nf", title: String(x.title || "").slice(0, 120), ref: key || x.k, link: l, img: RE_IMG.test(x.poster || "") ? x.poster : RE_IMG.test(x.backdrop || "") ? x.backdrop : "", ch: l ? (d ? "דיסני+" : "נטפליקס") : "", at: 0 };
   }
   function srcTv(r) {
     var pt = TVG.shareParts ? TVG.shareParts(r) : null;
@@ -347,7 +347,7 @@
     h += '<div class="lnd-meta glass"><div class="lnd-row"><span class="lnd-ic">🗓</span><span>' + esc(dayShort(w) + " " + w.getDate() + "." + (w.getMonth() + 1)) + "</span></div>" +
       '<div class="lnd-row"><span class="lnd-ic">🕐</span><span><bdi dir="ltr">' + hhmm(w) + "</bdi>" + tz + "</span></div>" +
       '<div class="lnd-row"><span class="lnd-ic">📍</span><span>' + bdi(whereTxt(v)) + "</span></div>";
-    if (hasWatch(v)) h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>בנטפליקס</span><a class="pty-open" href="' + esc(v.link) + '" target="_blank" rel="noopener">פתיחה</a></div>';
+    if (hasWatch(v)) h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>' + (/disneyplus/.test(v.link) ? "בדיסני+" : "בנטפליקס") + '</span><a class="pty-open" href="' + esc(v.link) + '" target="_blank" rel="noopener">פתיחה</a></div>';
     else if (v.kind === "tv" && v.ch) h += '<div class="lnd-row"><span class="lnd-ic">📺</span><span>בערוץ ' + bdi(TVG.bidi(v.ch)) + "</span></div>";
     else h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>צפייה</span></div>';
     h += "</div>";
@@ -490,7 +490,7 @@
   function cdFinal() {
     var v = CD.v, nf = v.kind === "nf" && RE_NF.test(v.link || "");
     return '<div class="pty-go-in"><div class="pty-big pty-play" aria-live="assertive">▶ פליי!</div><p class="pty-go-t"><bdi dir="auto">' + esc(v.title) + "</bdi></p>" +
-      (nf ? '<a class="btn nfgo" href="' + esc(v.link) + '" target="_blank" rel="noopener">▶ פתיחה בנטפליקס</a>' : v.ch ? '<p class="pty-go-ch">📺 עברו לערוץ <bdi>' + esc(TVG.bidi(v.ch)) + "</bdi></p>" : "") +
+      (nf ? '<a class="btn nfgo" href="' + esc(v.link) + '" target="_blank" rel="noopener">▶ פתיחה ב' + (/disneyplus/.test(v.link) ? "דיסני+" : "נטפליקס") + '</a>' : v.ch ? '<p class="pty-go-ch">📺 עברו לערוץ <bdi>' + esc(TVG.bidi(v.ch)) + "</bdi></p>" : "") +
       '<button type="button" class="ghost" data-ptygoclose>סגירה</button></div>';
   }
   function cdPaint() {

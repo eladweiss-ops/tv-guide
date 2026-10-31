@@ -522,6 +522,16 @@
   .nfb.tv { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); }
   .nfb.no { background: var(--soft); color: var(--muted); font-weight: 600; }
   :root[data-theme="dark"] .nfb.nf { background: rgba(255,69,80,.2); color: #ff6b73; }
+  .nfb.ds { background: rgba(26,70,209,.12); color: #1a46d1; }
+  :root[data-theme="dark"] .nfb.ds { background: rgba(110,150,255,.2); color: #9db8ff; }
+  /* מתג שירות בראש לשונית הסטרימינג (נטפליקס / דיסני+), באותו סגנון כמו שאר המתגים (.seg) */
+  .seg.nfsvc { grid-template-columns: 1fr 1fr; }
+  .seg.nfsvc button { min-height: 44px; }
+  /* שלד לדיסני+ בזמן הטעינה הראשונה */
+  .nfsk0 { min-height: 250px; border-radius: 28px; background: var(--soft); animation: nfsk 1.3s ease-in-out infinite; }
+  .nfskh { width: 110px; height: 20px; border-radius: 10px; background: var(--soft); }
+  .nfsk0 + .nfsec { margin-top: 12px; }
+  @media (prefers-reduced-motion: reduce) { .nfsk0 { animation: none; } }
   .nfc .nfb { margin-top: 2px; font-size: .68rem; padding: 2px 8px; align-self: flex-start; }
   .nfc .nfp { width: 100%; }
   .nfpr { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }

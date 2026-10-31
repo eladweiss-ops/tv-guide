@@ -82,7 +82,12 @@ test("אוסף: 'הנוקמים' מחזיר את הסרטים לפי סדר יצ
   assert.deepEqual(out.collection.keys, ["m24428", "m99861", "m299534"]);
   assert.equal(out.collection.name, "הנוקמים"); // הכותרת כבר אומרת "סדרת סרטים"
   assert.equal(out.items.m24428.nf, false);
-  assert.deepEqual(out.items.m24428.others, ["Disney Plus"]);
+  // דיסני+ (337) הוא דגל ds עם קישור חיפוש, לא שם ברשימת others
+  assert.deepEqual(out.items.m24428.others, []);
+  assert.equal(out.items.m24428.ds, true);
+  assert.match(out.items.m24428.dlink, /^https:\/\/www\.disneyplus\.com\/he-il\/search\?q=/);
+  assert.equal(out.items.m24428.link, "");
+  assert.equal(out.items.m299534.ds, false); assert.equal(out.items.m299534.dlink, "");
 });
 
 test("מותג: 'מארוול' עובר דרך כינוי ל-Marvel Studios ו-discover לפי with_companies", async () => {

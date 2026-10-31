@@ -13,6 +13,8 @@ export const T = {
   GUIDE_MAX_AGE_H: 30,        // guide.json.updated – הפעולה הלילית רצה כל 24 ש', 30 נותן מרווח לשעות איחור
   NETFLIX_MAX_AGE_H: 36,
   NETFLIX_MIN_ITEMS: 120, // אחרי הרחבת השורות (≈250); פחות מזה = שורות חסרות
+  DISNEY_MAX_AGE_H: 36,
+  DISNEY_MIN_ITEMS: 60,   // דיסני+ קטן יותר מנטפליקס (מינימום צנוע)
   MIN_PROGRAMS: 20000,        // סה״כ תוכניות (בפועל ~29.7K)
   MIN_CHANNELS: 120,          // בפועל 169
   MIN_SYNOPSIS_PCT: 38,       // % תוכניות עם תקציר ב-72 השעות הקרובות, אחרי העתקה לפי שם (31.10: 46.9%)
@@ -98,18 +100,21 @@ export function evaluateGuide(guide, now = new Date()) {
   return { problems, info };
 }
 
-export function evaluateNetflix(nf, now = new Date()) {
+// קובץ סטרימינג (netflix.json / disney.json, אותה סכמה). label = שם השירות בעברית להודעות
+export function evaluateStreaming(nf, { file, label, minItems, maxAgeH }, now = new Date()) {
   const problems = [], info = {};
-  if (!nf) return { problems: ["netflix.json לא נטען"], info };
-  if (nf.v !== 2) problems.push("netflix.json: גרסה " + nf.v + " במקום 2");
+  if (!nf) return { problems: [file + " לא נטען"], info };
+  if (nf.v !== 2) problems.push(file + ": גרסה " + nf.v + " במקום 2");
   const list = nf.items ? (Array.isArray(nf.items) ? nf.items : Object.values(nf.items)) : [];
   info.items = list.length;
-  if (list.length < T.NETFLIX_MIN_ITEMS) problems.push("נטפליקס: " + list.length + " פריטים (מינימום " + T.NETFLIX_MIN_ITEMS + ")");
-  if (nf.updated) { const age = hoursSince(nf.updated, now); info.ageH = Math.round(age * 10) / 10; if (!(age < T.NETFLIX_MAX_AGE_H)) problems.push("נטפליקס לא התעדכן " + fmtAge(age)); }
-  else problems.push("netflix.json: אין שדה updated");
+  if (list.length < minItems) problems.push(label + ": " + list.length + " פריטים (מינימום " + minItems + ")");
+  if (nf.updated) { const age = hoursSince(nf.updated, now); info.ageH = Math.round(age * 10) / 10; if (!(age < maxAgeH)) problems.push(label + " לא התעדכן " + fmtAge(age)); }
+  else problems.push(file + ": אין שדה updated");
   info.rated = list.filter((i) => i && i.ratings && i.ratings.imdb != null).length; // ציוני IMDb מ-OMDb (מידע בלבד)
   return { problems, info };
 }
+export const evaluateNetflix = (nf, now = new Date()) => evaluateStreaming(nf, { file: "netflix.json", label: "נטפליקס", minItems: T.NETFLIX_MIN_ITEMS, maxAgeH: T.NETFLIX_MAX_AGE_H }, now);
+export const evaluateDisney = (ds, now = new Date()) => evaluateStreaming(ds, { file: "disney.json", label: "דיסני+", minItems: T.DISNEY_MIN_ITEMS, maxAgeH: T.DISNEY_MAX_AGE_H }, now);
 
 export function evaluateCaches(hot, extra, now = new Date()) {
   const problems = [], info = {};
@@ -186,6 +191,8 @@ export async function runHealth({ base = SITE, server = SERVER, fetchFn = fetch,
   if (guide) { const g = evaluateGuide(guide, now); problems.push(...g.problems); info.guide = g.info; }
   const nf = await json("netflix.json", base + "netflix.json?" + nb);
   if (nf) { const n = evaluateNetflix(nf, now); problems.push(...n.problems); info.netflix = n.info; }
+  const ds = await json("disney.json", base + "disney.json?" + nb);
+  if (ds) { const n = evaluateDisney(ds, now); problems.push(...n.problems); info.disney = n.info; }
   const hot = await json("hot-cache.json", base + "hot-cache.json?" + nb);
   const extra = await json("extra-cache.json", base + "extra-cache.json?" + nb);
   if (hot && extra) { const c = evaluateCaches(hot, extra, now); problems.push(...c.problems); info.caches = c.info; }
@@ -212,7 +219,7 @@ export function summaryLine(res) {
   const g = (res.info && res.info.guide) || {}, rep = g.channelsReport || {}, n = (res.info && res.info.netflix) || {};
   const c14 = rep["ערוץ 14"];
   return "הכול תקין · " + (g.programs || 0).toLocaleString("en-US") + " תוכניות · " + (g.days || 0) + " ימים · " +
-    (c14 && c14.found && !(c14.missing || []).length ? "ערוץ 14 תקין" : "ערוץ 14: בעיה") + " · נטפליקס " + (n.items || 0);
+    (c14 && c14.found && !(c14.missing || []).length ? "ערוץ 14 תקין" : "ערוץ 14: בעיה") + " · נטפליקס " + (n.items || 0) + " · דיסני+ " + ((res.info && res.info.disney && res.info.disney.items) || 0);
 }
 
 // ───────── CLI ─────────

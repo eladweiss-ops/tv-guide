@@ -24,6 +24,8 @@ const ALLOW = [
   { type: "textover", sel: "#qx", why: "same: clear button inside the search field" },
   { type: "textover", sel: ".lnd-em", why: "decorative watermark emoji (opacity .2, pointer-events none, rotated) behind the landing title" },
   { type: "small", sel: ".tmdbmark", why: "TMDB attribution badge (mandated logo, kept small); a ::after extends the real tap area to 44px, which getBoundingClientRect cannot see" },
+  { type: "tight", sel: ".sheet[style*=\"scale\"]", why: "cardstack.js: the sheet UNDER another sheet is scaled to 0.97 (inline `scale`), so 8px gaps measure 7.8px; it is dimmed, covered and not meant to be tapped. Only matches while that inline scale is set" },
+  { type: "small", sel: ".sheet[style*=\"scale\"]", why: "same: 44px targets measure 42.7px inside the scaled lower sheet while another sheet is on top of it" },
 ];
 
 // Intentional segmented groups: controls inside may be closer than 8px as long as the gap is >= 6px.

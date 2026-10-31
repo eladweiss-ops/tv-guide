@@ -625,6 +625,83 @@ function nfFixtureData() {
       await page.evaluate(() => TVG.setTheme("light"));
     });
 
+    // ---- 📚 דחיפת הדף אחורה + כותרת שמתכווצת (js/cardstack.js, js/largetitle.js) ----
+    const stkChk = (c, m) => { if (!c) throw new Error("assert: " + m); };
+    const stkSt = () => page.evaluate(() => { const sc = (s) => { const m = /matrix\(([-\d.]+),/.exec(getComputedStyle(document.querySelector(s)).transform); return m ? +m[1] : 1; };
+      const f = document.querySelector("#stkf"); return { page: sc(".page"), dock: sc(".dock"), cbar: sc("#cbar"), frame: !!f && !f.hidden, ptr: f ? getComputedStyle(f).pointerEvents : "", cls: document.documentElement.classList.contains("stk") }; });
+    await step("stack-open-drag-close", async () => { // חלון נפתח -> הדף 0.94; גרירה לחצי -> בין; שחרור חוזר; סגירה -> זהות
+      const cdp = await ctx.newCDPSession(page); await fluidOpen();
+      const o = await stkSt(); stkChk(Math.abs(o.page - 0.94) < 0.004 && Math.abs(o.dock - 0.94) < 0.004 && o.frame && o.cls, "open sheet -> page/dock scale 0.94: " + JSON.stringify(o)); stkChk(o.ptr === "none", "frame must not take taps");
+      await snap("74_stack_open");
+      const s0 = await fluidSt("#rem"), cx = d.w / 2;
+      await touch.drag(cdp, [[cx, s0.top + 14], [cx, s0.top + 14 + s0.h * 0.28]], 600, { hold: 200, release: false });
+      const m = await stkSt(); stkChk(m.page > 0.945 && m.page < 0.995, "mid drag: page scale between 0.94 and 1: " + m.page); await snap("74_stack_drag_mid");
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await page.waitForTimeout(900);
+      const b = await stkSt(); stkChk(Math.abs(b.page - 0.94) < 0.004 && !(await fluidSt("#rem")).hidden, "released short of the threshold: sheet open, page back to 0.94: " + JSON.stringify(b));
+      const s1 = await fluidSt("#rem"); await touch.drag(cdp, [[cx, s1.top + 14], [cx, s1.top + 14 + 150]], 100); await page.waitForTimeout(900); // זריקה: נסגר
+      const c = await stkSt(); stkChk((await fluidSt("#rem")).hidden && c.page === 1 && c.dock === 1 && !c.frame && !c.cls, "flick close -> identity: " + JSON.stringify(c));
+      await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(700); await page.keyboard.press("Escape"); await page.waitForTimeout(900);
+      const e = await stkSt(); stkChk(e.page === 1 && !e.frame, "Escape close -> identity: " + JSON.stringify(e));
+      const tr = await page.evaluate(() => getComputedStyle(document.querySelector(".page")).transform); stkChk(tr === "none", "identity is transform:none (no leftover stacking context): " + tr);
+    });
+    await step("stack-fixed-and-keyboard", async () => { // אלמנטים קבועים לא זזים ממקומם הלוגי; הודעה (pill) לא מוקטנת; שדה בתוך חלון עדיין עובד
+      await fresh(); await page.click("#setBtn"); await page.waitForTimeout(700);
+      const r = await page.evaluate(() => { const g = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; }; return { dock: g(".dock"), vw: innerWidth, vh: innerHeight }; });
+      stkChk(r.dock && r.dock.l > 0 && r.dock.r < r.vw && r.dock.b < r.vh, "scaled dock stays inside the viewport: " + JSON.stringify(r.dock));
+      await page.evaluate(() => TVG.pill("בדיקה", 1500)); await page.waitForTimeout(150);
+      const pl = await page.evaluate(() => { const m = /matrix\(([-\d.]+),/.exec(getComputedStyle(document.querySelector(".pill")).transform); return m ? +m[1] : 1; }); stkChk(Math.abs(pl - 1) < 0.001, "pill (fixed) is not scaled: " + pl);
+      const typed = await page.evaluate(() => { const i = document.querySelector("#setsheet input:not([type=checkbox]):not([type=radio]):not([type=hidden]), #setsheet textarea"); if (!i) return null; i.focus(); return i.id || i.tagName; });
+      if (typed) { await page.keyboard.type("abc"); stkChk(await page.evaluate(() => document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)), "input inside the sheet keeps focus under the stack effect"); }
+      await page.keyboard.press("Escape"); await page.waitForTimeout(900);
+      stkChk((await stkSt()).page === 1, "closed after typing in a sheet");
+    });
+    await step("stack-sheet-over-sheet", async () => { // נטפליקס + חלון מעליו: הדף 0.94, החלון התחתון 0.97; הסגירה מחזירה בשלבים
+      await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(800); await page.click(".nfhero"); await page.waitForTimeout(700);
+      stkChk(Math.abs((await stkSt()).page - 0.94) < 0.004, "nf page open -> 0.94");
+      await page.evaluate(() => { document.querySelector("#rem").hidden = false; document.querySelector("#scrim2").hidden = false; }); await page.waitForTimeout(800);
+      const m = await page.evaluate(() => ({ low: getComputedStyle(document.querySelector("#nfsheet")).scale, top: getComputedStyle(document.querySelector("#rem")).scale })); const st = await stkSt();
+      stkChk(Math.abs(parseFloat(m.low) - 0.97) < 0.004 && (m.top === "none" || m.top === "1"), "lower sheet 0.97, top sheet untouched: " + JSON.stringify(m)); stkChk(Math.abs(st.page - 0.94) < 0.004, "page stays 0.94 (only the base page scales): " + st.page);
+      await snap("74_stack_sheet_over_sheet");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(800);
+      const m2 = await page.evaluate(() => getComputedStyle(document.querySelector("#nfsheet")).scale); stkChk(m2 === "none" || Math.abs(parseFloat(m2) - 1) < 0.002, "lower sheet back to 1 after closing the top one: " + m2);
+      stkChk(Math.abs((await stkSt()).page - 0.94) < 0.004, "page still 0.94 under the nf page"); await page.keyboard.press("Escape"); await page.waitForTimeout(900); stkChk((await stkSt()).page === 1, "all closed -> identity");
+    });
+    await step("title-collapse", async () => { // כותרת גדולה -> קטנה בגלילה, ובחזרה; בכל המסכים
+      for (const [tab, y] of [["grid", 80], ["now", 80], ["dial", 260]]) {
+        await fresh(); await page.click('[data-tab="' + tab + '"]'); await page.waitForTimeout(600);
+        const T = () => page.evaluate(() => ({ sy: scrollY, big: +getComputedStyle(document.querySelector("#ttl")).opacity, small: +getComputedStyle(document.querySelector("#cbar .cbt")).opacity, bar: +getComputedStyle(document.querySelector("#cbar")).opacity, txt: document.querySelector("#cbar .cbt").textContent === document.querySelector("#ttl").textContent, ov: document.documentElement.scrollWidth > innerWidth }));
+        const a = await T(); stkChk(a.big === 1 && a.small === 0 && a.bar === 0, tab + " at top: big title only: " + JSON.stringify(a));
+        await page.evaluate((y) => window.scrollTo(0, y), y); await page.waitForTimeout(300);
+        const b = await T(); stkChk(b.sy > 40 && b.big < 0.05 && b.small > 0.95 && b.bar > 0.95 && b.txt && !b.ov, tab + " scrolled: compact title only, same text: " + JSON.stringify(b));
+        await snap("75_title_collapsed_" + tab);
+        await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+        const c = await T(); stkChk(c.big === 1 && c.small === 0, tab + " back at top: restored: " + JSON.stringify(c));
+      }
+      if (d.name.indexOf("android") === 0) { const bf = await page.evaluate(() => getComputedStyle(document.querySelector("header.top"), "::before").backdropFilter); stkChk(bf === "none", "android: solid bar, no new blur: " + bf); }
+    });
+    await step("title-reduced-motion", async () => { // הפחתת תנועה: אין שינוי גודל לדף, והכותרת מתחלפת מיידית בסף
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      try {
+        await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(600);
+        await page.evaluate(() => window.scrollTo(0, 12)); await page.waitForTimeout(250); const a = await page.evaluate(() => +getComputedStyle(document.querySelector("#ttl")).opacity);
+        await page.evaluate(() => window.scrollTo(0, 45)); await page.waitForTimeout(250); const b = await page.evaluate(() => ({ big: +getComputedStyle(document.querySelector("#ttl")).opacity, small: +getComputedStyle(document.querySelector("#cbar .cbt")).opacity, t: document.querySelector("#ttl").style.transform }));
+        stkChk(a === 1 && b.big === 0 && b.small === 1 && b.t === "", "reduced motion: instant switch at the threshold, no transform: " + JSON.stringify([a, b]));
+        await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
+        await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(600);
+        const s = await stkSt(); stkChk(s.page === 1 && !s.frame, "reduced motion: page does not scale: " + JSON.stringify(s));
+      } finally { await page.emulateMedia({ reducedMotion: "no-preference" }); }
+    });
+    await step("nf-page-compact-bar", async () => { // דף תוכן נטפליקס: גלילה -> סרגל קומפקטי עם שם התוכן + פרלקסה לתמונה; חזרה -> נעלם
+      await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(800); await page.click(".nfhero"); await page.waitForTimeout(800);
+      const N = () => page.evaluate(() => { const b = document.querySelector("#nfsBody"), i = document.querySelector(".nfbd img"); return { st: b.scrollTop, max: b.scrollHeight - b.clientHeight, op: +getComputedStyle(document.querySelector("#nfcb")).opacity, vis: getComputedStyle(document.querySelector("#nfcb")).visibility, same: document.querySelector("#nfcb span").textContent === document.querySelector("#nfsT").textContent, img: i ? i.style.transform : null, bar: !!document.querySelector(".nfs-bar") && document.querySelector(".nfs-bar").getBoundingClientRect().bottom <= innerHeight + 1 }; });
+      const a = await N(); stkChk(a.op === 0 && a.vis === "hidden", "nf page top: no compact bar: " + JSON.stringify(a));
+      await page.evaluate(() => { const b = document.querySelector("#nfsBody"); b.scrollTop = Math.min(b.scrollHeight, 120); }); await page.waitForTimeout(250); const m = await N(); stkChk(m.img && /translate3d/.test(m.img), "hero image parallaxes while scrolling: " + JSON.stringify(m));
+      await page.evaluate(() => { document.querySelector("#nfsBody").scrollTop = 9999; }); await page.waitForTimeout(300);
+      const b = await N(); if (b.max > 120) { stkChk(b.op > 0.95 && b.vis === "visible" && b.same && b.bar, "nf page scrolled: compact bar with the title, bottom action bar kept: " + JSON.stringify(b)); await snap("75_nf_compact_bar"); }
+      await page.evaluate(() => { document.querySelector("#nfsBody").scrollTop = 0; }); await page.waitForTimeout(300);
+      const c = await N(); stkChk(c.op === 0, "nf page back at top: compact bar gone: " + JSON.stringify(c));
+    });
+
     // תרחישי אנדרואיד/יומן: בסוף, כדי שלא ישנו מצב (tab/calmode) לצילומים הקודמים; כל צעד מנקה אחריו
     await step("cal-ics-sheet", async () => { // יומן רגיל (באנדרואיד: יומן Google), חלון תזכורת אחרי בחירת מצב
       await fresh(); await page.evaluate(() => { localStorage.setItem("tvg.calmode", "ics"); }); await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(600);

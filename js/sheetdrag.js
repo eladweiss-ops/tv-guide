@@ -4,7 +4,7 @@
    מעל ~10px נועלים כיוון: אופקי / גלילה פנימית עוברים לדפדפן. עוקבים אחרי האצבע 1:1 (בלי קפיצה: הנקודה בה נעלנו היא אפס).
    שחרור: הקרנת תנופה (TVG.project). חצתה ~40% מגובה החלון, או מהירות כלפי מטה מעל 800px/s -> יוצא מטה בקפיץ; אחרת חוזר בקפיץ.
    יציאה = TVG.closeTop() (אותה סגירה כמו Escape / "חזור" / כפתור: close של השכבה ב-nav.js, ההיסטוריה מתנקה שם), רק אחרי שהחלון יצא מהמסך.
-   הרקע הכהה (scrim) דועך עם הגרירה. בהפחתת תנועה: בלי קפיץ, דעיכת שקיפות קצרה. אפשר לאחוז באמצע אנימציה: ממשיכים מהמקום החי. */
+   הקרסים TVG.onSheetDrag(el, p) / TVG.onSheetSettle(el) מעדכנים את cardstack.js (הדף שמאחור). הרקע הכהה (scrim) דועך עם הגרירה. בהפחתת תנועה: בלי קפיץ, דעיכת שקיפות קצרה. אפשר לאחוז באמצע אנימציה: ממשיכים מהמקום החי. */
 (function (TVG) {
   TVG.files["sheetdrag"] = 1;
   var $ = TVG.$;
@@ -21,12 +21,14 @@
     el.style.transform = y ? "translate3d(0," + y.toFixed(2) + "px,0)" : "";
     var s = scrimOf(el); if (s && alone()) s.style.opacity = y > 0 ? String(Math.max(0, 1 - y / H)) : "";
     cur = { el: el, y: y };
+    if (TVG.onSheetDrag) TVG.onSheetDrag(el, y > 0 ? Math.min(1, y / H) : 0); // cardstack.js: הדף שמאחור חוזר ל-1 ביחס לירידת החלון
   }
   function reset(el) {
     el.style.transform = ""; el.style.opacity = ""; el.style.transition = ""; el.style.willChange = "";
     var s = scrimOf(el); if (s) { s.style.opacity = ""; s.style.transition = ""; }
     if (cur && cur.el === el) cur = null;
     if (an && an.el === el) { an.h.stop(); an = null; }
+    if (TVG.onSheetSettle) TVG.onSheetSettle(el); // cardstack.js
   }
   function offY(el) { var r = el.getBoundingClientRect(), y = cur && cur.el === el ? cur.y : 0; return window.innerHeight - (r.top - y) + 6; } // כמה למטה כדי לצאת מהמסך
 

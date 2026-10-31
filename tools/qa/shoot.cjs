@@ -885,6 +885,20 @@ function nfFixtureData() {
       });
     }
 
+    await step("src-from-join", async () => { // מקור ההגעה (tvg.src): נקבע פעם אחת מ-?from=join, הכתובת מתנקה, ולא נדרס בטעינות הבאות
+      const chk = (c, m) => { if (!c) throw new Error("assert: " + m); };
+      const get = () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem("tvg.src") || "null"); } catch (e) { return null; } });
+      await fresh(); await page.evaluate(() => localStorage.removeItem("tvg.src"));
+      await fresh("?from=join"); const a = await get();
+      chk(a && a.s === "join" && !!a.d && a.at > 0, "tvg.src from ?from=join: " + JSON.stringify(a));
+      chk(!/from=/.test(page.url()), "url cleaned: " + page.url());
+      await fresh("?tab=rems"); const b = await get();
+      chk(b && b.s === "join" && b.at === a.at, "not overwritten by a later load: " + JSON.stringify(b));
+      await fresh("?from=join&tab=grid"); chk(!/from=/.test(page.url()), "url cleaned with other params: " + page.url());
+      await page.evaluate(() => localStorage.removeItem("tvg.src")); await page.route("**/api/backup?*", (r) => r.fulfill({ status: 404, contentType: "application/json", headers: CORS, body: "{}" })); await fresh("?r=" + "x".repeat(30));
+      const c = await get(); chk(c && c.s === "restore", "?r= is restore: " + JSON.stringify(c));
+      await page.unroute("**/api/backup?*"); await page.evaluate(() => localStorage.removeItem("tvg.src"));
+    });
     if (d.name === "iphone_375") await step("card-png", async () => {
       await fresh();
       const out = await page.evaluate(async () => {

@@ -34,6 +34,8 @@
   // פריט "דל" לפתיחה מהודעה/תזכורת. ev: "nf" = ההודעה אמרה שהגיע לנטפליקס (תמיד ▶ פתח בנטפליקס), "rem" = מתזכורת צפייה
   function wlItem(k, ev) {
     var w = wlFind(k), r = remOf(k), nx = r && r.nx;
+    // תזכורת בלי nx (נוצרה בגרסה ישנה, או שהסנכרון עם השרת השמיט את השדה): בונים מהכותרת ומהקישור שבתיאור; הסוג לפי המפתח (t…=סדרה, m…=סרט); השאר משלים nfEnsure מהחיפוש
+    if (r && !nx) { var ml = /https:\/\/www\.netflix\.com\/\S+/.exec(r.desc || ""); nx = { t: r.title, ty: /^t/.test(k) ? "tv" : "movie", p: "", l: ml ? ml[0] : "" }; }
     if (!w && !nx) return null;
     var title = w ? w.title : nx.t || r.title, orig = w ? w.orig || "" : "", type = (w ? w.type : nx.ty) === "tv" ? "tv" : "movie", poster = w ? w.poster : nx.p;
     var link = (w && RE_NF.test(w.link || "") && w.link) || (nx && RE_NF.test(nx.l || "") && nx.l) || "";

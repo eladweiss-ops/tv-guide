@@ -166,7 +166,17 @@
   }
   function openNf(k, ev) {
     TVG.nfOpenEv = ev || null;
-    var x = getItem(k); if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
+    var x = getItem(k);
+    if (!x && ev === "rem" && !TVG.nfRemTry && TVG.calTok && TVG.CAL_API) { // תזכורת שלא שמורה במכשיר הזה (נוצרה בספארי/מכשיר אחר): מושכים מהשרת ומנסים שוב פעם אחת
+      TVG.nfRemTry = true;
+      fetch(TVG.CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        var rec = j && Array.isArray(j.rems) && j.rems.filter(function (r) { return r && typeof r.k === "string" && r.k.indexOf("nf|" + k + "|") === 0; })[0];
+        if (rec && !TVG.hasRem(rec.k)) { TVG.REMS.push(rec); TVG.saveRems(); }
+        openNf(k, ev);
+      }).catch(function () { openNf(k, ev); }).then(function () { TVG.nfRemTry = false; });
+      return;
+    }
+    if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
     TVG.nfOpen = k;
     $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = 0;
     $("#nfsheet").hidden = false; $("#scrim2").hidden = false;

@@ -81,6 +81,8 @@
     var chips = KINDS.filter(function (kd) {
       if (kd[0] === "nf") return !TVG.nfIsNf(x) || wlHas(x.k, "nf");   // כבר בנטפליקס: אין מה להתריע
       if (kd[0] === "season") return x.type === "tv";
+      // "כשמשודר בטלוויזיה": לא לתוכן שקיים רק בנטפליקס ושיצא בשנתיים האחרונות (כמעט תמיד הפקה מקורית – לא יגיע לערוץ). אם כבר נבחר, נשאר כדי שאפשר יהיה לבטל
+      if (kd[0] === "tv") return wlHas(x.k, "tv") || !(TVG.nfIsNf(x) && !(x.others && x.others.length) && (x.year || x.y || 0) >= new Date().getFullYear() - 1);
       return true;
     }).map(function (kd) {
       return '<button type="button" class="chip" data-wlkind="' + kd[0] + '" aria-pressed="' + wlHas(x.k, kd[0]) + '">' + kd[1] + "</button>";

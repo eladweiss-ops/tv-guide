@@ -307,7 +307,7 @@
   .rsyn p { margin: 0; }
   .srow > .rsyn + .rbts { margin-inline-start: auto; }
   .rclamp:not(.full) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .rsyn .moreb { margin-top: 2px; }
+  .rsyn .moreb { margin: 2px 0 0; }
   .pill .pillact { margin-inline-start: 10px; border: 0; background: transparent; color: #64d2ff; font: inherit; font-weight: 800; padding: 4px 6px; cursor: pointer; }
   .remall { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 18px; background: var(--soft); }
   .remall span { flex: 1; font-weight: 700; }
@@ -371,7 +371,7 @@
   .tagk.now { background: rgba(255,59,48,.2); color: #FF453A; } .tagk.live { background: rgba(255,159,10,.2); color: #FF9F0A; }
   .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .clamp.full { display: block; -webkit-line-clamp: unset; }
-  .moreb { border: 0; background: none; color: inherit; opacity: .85; font: inherit; font-weight: 800; padding: 2px 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .moreb { border: 0; background: none; color: inherit; opacity: .85; font: inherit; font-weight: 800; padding: 2px 0; display: block; margin: 6px 0 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .dcard p { font-size: .98rem; line-height: 1.5; }
   .chnum { display: inline-block; min-width: 30px; margin-inline-end: 8px; padding: 1px 6px; border-radius: 8px; background: var(--soft); color: var(--accent); font-size: .85rem; text-align: center; }
   .hb { display: flex; gap: 8px; }

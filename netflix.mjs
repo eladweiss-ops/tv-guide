@@ -240,7 +240,7 @@ export const SERVICES = {
     base: ["popular", "recent", "top"], order: NEW_ORDER, meta: ROW_META, specs: newRowSpecs, priority: ["popular", "top", "israeli", "recent"],
   },
   disney: {
-    id: "disney", file: "disney.json", providerId: DISNEY, resolveName: /^disney\s*(plus|\+)/i, linkBase: "https://www.disneyplus.com/he-il/search?q=",
+    id: "disney", file: "disney.json", providerId: DISNEY, resolveName: /^disney\s*(plus|\+)/i, fallbackRegion: "US", linkBase: "https://www.disneyplus.com/he-il/search?q=",
     base: ["popular", "top"], order: DISNEY_ORDER, meta: DISNEY_META, specs: disneyRowSpecs, priority: ["popular", "top", "week"],
   },
 };
@@ -431,6 +431,13 @@ async function buildService(svc, ctx) {
     const t2 = await tmdb("/discover/movie", Object.assign({}, d2, { page: 1 }));
     console.log(`${svc.id}: provider=${pid} total(flatrate)=${t1 && t1.total_results} total(any)=${t2 && t2.total_results}`);
   } catch (e) { console.log(`${svc.id}: provider=${pid} diag failed ${e.message}`); }
+  // TMDB לא מחזיר רשימות discover לדיסני+ בישראל (0 תוצאות), אבל יודע לכל כותר אם הוא בדיסני+ ישראל.
+  // לכן: מועמדים מאזור גיבוי (ארה"ב), ואחר כך סינון לפי זמינות בישראל בדף הספקים של כל כותר
+  let dd = d, ilCheck = false;
+  if (svc.fallbackRegion) {
+    const probe = await tmdb("/discover/movie", Object.assign({}, d, { page: 1 })).catch(() => null);
+    if (!probe || !(probe.total_results || (probe.results || []).length)) { dd = Object.assign({}, d, { watch_region: svc.fallbackRegion }); ilCheck = true; console.log(svc.id + ": אין רשימות לישראל ב-TMDB, מועמדים מ-" + svc.fallbackRegion + " + סינון זמינות בישראל"); }
+  }
   const from = day(-60), to = day(0);
   const byPop = (a, b) => b.pop - a.pop;
   const specs = [
@@ -444,19 +451,32 @@ async function buildService(svc, ctx) {
     ["movie", { sort_by: "popularity.desc", "primary_release_date.gte": from, "primary_release_date.lte": to }],
     ["tv", { sort_by: "popularity.desc", "first_air_date.gte": from, "first_air_date.lte": to }],
   );
-  const [pm, pt, tm, tt, nm, nt] = await pool(specs.map(([t, e]) => () => list(tmdb, t, e, { d })));
+  const [pm, pt, tm, tt, nm, nt] = await pool(specs.map(([t, e]) => () => list(tmdb, t, e, { d: dd })));
   const refs = { popular: mergeRow(pm, pt, byPop), top: [...tm, ...tt] };
   if (withRecent) refs.recent = mergeRow(nm, nt, byPop);
   // שורות חדשות: מועמדים לכל שורה, ואז הצבה לפי סדר קבוע עם מגבלת "עד 2 שורות לפריט".
   // 'הכי מדורגים' עוד לא סופי (ממתין לציוני OMDb), לכן אכיפה סופית נעשית בסוף (enforceMax)
   const specsNew = svc.specs();
-  const cands = await pool(svc.order.map((name) => () => newRowCands(tmdb, specsNew[name], d).catch((e) => { console.error("שורה " + name + ": " + e.message); return []; })));
+  const cands = await pool(svc.order.map((name) => () => newRowCands(tmdb, specsNew[name], dd).catch((e) => { console.error("שורה " + name + ": " + e.message); return []; })));
   const counts = new Map();
   for (const r of [...refs.popular, ...(refs.recent || [])]) counts.set(key(r.type, r.id), 1);
   svc.order.forEach((name, i) => { refs[name] = place(cands[i], NEW_LIMIT, counts); });
   const uniq = new Map();
   for (const r of Object.values(refs).flat()) uniq.set(key(r.type, r.id), r);
 
+  if (ilCheck) {
+    const ok = new Set(), all = uniq.size;
+    await pool([...uniq.entries()].map(([k, r]) => async () => {
+      try {
+        const j = await tmdb("/" + r.type + "/" + r.id + "/watch/providers", {});
+        const il = j && j.results && j.results.IL;
+        if (il && (il.flatrate || []).some((p) => String(p.provider_id) === String(pid))) ok.add(k);
+      } catch (e) {}
+    }));
+    for (const name of Object.keys(refs)) refs[name] = refs[name].filter((r) => ok.has(key(r.type, r.id)));
+    for (const k of [...uniq.keys()]) if (!ok.has(k)) uniq.delete(k);
+    console.log(svc.id + ": " + ok.size + " מתוך " + all + " מועמדים זמינים בישראל");
+  }
   const items = {};
   await pool(
     [...uniq.entries()].map(([k, r]) => async () => {

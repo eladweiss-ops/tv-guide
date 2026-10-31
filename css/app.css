@@ -307,7 +307,7 @@
   .rsyn p { margin: 0; }
   .srow > .rsyn + .rbts { margin-inline-start: auto; }
   .rclamp:not(.full) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .rsyn .moreb { margin-top: 2px; }
+  .rsyn .moreb { margin: 2px 0 0; }
   .pill .pillact { margin-inline-start: 10px; border: 0; background: transparent; color: #64d2ff; font: inherit; font-weight: 800; padding: 4px 6px; cursor: pointer; }
   .remall { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 18px; background: var(--soft); }
   .remall span { flex: 1; font-weight: 700; }
@@ -371,7 +371,7 @@
   .tagk.now { background: rgba(255,59,48,.2); color: #FF453A; } .tagk.live { background: rgba(255,159,10,.2); color: #FF9F0A; }
   .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .clamp.full { display: block; -webkit-line-clamp: unset; }
-  .moreb { border: 0; background: none; color: inherit; opacity: .85; font: inherit; font-weight: 800; padding: 2px 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .moreb { border: 0; background: none; color: inherit; opacity: .85; font: inherit; font-weight: 800; padding: 2px 0; display: block; margin: 6px 0 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .dcard p { font-size: .98rem; line-height: 1.5; }
   .chnum { display: inline-block; min-width: 30px; margin-inline-end: 8px; padding: 1px 6px; border-radius: 8px; background: var(--soft); color: var(--accent); font-size: .85rem; text-align: center; }
   .hb { display: flex; gap: 8px; }
@@ -406,6 +406,13 @@
   .shbub b { font-weight: 800; }
   .shl3 { margin-top: 4px; color: #027eb5; text-align: right; font-size: .88rem; }
   :root[data-theme="dark"] .shl3 { color: #7FD4FF; }
+  .shsyn { margin-top: 4px; font-style: italic; opacity: .85; }
+  .shlnk { display: flex; gap: 10px; align-items: center; margin: 8px 0 4px; padding: 8px; border-radius: 12px; background: rgba(0,0,0,.06); }
+  :root[data-theme="dark"] .shlnk { background: rgba(255,255,255,.08); }
+  .shlnk img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+  .shlnk div { display: flex; flex-direction: column; min-width: 0; font-size: .82rem; line-height: 1.35; }
+  .shlnk span { opacity: .8; }
+  .shlnk i { font-style: normal; opacity: .6; font-size: .75rem; text-align: right; }
   .shcard { display: flex; align-items: center; justify-content: center; height: min(300px, 38vh); border-radius: 18px; background: var(--soft); color: var(--muted); overflow: hidden; }
   .shcard img { height: 100%; width: auto; max-width: 100%; object-fit: contain; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
   .btn.wa { background: #25D366; color: #05301E; }
@@ -527,3 +534,79 @@
   .wlt b { overflow-wrap: anywhere; }
   .wls { color: var(--muted); font-size: .82rem; }
   .wlrow .rbt { width: 44px; height: 44px; }
+  /* ===== שיתוף: כרטיס 1200x630 בתוך בועת הוואטסאפ ===== */
+  .shgap { height: 6px; }
+  .shpic { border-radius: 12px; overflow: hidden; margin-bottom: 6px; background: rgba(0,0,0,.06); aspect-ratio: 1200 / 630; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
+  .shpic img { display: block; width: 100%; height: auto; }
+  .shpic.ld { opacity: .7; }
+
+  /* ===== דף נחיתה לתוכנית ששיתפו (js/landing.js) ===== */
+  .sheet.land { top: calc(10px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; padding: 0; max-height: none; overflow: hidden; }
+  .sheet.land[hidden] { display: none; }
+  .lnd-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 18px 18px 8px; display: flex; flex-direction: column; gap: 14px; }
+  .lnd-top { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+  .lnd-brand { font-weight: 800; font-size: 1.05rem; color: var(--muted); }
+  .lnd-x { font-size: 1.1rem; font-weight: 700; border: 0; cursor: pointer; }
+  .lnd-note { padding: 12px 16px; border-radius: 20px; background: var(--soft); font-weight: 600; line-height: 1.4; }
+  .lnd-hero { --g1: #FF9F0A; --g2: #FF375F; position: relative; overflow: hidden; border-radius: 34px; padding: 22px 22px 24px; color: #fff; min-height: 190px; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end;
+    background: radial-gradient(120% 90% at 100% 0%, rgba(255,255,255,.30), rgba(255,255,255,0) 60%), linear-gradient(145deg, var(--g1), var(--g2)); box-shadow: 0 14px 34px color-mix(in srgb, var(--g2) 38%, transparent), inset 0 1px 0 rgba(255,255,255,.35); }
+  .lnd-hero.k-sport { --g1: #5E5CE6; --g2: #BF5AF2; } .lnd-hero.k-news { --g1: #0A84FF; --g2: #5AC8FA; } .lnd-hero.k-life { --g1: #30D158; --g2: #00A99D; } .lnd-hero.k-oth { --g1: #8E8E93; --g2: #48484A; }
+  .lnd-em { position: absolute; left: 6px; top: 4px; font-size: 96px; line-height: 1; opacity: .2; pointer-events: none; transform: rotate(-8deg); }
+  .lnd-ch { position: relative; align-self: flex-start; padding: 5px 14px; border-radius: 999px; background: rgba(255,255,255,.24); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font-weight: 800; font-size: .95rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+  .lnd-ttl { position: relative; margin: 0; font-family: var(--font-display); font-size: 2rem; line-height: 1.12; font-weight: 800; letter-spacing: -.4px; overflow-wrap: anywhere; text-shadow: 0 2px 14px rgba(0,0,0,.22); }
+  .lnd-bs { position: relative; display: flex; gap: 6px; flex-wrap: wrap; }
+  .lnd-b { padding: 3px 12px; border-radius: 999px; background: rgba(255,255,255,.26); font-size: .82rem; font-weight: 800; }
+  .lnd-b.live { background: #fff; color: #D70015; }
+  .lnd-meta { border-radius: 26px; padding: 6px 18px; display: flex; flex-direction: column; }
+  .lnd-row { display: flex; align-items: center; gap: 12px; min-height: 48px; font-size: 1.08rem; font-weight: 700; }
+  .lnd-row + .lnd-row { border-top: 1px solid var(--line); }
+  .lnd-ic { font-size: 1.25rem; width: 28px; text-align: center; flex: none; }
+  .lnd-cd { align-self: flex-start; padding: 8px 16px; border-radius: 999px; font-weight: 800; background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .lnd-cd.live { background: color-mix(in srgb, var(--live) 18%, transparent); box-shadow: inset 0 0 0 1.5px var(--live); color: var(--live); }
+  .lnd-syn { margin: 2px 2px 8px; font-size: 1.05rem; line-height: 1.65; color: var(--ink); white-space: pre-line; }
+  .lnd-empty { text-align: center; padding: 36px 12px 12px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .lnd-empty h1 { margin: 0; font-size: 1.7rem; }
+  .lnd-empty p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 1.05rem; }
+  .lnd-empty p b { color: var(--ink); }
+  .lnd-empty .lnd-sm { font-size: .95rem; }
+  .lnd-big { font-size: 64px; line-height: 1.25; }
+  .lnd-bar { flex: none; position: relative; display: flex; flex-direction: column; gap: 8px; padding: 12px 18px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .lnd-bar::before { content: ""; position: absolute; inset: -26px 0 auto 0; height: 26px; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0), var(--sheet)); }
+  .lnd-bar .btn, .lnd-bar .ghost { width: 100%; min-height: 52px; }
+  .lnd-link { align-self: center; border: 0; background: transparent; color: var(--muted); font-weight: 600; min-height: 40px; padding: 0 16px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .shnote { margin: -4px 0 0; font-size: .85rem; color: var(--muted); text-align: center; }
+  .lnd-tz { font-weight: 500; color: var(--muted); font-size: .85rem; }
+  .lnd-inst { align-self: center; border: 0; background: transparent; color: var(--muted); font-weight: 600; font-size: .92rem; min-height: 36px; padding: 0 14px; cursor: pointer; }
+  .lnd-isheet { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; background: rgba(0,0,0,.35); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .lnd-isheet[hidden] { display: none; }
+  .lnd-ib { width: 100%; box-sizing: border-box; padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px)); border-radius: 28px 28px 0 0; background: var(--sheet); box-shadow: 0 -10px 40px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 12px; text-align: center; }
+  .lnd-ib h3 { margin: 0; font-size: 1.15rem; }
+  .lnd-ib p { margin: 0; line-height: 1.6; }
+  .lnd-ib .shg { display: inline-block; vertical-align: -5px; width: 22px; height: 22px; margin: 0 2px; color: #0a84ff; }
+  .lnd-hint { margin: 2px 0 0; text-align: center; font-size: .9rem; color: var(--muted); }
+  .lnd-safari { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 22px; background: var(--soft); line-height: 1.4; }
+  .lnd-safari span { color: var(--muted); font-size: .92rem; }
+  html.android .sheet.land { max-height: none; }
+  /* ===== ביקורת פריסה (tools/qa/audit.cjs): יעד מגע 44px לפחות ורווח 8px בין שני פקדים. סקאלה: 8/12/16/24 ===== */
+  .chip, .chips.lp .chip, .synb, .btn.sm, .ghost.sm, .ghost[data-grp], .lnd-link, .lnd-inst, .island, .lpsel select, .pill .pillact { min-height: 44px; }
+  .lpsel select { height: 44px; }
+  .sheet .chips, .chips.lp, .seg, .rbts, .lnd-bs, .hb { gap: 8px; }
+  .chips.lp { row-gap: 8px; }
+  .srow { row-gap: 8px; }
+  .island { height: 44px; }
+  .moreb { display: flex; align-items: center; justify-content: flex-start; flex: 0 0 100%; width: 100%; min-height: 44px; padding: 0; margin: 0 0 8px; } /* שורה משלו: לא יושב ליד כפתורי הפעולה (באג v1.39) */
+  .chip { min-width: 44px; }
+  .rsyn .moreb { margin: 0; }
+  .pill { display: flex; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); white-space: normal; text-align: center; box-sizing: border-box; border-radius: 24px; }
+  .pill[hidden] { display: none; }
+  .pill .pillact { margin-inline-start: 0; flex: none; }
+  .open > .more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } /* תקציר פתוח: טקסט, "עוד…" וכפתורי הפעולה בשורות נפרדות עם רווח 8 (לא צמודים) */
+  .more > p, .more > .moreb { flex: 1 1 100%; }
+  .more > .ghost { flex: 1 1 auto; margin: 0; }
+  .pill .pillact { padding: 0 10px; }
+  #qx { width: 44px; height: 44px; inset-inline-end: 0; background: none; }
+  #qx::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(118,118,128,.28); z-index: -1; }
+  #qx { z-index: 0; isolation: isolate; }
+  .tmdbmark { position: relative; } .tmdbmark::after { content: ""; position: absolute; inset: -12px -8px; } /* אזור לחיצה 44px, התג עצמו נשאר קטן */
+  details.calopt summary { display: flex; align-items: center; min-height: 44px; }
+  .srow.sgrow { flex-wrap: nowrap; } .srow.sgrow > .go { flex: 1 1 auto; } .srow.sgrow > .go + * { margin-inline-start: 0; } /* הצעה: הכוכב באותה שורה עם השם, בלי שורה ריקה */

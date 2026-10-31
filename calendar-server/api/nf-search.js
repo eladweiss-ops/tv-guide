@@ -1,7 +1,7 @@
 // GET /api/nf-search?q=...  → חיפוש מלא בנטפליקס דרך TMDB (המפתח בשרת: TMDB_API_KEY)
 //   {v, q, collection, brand, titles:[k], persons:[...], items:{k:{k,id,type,title,orig,year,overview,poster,backdrop,vote,nf,others,link}}}
 //   nf=true: יש ב-flatrate של נטפליקס ישראל; link = חיפוש בנטפליקס. others = שירותים אחרים בישראל (מידע בלבד).
-// מטמון: זיכרון + Blob (cache/nf/<hash>.json) ל-12 שעות. קצב: 30 בדקה ל-IP. שגיאות: 400 קלט, 429 קצב, 502 TMDB, 503 לא מוגדר.
+// מטמון: זיכרון + Firestore דרך _db.js (cache/nf/<hash>.json) ל-12 שעות. קצב: 30 בדקה ל-IP. שגיאות: 400 קלט, 429 קצב, 502 TMDB, 503 לא מוגדר.
 import { createHash } from "node:crypto";
 import { searchNf, cleanQuery, norm, SEARCH_TTL } from "./_nfs.js";
 import { readJson, writeJson } from "./_push.js";
@@ -24,7 +24,7 @@ export async function handleSearch(q0, d = {}) {
   const rj = d.readJson || readJson, wj = d.writeJson || writeJson;
   try {
     const b = await rj(path, null);
-    if (b && typeof b.t === "number" && b.v && now - b.t < SEARCH_TTL) { mem.set(h, { t: b.t, v: b.v }); return { status: 200, json: b.v, cache: "blob" }; }
+    if (b && typeof b.t === "number" && b.v && now - b.t < SEARCH_TTL) { mem.set(h, { t: b.t, v: b.v }); return { status: 200, json: b.v, cache: "db" }; }
   } catch (e) { /* מטמון לא זמין: ממשיכים לחיפוש חי */ }
   let out;
   try { out = await searchNf(q, { ...d, provCache }); }

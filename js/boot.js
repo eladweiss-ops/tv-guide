@@ -25,7 +25,7 @@
     TVG.scrollNext = TVG.tab === "grid";
     TVG.render();
     if (TVG.afterBoot) TVG.afterBoot(); // nav.js: מקום אחד לפרמטרים בכתובת, קדימות rem > p > q > tab
-    if (TVG.needsPick() && $("#rem").hidden &&TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
+    if (TVG.needsPick() && $("#rem").hidden && $("#land").hidden &&TVG.store("tvg.tab") !== "nf") TVG.openSheet(true);
     // לשונית נטפליקס מופיעה רק אם הקובץ netflix.json קיים
     fetch("netflix.json", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })

@@ -77,6 +77,7 @@
   navLayer("#sheet", function () { TVG.openSheet(false); TVG.render(); });
   navLayer("#setsheet", function () { TVG.closeFavs(); });
   navLayer("#favs", function () { TVG.closeFavs(); });
+  navLayer("#land", function () { if (TVG.closeLand) TVG.closeLand(); }); // דף נחיתה לתוכנית ששיתפו (landing.js). לפני #rem: תזכורת נפתחת מעליו
   navLayer("#rem", function () { TVG.closeRem(); });
   navLayer("#nfsheet", function () { if (TVG.closeNf) TVG.closeNf(); }); // דף תוכן נטפליקס (netflix.js)
   navLayer("#qwrap", function () { TVG.setSearch(false); });
@@ -124,6 +125,18 @@
     handleUrl(pend || null, !pend);
     if (pend) cleanUrl(URL_PARAMS);
   }
+  // אנדרואיד (Chrome WebAPK): קישור ?p=/?rem= שנפתח מאפליקציה אחרת כשהאפליקציה כבר פתוחה ממוקד אליה (launch_handler: navigate-existing) ולא טוען דף מחדש.
+  // launchQueue מוסר את הכתובת אלינו. בעלייה קרה (הכתובת הנוכחית כבר טופלה ב-afterBoot) מדלגים על ההפעלה הראשונה אם היא אותה כתובת. iOS: אין launchQueue, לא נוגעים.
+  try {
+    var bootHref = location.href, firstLaunch = true;
+    if ("launchQueue" in window && window.launchQueue && window.launchQueue.setConsumer) window.launchQueue.setConsumer(function (lp) {
+      var t = lp && lp.targetURL; if (!t) return;
+      var same = firstLaunch && t === bootHref; firstLaunch = false;
+      if (same) return;
+      try { if (new URL(t).origin !== location.origin) return; } catch (e) { return; }
+      handleUrl(t, false); cleanUrl(URL_PARAMS);
+    });
+  } catch (e) {}
   try {
     if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (e) {
       var d = e.data; if (d && d.type === "open" && typeof d.url === "string") { handleUrl(d.url, false); cleanUrl(URL_PARAMS); }

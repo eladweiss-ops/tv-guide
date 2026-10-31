@@ -1,4 +1,4 @@
-// לוגיקת חיפוש נטפליקס (בלי תלות ב-Vercel/Blob, כדי לבדוק עם node --test). d: {fetch, key}
+// לוגיקת חיפוש נטפליקס (בלי תלות ב-Vercel/Firestore, כדי לבדוק עם node --test). d: {fetch, key}
 import { tget, providersIL, shapeTitle, applyAvail, img } from "./_tmdb.js";
 
 export const MAX_ITEMS = 26;     // תקרת פריטים בתשובה (וכך גם בקשות watch/providers לחיפוש)

@@ -90,6 +90,7 @@
   }
   function icsEsc(s) { return String(s || "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\;"); }
   function icsT(d) { return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
+  function icsW(d) { return icsT(new Date(TVG.ilTs(d))); } // d = שעון קיר ישראלי (ראו core.js)
   function findProg(v) {
     var k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
     var p = (TVG.by.get(id) || []).filter(function (x) { return x.s.getTime() === ts; })[0];
@@ -98,18 +99,18 @@
   // קישור "הוספה ליומן Google" (באנדרואיד webcal/‏.ics לא עובדים). אי אפשר להעביר דרכו שעת התראה מדויקת
   function gcalUrl(r) {
     try {
-      var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : ""), desc = Array.from(p.desc || "").slice(0, 300).join("");
-      return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ttl) + "&dates=" + icsT(p.s) + "/" + icsT(p.e) + "&details=" + encodeURIComponent(desc);
+      var p = r.p, ch = TVG.bidiText(chName(r.id)), ttl = p.title + (ch ? " (" + ch + ")" : ""), desc = Array.from(p.desc || "").slice(0, 300).join("");
+      return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ttl) + "&dates=" + icsW(p.s) + "/" + icsW(p.e) + "&details=" + encodeURIComponent(desc);
     } catch (e) { return "https://calendar.google.com/calendar"; }
   }
   function chName(id) { return (TVG.G.channels.filter(function (c) { return c.id === id; })[0] || {}).name || ""; }
   function icsText(r, cancel) {
-    var p = r.p, ch = chName(r.id), ttl = p.title + (ch ? " (" + ch + ")" : "");
+    var p = r.p, ch = TVG.bidiText(chName(r.id)), ttl = p.title + (ch ? " (" + ch + ")" : "");
     if (cancel) return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "METHOD:CANCEL", "BEGIN:VEVENT",
-      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:1", "STATUS:CANCELLED", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
+      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:1", "STATUS:CANCELLED", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsW(p.s), "DTEND:" + icsW(p.e),
       "SUMMARY:" + icsEsc("בוטל: " + ttl), "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//tv-guide//HE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
-      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:0", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsT(p.s), "DTEND:" + icsT(p.e),
+      "UID:" + r.id + "-" + p.s.getTime() + "@tv-guide", "SEQUENCE:0", "DTSTAMP:" + icsT(new Date()), "DTSTART:" + icsW(p.s), "DTEND:" + icsW(p.e),
       "SUMMARY:" + icsEsc(ttl), "DESCRIPTION:" + icsEsc((p.desc || "").slice(0, 300)),
       "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:-PT" + (r.lead != null ? r.lead : TVG.lead) + "M", "END:VALARM"]
       .concat(r.dbl && (r.lead != null ? r.lead : TVG.lead) > 0 ? ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(ttl), "TRIGGER:PT0S", "END:VALARM"] : [], ["END:VEVENT", "END:VCALENDAR"]).join("\r\n");

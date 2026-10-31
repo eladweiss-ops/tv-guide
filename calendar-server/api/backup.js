@@ -1,6 +1,6 @@
 // GET  /api/backup?t=TOKEN          → ההגדרות השמורות {data:{...}}
 // POST /api/backup {t, data:{...}}   → שמירת ההגדרות (ערוצים, מועדפים, נושאים, תזכורות...)
-import { put, list } from "@vercel/blob";
+import { readJson, writeJson } from "./_db.js";
 import { okToken } from "./_store.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
@@ -13,10 +13,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       const t = String(req.query.t || "");
       if (!okToken(t)) return res.status(400).json({ error: "bad token" });
-      const { blobs } = await list({ prefix: path(t), limit: 1 });
-      if (!blobs.length) return res.status(404).json({ error: "not found" });
-      const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
-      const j = r.ok ? await r.json().catch(() => null) : null;
+      const j = await readJson(path(t), null);
       if (!j) return res.status(404).json({ error: "not found" });
       res.setHeader("cache-control", "no-store");
       return res.status(200).json(j);
@@ -35,7 +32,8 @@ export default async function handler(req, res) {
         data[k] = v; size += v.length;
       }
       if (size > 200000) return res.status(413).json({ error: "too big" });
-      await put(path(body.t), JSON.stringify({ at: Date.now(), data }), { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 });
+      const cur = await readJson(path(body.t), null); // גיבוי זהה לשמור: לא כותבים שוב (חוסך מכסת כתיבות)
+      if (!cur || JSON.stringify(cur.data) !== JSON.stringify(data)) await writeJson(path(body.t), { at: Date.now(), data });
       return res.status(200).json({ ok: true });
     }
     return res.status(405).end();

@@ -122,3 +122,19 @@ test("parseUx כשלים", () => {
   assert.ok(p.some((x) => x.includes("גלילה אופקית") && x.includes("android_360")));
 });
 test("parseUx: קריסה בלי שורות מכשיר", () => { assert.equal(uxProblems(parseUx("Error: browser not found")).length, 1); assert.deepEqual(uxProblems(parseUx("")), []); });
+
+const UX_AUDIT_OK = "iphone_375 scrollWidth/clientWidth 375/375 errors: 0\naudit iphone_375 issues: 0 {}\nandroid_360 scrollWidth/clientWidth 360/360 errors: 0\naudit android_360 issues: 0 {}\n\nlayout audit issues: 0 (report only)";
+const UX_AUDIT_BAD = "iphone_375 scrollWidth/clientWidth 375/375 errors: 0\naudit iphone_375 issues: 3 {\"tight\":3}\n    audit: [tight] button.moreb[data-more] \"עוד…\" <> button.btn.rem \"⏰ תזכיר לי\" - stacked gap 0px (<8) @A_light_03\nandroid_360 scrollWidth/clientWidth 360/360 errors: 0\naudit android_360 issues: 0 {}";
+test("ביקורת פריסה: 0 בעיות = תקין, ומופיע בסיכום היומי", () => {
+  const ux = parseUx(UX_AUDIT_OK);
+  assert.deepEqual(uxProblems(ux), []); assert.equal(ux.audit.total, 0); assert.equal(Object.keys(ux.audit.devices).length, 2);
+  const d = run({}, [], "daily", NOW, ux); assert.match(d.text, /ביקורת פריסה: 0 בעיות/);
+});
+test("ביקורת פריסה: בעיות = 🔴 בסיכום היומי, עם דוגמה; לא נשלחת התראה ב-check", () => {
+  const ux = parseUx(UX_AUDIT_BAD), p = uxProblems(ux);
+  assert.equal(ux.audit.total, 3); assert.equal(p.length, 1);
+  assert.match(p[0], /ביקורת פריסה ב-iphone_375: 3 בעיות/); assert.match(p[0], /moreb/);
+  const d = run({}, p, "daily", NOW, ux); assert.equal(d.send, true); assert.match(d.text, /🔴/); assert.match(d.text, /ביקורת פריסה/);
+  assert.equal(problemKey(p[0]), problemKey(p[0].replace("3 בעיות", "5 בעיות"))); // שינוי במספר לא נחשב תקלה חדשה
+  const c = run(d.state, [], "check", at("2026-10-30T08:05:00Z")); assert.equal(c.send, false); assert.equal(c.state.status, "bad"); // נשארת פתוחה עד הבוקר הבא
+});

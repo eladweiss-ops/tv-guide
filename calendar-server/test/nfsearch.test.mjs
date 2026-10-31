@@ -130,16 +130,16 @@ test("רשימה לבנה: תמונות רק מ-image.tmdb.org, קישורים �
   for (const v of Object.values(out.items)) for (const f of [v.poster, v.backdrop]) assert.ok(f === "" || f.startsWith("https://image.tmdb.org/t/p/"));
 });
 
-test("מטמון: אותה שאילתה פעמיים = קריאה אחת ל-TMDB; Blob משרת instance חדש", async () => {
+test("מטמון: אותה שאילתה פעמיים = קריאה אחת ל-TMDB; Firestore משרת instance חדש", async () => {
   const fx = tmdb({ "/search/multi": { results: [{ media_type: "movie", ...mov(1, "א") }] } });
-  const blob = {};
-  const d = { fetch: fx, readJson: async (p, dflt) => blob[p] ?? dflt, writeJson: async (p, o) => { blob[p] = JSON.parse(JSON.stringify(o)); }, now: () => 1_000_000 };
+  const store = {};
+  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, now: () => 1_000_000 };
   const a = await handleSearch("matrix", d); assert.equal(a.cache, "miss");
   const n = fx.calls.length;
   const b = await handleSearch("  Matrix ", d); assert.equal(b.cache, "mem"); assert.equal(fx.calls.length, n);
-  assert.ok(blob[`cache/nf/${hashOf("matrix")}.json`], "נכתב ל-Blob");
+  assert.ok(store[`cache/nf/${hashOf("matrix")}.json`], "נכתב לאחסון");
   _clearCache();
-  const c = await handleSearch("matrix", d); assert.equal(c.cache, "blob"); assert.equal(fx.calls.length, n);
+  const c = await handleSearch("matrix", d); assert.equal(c.cache, "db"); assert.equal(fx.calls.length, n);
   // אחרי 12 שעות: חיפוש חי
   const e = await handleSearch("matrix", { ...d, now: () => 1_000_000 + 12 * 3600 * 1000 + 1 }); assert.equal(e.cache, "miss");
 });
@@ -150,10 +150,10 @@ test("שגיאות: שאילתה קצרה 400, בלי מפתח 503, TMDB נופ�
   assert.equal((await handleSearch("matrix", { fetch: tmdb() })).status, 503);
   process.env.TMDB_API_KEY = saved;
   const down = async () => jr({}, 500);
-  const blob = {};
-  const d = { fetch: down, readJson: async () => null, writeJson: async (p, o) => { blob[p] = o; } };
+  const store = {};
+  const d = { fetch: down, readJson: async () => null, writeJson: async (p, o) => { store[p] = o; } };
   assert.equal((await handleSearch("matrix", d)).status, 502);
-  assert.deepEqual(blob, {});
+  assert.deepEqual(store, {});
 });
 
 test("handler: GET בלבד, 429 אחרי 30 בקשות לדקה ל-IP, כותרות מטמון", async () => {

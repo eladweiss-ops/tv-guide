@@ -1,19 +1,15 @@
 // GET /api/watch-check  → הבדיקה היומית של רשימות המעקב (Vercel Cron, ראו vercel.json "crons").
 // אימות: Vercel שולחת Authorization: Bearer <CRON_SECRET> כש-CRON_SECRET מוגדר בפרויקט. בלי המשתנה, הנקודה סגורה (503).
-import { list } from "@vercel/blob";
 import { safeEq } from "./_sig.js";
 import { readJson, getSubs, sendTo } from "./_push.js";
+import { listJson } from "./_db.js";
 import { runCheck } from "./_wcheck.js";
 import { fail } from "./_guard.js";
 
-async function listTokens() {
-  const out = []; let cursor;
-  do {
-    const r = await list({ prefix: "wl/", cursor, limit: 1000 });
-    for (const b of r.blobs) { const m = /^wl\/([a-z0-9]{24,48})\.json$/.exec(b.pathname); if (m) out.push(m[1]); }
-    cursor = r.hasMore ? r.cursor : undefined;
-  } while (cursor && out.length < 5000);
-  return out;
+// כל המשתמשים עם רשימת מעקב: אוסף wl ב-Firestore (מזהה המסמך = הטוקן)
+export async function listTokens(list = listJson) {
+  const rows = await list("wl");
+  return rows.map((r) => r.id).filter((id) => /^[a-z0-9]{24,48}$/.test(id)).slice(0, 5000);
 }
 
 // 200 מותר · 401 סוד שגוי/חסר · 503 CRON_SECRET לא מוגדר (הנקודה סגורה)

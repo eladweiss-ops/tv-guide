@@ -9,6 +9,24 @@
   TVG.$ = $;
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
   TVG.esc = esc;
+  // שמות ערוצים בנתונים נשמרים לפעמים בסדר חזותי ("!E ערוץ הבידור"): מחזירים ל"E! ערוץ הבידור"
+  TVG.chNice = function (s) { return String(s == null ? "" : s).replace(/(^|\s)!([A-Za-z0-9]+)/g, "$1$2!"); };
+  // bidi (לתצוגת HTML בלבד, לא לטקסט שנשלח): רצפים לטיניים/מספרים (כולל סימן סוף כמו ! או +) בבידוד LTR, כדי ש"E!" ו-"5+" לא יתהפכו
+  TVG.bidi = function (s) { return TVG.chNice(s).replace(/[A-Za-z0-9][A-Za-z0-9 ]*[!?+]*/g, function (m) { return "\u2066" + m.replace(/ +$/, "") + "\u2069" + (/ $/.test(m) ? " " : ""); }); };
+  // bidi לטקסט פשוט שנשלח (וואטסאפ, יומן, ICS): בלי תווי בידוד (וואטסאפ מציג אותם כריבועים). כל רצף לטיני/ספרות עטוף ב-LRM משני צדיו (U+200E):
+  // ה-LRM שלפניו הופך את הספרה ל-L (כלל W7) כך ש"5 LIVE" נשאר "5 LIVE" ולא "LIVE 5"; ה-LRM שאחריו מחזיק סימן סוף כמו ! או + ליד האות ולא מתהפך.
+  TVG.bidiText = function (s) { return TVG.chNice(s).replace(/[A-Za-z0-9][A-Za-z0-9 ]*[!?+]*/g, function (m) { return "‎" + m.replace(/ +$/, "") + "‎" + (/ $/.test(m) ? " " : ""); }); };
+  // אזור זמן: זמני הלוח הם שעון קיר ישראלי, ו-TVG.parse בונה Date שרכיביו (getHours...) הם שעון הקיר הזה גם במכשיר שאזורו שונה.
+  // ilTs מחזיר את הרגע האמיתי (ms) של שעון קיר כזה ב-Asia/Jerusalem (כולל שעון קיץ); ilNow את "עכשיו" כשעון קיר ישראלי באותה מוסכמה.
+  var ILF = null;
+  function ilParts(ts) {
+    if (!ILF) ILF = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jerusalem", hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
+    var o = {}; ILF.formatToParts(new Date(ts)).forEach(function (p) { o[p.type] = +p.value; }); return o;
+  }
+  function ilOff(ts) { var p = ilParts(ts); return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - Math.floor(ts / 1000) * 1000; }
+  TVG.ilOffMin = function (ts) { return Math.round(ilOff(ts) / 60000); };
+  TVG.ilTs = function (w) { var g = Date.UTC(w.getFullYear(), w.getMonth(), w.getDate(), w.getHours(), w.getMinutes()), t = g - ilOff(g); return g - ilOff(t); };
+  TVG.ilNow = function () { var p = ilParts(Date.now()); return new Date(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second); };
   var DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
   TVG.DAYS = DAYS;
   var p2 = function (n) { return String(n).padStart(2, "0"); };

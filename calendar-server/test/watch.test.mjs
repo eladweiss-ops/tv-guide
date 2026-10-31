@@ -244,3 +244,27 @@ test("vercel.json: cron יומי על /api/watch-check", async () => {
   const v = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
   assert.deepEqual(v.crons, [{ path: "/api/watch-check", schedule: "0 6 * * *" }]);
 });
+
+// ---------- אחסון אמיתי (_db.js) מול Firestore מדומה: נתיבים חוקיים, מיפוי מזהים, listTokens ----------
+test("אחסון Firestore: watch/nf-search כותבים דרך _db.js, listTokens מוצא את המשתמשים", async () => {
+  const { fakeFirestoreClient } = await import("./helpers/fakedb.mjs");
+  const { _setBackend, firestoreBackend } = await import("../api/_db.js");
+  const cl = fakeFirestoreClient(); _setBackend(firestoreBackend(cl));
+  try {
+    const r = await handleWatch("POST", { t: TOK, items: [item()] });
+    assert.deepEqual(r.json, { ok: true, n: 1 });
+    assert.ok(cl.data.has(`wl/${TOK}`), "wl/<t> ב-Firestore");
+    assert.equal((await handleWatch("GET", { t: TOK })).json.items[0].k, "m603");
+    await handleWatch("POST", { t: TOK2, items: [item({ k: "m7" })] });
+    const { listTokens } = await import("../api/watch-check.js");
+    assert.deepEqual((await listTokens()).sort(), [TOK, TOK2].sort());
+    const { handleSearch, _clearCache } = await import("../api/nf-search.js");
+    _clearCache();
+    const fx = async () => ({ ok: true, status: 200, json: async () => ({ results: [] }) });
+    const s = await handleSearch("matrix", { fetch: fx });
+    assert.equal(s.status, 200);
+    assert.ok([...cl.data.keys()].some((k) => k.startsWith("cache/nf__")), "מטמון החיפוש נכתב");
+    _clearCache();
+    assert.equal((await handleSearch("matrix", { fetch: fx })).cache, "db");
+  } finally { _setBackend(null); }
+});

@@ -7,6 +7,8 @@
  * Without baseUrl it serves the repo root on a random local port.
  * Takes screenshots of every tab and sheet at 375 + 393 (iPhone UA) and 360 + 412 (Android Chrome UA),
  * freezes the clock so before/after runs are comparable, and fails (exit 1) on any console error / pageerror.
+ * After EVERY snap a layout audit runs (tools/qa/audit.cjs): touching/overlapping/tiny controls, clipped text, horizontal overflow.
+ * It writes <outDir>/qa-audit-<device>.json and prints "audit <device> issues: N"; TVG_AUDIT_STRICT=1 makes issues fail the run (exit 1).
  * Compare two runs with:  node tools/qa/diff.cjs <dirA> <dirB>
  *
  * Needs installed Chrome (channel "chrome") and:  cd tools/qa && npm install
@@ -15,6 +17,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { chromium } = require("playwright-core");
+const { audit: runAudit } = require("./audit.cjs");
 
 const OUT = path.resolve(process.argv[2] || "shots");
 const REPO = path.resolve(__dirname, "..", "..");
@@ -83,7 +86,7 @@ function nfFixtureData() {
   if (!base) { const s = await serve(); srv = s.srv; base = s.url; }
   if (!base.endsWith("/")) base += "/";
   let browser = null; // דפדפן חדש לכל מכשיר: ריצה ארוכה של כמה מכשירים ברצף עלולה להפיל את הרנדרר (Target crashed)
-  let total = 0, failed = 0; const allErrors = [];
+  let total = 0, failed = 0, auditTotal = 0; const allErrors = [];
   const RUNS = []; DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0)).forEach((x) => ["main", "nfs"].forEach((p) => RUNS.push([x, p]))); // שני שלבים לכל מכשיר, בדפדפן נפרד: ריצה אחת ארוכה מדי מפילה את הרנדרר בזיכרון
   for (const [d, phase] of RUNS) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
     browser = await chromium.launch({ channel: "chrome", headless: true, args: process.env.TVG_CHROME_ARGS ? process.env.TVG_CHROME_ARGS.split(" ") : [] });
@@ -105,11 +108,12 @@ function nfFixtureData() {
       return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":1}' });
     });
     let page = null;
-    const errs = [];
+    const errs = [], auditRaw = [];
+    const audit = (name) => runAudit(page, name, auditRaw);
     const hookPage = () => { page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
     page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => console.log("  !! renderer crashed", d.name)); };
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
-    const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); };
+    const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await audit(n); };
     const step = (n, f) => (phase === "main" ? runStep(n, f) : Promise.resolve());
     const runStep = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
@@ -406,18 +410,233 @@ function nfFixtureData() {
 
     await step("share-text", async () => { await fresh(); await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(500); await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (!b) throw new Error("no share btn; dCard=" + document.querySelector("#dCard").innerHTML.slice(-300) + " tab=" + TVG.tab + " ch=" + TVG.chId); b.click(); }); await page.waitForTimeout(700); await snap("11_share_text"); });
     await step("share-card", async () => { await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("12_share_card"); });
-    await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); });
-    await step("deeplink", async () => {
+    await step("share-copy", async () => { await page.click("[data-shcopy]"); await page.waitForTimeout(300); const t = await page.textContent("#pill"); if (!/הקישור הועתק|לא הצלחנו/.test(t)) throw new Error("copy toast: " + t); if (/הקישור הועתק/.test(t) && !(await page.evaluate(() => document.querySelector("#rem").hidden))) throw new Error("share sheet still open after copy"); });
+    await step("share-texts", async () => { // הטקסט המדויק שנשלח בכל מצב (נשמר לקובץ לעיון)
       await fresh();
-      const v = await page.evaluate(() => { const now = Date.now(); const ids = Array.from(TVG.sel); for (const id of ids) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 86400000 * 1.2); if (a.length) { const p = a[Math.min(3, a.length - 1)]; return id + "%7C" + TVG.dstr(p.s) + "T" + TVG.hhmm(p.s); } } return null; });
-      if (!v) throw new Error("no program for deep link");
-      await page.goto(base + "index.html?p=" + v + "&x=1", { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
-      const u = await page.evaluate(() => location.search); if (u !== "?x=1") throw new Error("url not cleaned: " + u);
-      await snap("13_deeplink");
-      await page.goto(base + "index.html?p=208%7C2020-01-01T10:00", { waitUntil: "networkidle" }); await page.waitForTimeout(1000);
-      const t = await page.textContent("#pill"); if (!/כבר לא בלוח/.test(t)) throw new Error("gone toast: " + t);
-      await snap("13_deeplink_gone");
+      const o = await page.evaluate(() => { const now = Date.now(); const out = []; for (const id of Array.from(TVG.sel)) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 3600000 && p.desc && p.desc.length > 20); if (a.length) { const r = { id, p: a[0] }; out.push(TVG.shareText(r, false), TVG.shareText(r, true)); break; } } const lv = (TVG.by.get("3787") || []).filter(p => p.lv === 1)[0]; if (lv) out.push(TVG.shareText({ id: "3787", p: lv }, false)); return out; });
+      assert(o.length >= 2, "texts"); assert(/\n\n\u200F👇 לשמירה ביומן לחצו כאן:\nhttps:\/\/\S*\?p=\S+$/.test(o[0]), "text mode format: " + o[0]); assert(!/ליומן ותזכורת:/.test(o.join("")), "old CTA gone"); assert(!/[\u2066\u2069]/.test(o.join("")), "no isolates in sent text"); assert(!/\u200F[_*]/.test(o.join("")), "no RLM adjacent to markup"); assert(o[1].split("\n").length === 2 && /^\u200F👇 לשמירה ביומן לחצו כאן:\nhttps/.test(o[1]), "card text only cta+link: " + o[1]);
+      fs.appendFileSync(path.join(OUT, "share_texts_" + d.name + ".txt"), o.map((t, i) => "--- " + i + " ---\n" + t).join("\n\n") + "\n");
     });
+    await step("share-bidi", async () => { // שמות ערוצים לטיניים בטקסט שנשלח / ICS / גוגל קלנדר: LRM סביב הרצף הלטיני, בלי תווי בידוד
+      const o = await page.evaluate(() => ({ a: TVG.bidiText("5 LIVE"), b: TVG.bidiText("ספורט 5 LIVE"), c: TVG.bidiText("!E ערוץ הבידור"), d: TVG.bidiText("i24NEWS"), e: TVG.bidiText("רשת 13") }));
+      assert(o.a === "‎5 LIVE‎", "5 LIVE: " + JSON.stringify(o.a)); assert(o.b === "ספורט ‎5 LIVE‎", "ספורט 5 LIVE"); assert(o.c === "‎E!‎ ערוץ הבידור", "E!"); assert(o.d === "‎i24NEWS‎", "i24NEWS"); assert(o.e === "רשת ‎13‎", "רשת 13");
+      const t = await page.evaluate(() => { const id = Array.from(TVG.sel)[0]; const p = (TVG.by.get(id) || [])[0]; const r = { id, p, lead: 15 }; return { ics: TVG.icsText(r), g: decodeURIComponent(TVG.gcalUrl(r)), sh: TVG.shareText(r, false), ch: TVG.chName(id) }; });
+      assert(!/[⁦⁧⁨⁩]/.test(t.ics + t.g + t.sh), "no isolates in ics/gcal/share");
+      if (/[A-Za-z0-9]/.test(t.ch)) assert(/SUMMARY:[^\r\n]*‎/.test(t.ics) && /text=[^&]*‎/.test(t.g) && /‎/.test(t.sh), "LRM in all plain-text channel names");
+    });
+    // ---- דף נחיתה ----
+    const pickLink = (kind) => page.evaluate((kind) => {
+      const now = Date.now(), lk = (id, p) => id + "." + (TVG.dstr(p.s) + TVG.hhmm(p.s)).replace(/\D/g, "").slice(2);
+      const sel = Array.from(TVG.sel);
+      if (kind === "up") { for (const id of sel) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 3 * 3600000 && p.desc && p.desc.length > 60); if (a.length) return { v: lk(id, a[0]), id, t: a[0].title }; } }
+      if (kind === "live") { for (const id of sel) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() <= now && p.e.getTime() > now && p.desc); if (a.length) return { v: lk(id, a[0]), id, t: a[0].title }; } }
+      if (kind === "rerun" || kind === "ended") {
+        for (const id of sel) for (const p of (TVG.by.get(id) || [])) {
+          if (p.e.getTime() >= now || p.e.getTime() < now - 8 * 3600000) continue;
+          let again = false; TVG.by.forEach((a) => { if (a.some(q => q.title === p.title && q.e.getTime() > now)) again = true; });
+          if ((kind === "rerun") === again) return { v: lk(id, p), id, t: p.title };
+        }
+      }
+      return null;
+    }, kind);
+    const landOpen = (v) => page.goto(base + "index.html?p=" + v, { waitUntil: "networkidle" }).then(() => page.waitForTimeout(1300));
+    for (const kind of ["up", "live", "rerun", "ended"]) {
+      await step("landing-" + kind, async () => {
+        await fresh(); const pk = await pickLink(kind); assert(pk, "no program for " + kind);
+        await landOpen(pk.v);
+        assert(await vis("#land"), "landing visible"); assert(!(await vis("#sheet")), "no channel picker"); assert(!/[?&]p=/.test(page.url()), "url cleaned " + page.url());
+        const txt = await page.textContent("#land");
+        if (kind === "up") { assert(txt.indexOf(pk.t) >= 0, "title"); assert(/מתחיל בעוד/.test(txt), "countdown: " + txt.slice(0, 200)); assert(await vis("[data-landcal]"), "cal button"); if (d.name.indexOf("iphone") === 0) assert(!(await vis("[data-landrem]")), "iOS not installed: no reminder button"); else assert(await vis("[data-landrem]"), "android reminder button");
+          assert(await vis("[data-landinst]") && /להתקנת האפליקציה/.test(txt), "install row visible when not standalone");
+          const ib = await page.evaluate(() => { const a = document.querySelector("[data-landinst]").getBoundingClientRect(), b = document.querySelector("[data-landcal]").getBoundingClientRect(); return { ih: a.height, ch: b.height, below: a.top > b.bottom }; }); assert(ib.below && ib.ih < ib.ch, "install row is secondary (below + smaller): " + JSON.stringify(ib));
+          await page.click("[data-landinst]"); await page.waitForTimeout(300); const it = await page.textContent("#lndInst"); assert(await vis("#lndInst"), "install sheet opens");
+          if (d.name.indexOf("iphone") === 0) assert(/בספארי: שיתוף/.test(it) && /הוספה למסך הבית/.test(it) && (await page.evaluate(() => !!document.querySelector("#lndInst svg.shg"))), "ios install text+glyph: " + it); else assert(/התקנת האפליקציה/.test(it) && (/Chrome ⋮/.test(it) || (await vis("[data-landinstgo]"))), "android install text: " + it);
+          await snap("14_landing_install"); await page.click("[data-landinstx]"); await page.waitForTimeout(200); assert(!(await vis("#lndInst")), "install sheet closes"); }
+        if (kind === "live") { assert(/משודר עכשיו/.test(txt), "live text"); }
+        if (kind === "rerun") { assert(/כבר שודרה/.test(txt) && /מתחיל בעוד|משודר עכשיו/.test(txt), "rerun: " + txt.slice(0, 200)); }
+        if (kind === "ended") { assert(/התוכנית כבר שודרה/.test(txt) && /אין לה שידור נוסף/.test(txt), "ended: " + txt.slice(0, 200)); }
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), "no h-overflow");
+        await snap("14_landing_" + kind);
+      });
+    }
+    await step("landing-standalone", async () => { // באפליקציה המותקנת שורת ההתקנה מוסתרת
+      const pg2 = await ctx.newPage(); await pg2.addInitScript(() => { try { Object.defineProperty(navigator, "standalone", { get: () => true }); } catch (e) {} });
+      await pg2.clock.setFixedTime(new Date(FIXED_NOW)); const pk = await pickLink("up"); await pg2.goto(base + "index.html?p=" + pk.v, { waitUntil: "networkidle" }); await pg2.waitForTimeout(1300);
+      assert(await pg2.evaluate(() => !document.querySelector("#land").hidden && TVG.isStandalone === true), "landing open in standalone"); assert(await pg2.evaluate(() => !document.querySelector("[data-landinst]")), "install row hidden when standalone"); assert(await pg2.evaluate(() => !!document.querySelector("[data-landcal]")), "primary button still there");
+      await pg2.close();
+    });
+    await step("landing-long", async () => { // כותרת וסינופסיס ארוכים
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
+      await page.evaluate(() => { const p = TVG.landTest && 0; document.querySelector(".lnd-ttl").textContent = "מכבי תל אביב נגד הפועל באר שבע בגמר גביע המדינה בכדורסל – משחק שלישי בסדרה"; document.querySelector(".lnd-syn") && (document.querySelector(".lnd-syn").textContent = document.querySelector(".lnd-syn").textContent.repeat(4)); });
+      await page.waitForTimeout(200); await snap("14_landing_long");
+      assert(await vis("[data-landcal]"), "action bar visible with long content");
+      const bb = await page.evaluate(() => { const r = document.querySelector("[data-landcal]").getBoundingClientRect(); return r.bottom <= innerHeight && r.top > 0; }); assert(bb, "primary button inside viewport");
+    });
+    await step("landing-missing", async () => {
+      await landOpen("208.2001011000"); assert(await vis("#land") && /לא מצאנו/.test(await page.textContent("#land")), "missing msg");
+      await snap("14_landing_missing");
+      await landOpen("208%7C2020-01-01T10:00"); assert(/לא מצאנו/.test(await page.textContent("#land")), "old format missing");
+    });
+    await step("landing-old-format", async () => {
+      await fresh(); const pk = await pickLink("up"); const id = pk.v.split(".")[0], t = pk.v.split(".")[1];
+      const old = id + "%7C20" + t.slice(0, 2) + "-" + t.slice(2, 4) + "-" + t.slice(4, 6) + "T" + t.slice(6, 8) + ":" + t.slice(8, 10);
+      await landOpen(old); assert(await page.evaluate((x) => document.querySelector(".lnd-ttl") && document.querySelector(".lnd-ttl").textContent === x, pk.t), "old format resolves");
+    });
+    await step("landing-first-visit", async () => {
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => localStorage.setItem("tvg.sel", "[]"));
+      await landOpen(pk.v);
+      assert(await vis("#land"), "landing visible for first visit"); assert(!(await vis("#sheet")), "channel picker NOT shown over landing");
+      assert(await page.evaluate(() => JSON.parse(localStorage.getItem("tvg.sel")).length === 0), "channel not auto-added");
+      await snap("14_landing_firstvisit");
+      await page.click("[data-landguide]"); await page.waitForTimeout(600);
+      assert(!(await vis("#land")), "landing closed"); assert(await vis("#sheet"), "normal first run: channel picker after closing landing"); assert(await page.evaluate(() => TVG.sel.has("3787") && TVG.sel.has("3819") && TVG.sel.has("3826")), "core channels preselected");
+      await snap("14_landing_firstvisit_after");
+      await page.evaluate(() => localStorage.removeItem("tvg.sel")); // הבא יזרע מחדש
+    });
+    await step("landing-back-and-close", async () => {
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v); const url0 = page.url();
+      assert(await page.evaluate(() => !!(history.state && history.state.tvgLayer)), "pushState on landing");
+      await page.goBack(); await page.waitForTimeout(500); assert(!(await vis("#land")), "back closes landing"); assert(page.url() === url0, "still in app " + page.url());
+      await landOpen(pk.v); await page.click("[data-landclose]"); await page.waitForTimeout(500);
+      assert(!(await vis("#land")) && !(await vis("#scrim2")), "UI close hides scrim"); assert(await page.evaluate(() => !history.state), "history clean after UI close");
+      assert(await page.evaluate((id) => TVG.chId === id && TVG.tab === "dial", pk.id), "guide on program channel");
+      await landOpen(pk.v); await page.keyboard.press("Escape"); await page.waitForTimeout(400); assert(!(await vis("#land")), "Escape closes");
+      await snap("14_landing_closed_guide");
+    });
+    await step("landing-reminder", async () => {
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => { localStorage.setItem("tvg.sel", JSON.stringify(["3787"])); }); await landOpen(pk.v);
+      await page.evaluate((v) => { TVG.isStandalone = true; TVG.openLanding(v); }, pk.v); await page.waitForTimeout(300); await page.click("[data-landrem]"); await page.waitForTimeout(600);
+      assert(await vis("#rem") && await vis("#land"), "reminder sheet opens above landing"); await snap("14_landing_reminder");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(400);
+      assert(!(await vis("#rem")) && await vis("#land") && await vis("#scrim2"), "back to landing, scrim kept");
+      await page.evaluate(() => localStorage.removeItem("tvg.sel"));
+    });
+    if (d.name.indexOf("iphone") === 0) await step("landing-ics", async () => {
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 4000 }), page.click("[data-landcal]")]);
+      const name = dl.suggestedFilename(); assert(/\.ics$/.test(name) && name.indexOf(pk.t.slice(0, 8)) >= 0, "ics filename from title: " + name);
+      const body = fs.readFileSync(await dl.path(), "utf8"); assert(/TRIGGER:-PT15M/.test(body) && /BEGIN:VALARM/.test(body), "ics has 15m alarm");
+      await page.waitForTimeout(300); await snap("14_landing_ics_toast");
+    });
+
+    await step("landing-first-visit-x", async () => { // ✕ רק סוגר, בלי בורר ערוצים
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => localStorage.setItem("tvg.sel", "[]")); await landOpen(pk.v);
+      await page.click("[data-landclose]"); await page.waitForTimeout(600);
+      assert(!(await vis("#land")) && !(await vis("#sheet")), "X closes only, no picker"); await page.evaluate(() => localStorage.removeItem("tvg.sel"));
+    });
+    await step("landing-reminder-adds-channel", async () => { // תזכורת מדף נחיתה: הערוץ נוסף עם הודעה
+      await fresh(); const pk = await pickLink("up"); await page.evaluate(() => { localStorage.setItem("tvg.sel", JSON.stringify(["3787"])); }); await landOpen(pk.v);
+      assert(await page.evaluate((id) => !TVG.sel.has(id), pk.id), "channel not preselected: " + pk.id);
+      await page.evaluate((v) => { TVG.isStandalone = true; TVG.calMode = "ics"; TVG.openLanding(v); }, pk.v); await page.waitForTimeout(300);
+      await page.click("[data-landrem]"); await page.waitForTimeout(500); await page.evaluate(() => document.querySelector("[data-ics]").click()); await page.waitForTimeout(2600);
+      assert(await page.evaluate((id) => TVG.sel.has(id), pk.id), "channel added after reminder"); const pl = await page.textContent("#pill"); assert(/הוספנו את/.test(pl), "toast: " + pl);
+      assert(await vis("#land"), "landing still open"); await snap("14_landing_added_toast"); await page.evaluate(() => { localStorage.removeItem("tvg.sel"); localStorage.removeItem("tvg.calmode"); localStorage.removeItem("tvg.rem"); });
+    });
+    await step("landing-stub", async () => { // תוכנית שלא בלוח: ערוץ + מועד מתוך הקישור
+      await fresh(); await landOpen("3787.2611201000");
+      assert(await vis("#land"), "land"); const t = await page.textContent("#land"); assert(/תוכנית ב/.test(t) && /20\.11/.test(t), "stub text: " + t.slice(0, 200));
+      assert((await vis("[data-landcal]")) && !(await vis("[data-landrem]")), "stub: calendar only"); await snap("14_landing_stub");
+      if (d.name.indexOf("iphone") === 0) { const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 4000 }), page.click("[data-landcal]")]); const body = fs.readFileSync(await dl.path(), "utf8"); assert(/DTSTART:20261120T080000Z/.test(body), "stub ics time (10:00 Israel = 08:00Z): " + body.slice(0, 300)); }
+    });
+    await step("landing-tz", async () => { // מכשיר באזור זמן אחר (הקשר חדש): הזמנים לפי שעון ישראל, עם הערה
+      await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
+      const cd0 = await page.textContent("#lndCd"), t0 = await page.textContent("#land"); assert(!/שעון ישראל/.test(t0), "no tz note in Israel");
+      const ctx2 = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "America/New_York" });
+      try {
+        await ctx2.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
+        if (process.env.TVG_NO_WRITES) await ctx2.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "{}" })));
+        const p2 = await ctx2.newPage(); await p2.clock.setFixedTime(new Date(FIXED_NOW));
+        await p2.goto(base + "index.html?p=" + pk.v, { waitUntil: "networkidle" }); await p2.waitForTimeout(1300);
+        assert(await p2.evaluate(() => new Date(2026, 9, 30, 12).getTimezoneOffset() > 200), "device is in NY");
+        const t1 = await p2.textContent("#land"), cd1 = await p2.textContent("#lndCd");
+        assert(/\(שעון ישראל\)/.test(t1), "tz note in NY"); assert(cd1 === cd0, "same countdown in NY: " + cd0 + " vs " + cd1);
+        assert(t1.replace(/\s*\(שעון ישראל\)/, "") === t0, "same displayed times in NY");
+        await p2.screenshot({ path: path.join(OUT, d.name + "_14_landing_tz_ny.png") }); total++;
+        const m = pk.v.split(".")[1], exp = new Date("20" + m.slice(0, 2) + "-" + m.slice(2, 4) + "-" + m.slice(4, 6) + "T" + m.slice(6, 8) + ":" + m.slice(8, 10) + ":00+02:00").toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+        if (d.name.indexOf("iphone") === 0) {
+          const [dl] = await Promise.all([p2.waitForEvent("download", { timeout: 4000 }), p2.click("[data-landcal]")]); const body = fs.readFileSync(await dl.path(), "utf8");
+          assert(body.indexOf("DTSTART:" + exp) >= 0, "ics DTSTART in NY should be " + exp + ": " + (body.match(/DTSTART:\S+/) || [""])[0]);
+        } else {
+          const href = await p2.evaluate((v) => { const id = v.split(".")[0], q = v.split(".")[1]; const r = TVG.findProg(id + "|" + TVG.parse("20" + q.slice(0, 2) + "-" + q.slice(2, 4) + "-" + q.slice(4, 6) + "T" + q.slice(6, 8) + ":" + q.slice(8, 10)).getTime()); return TVG.gcalUrl(r); }, pk.v);
+          assert(href.indexOf("dates=" + exp + "/") >= 0, "gcal dates in NY should start " + exp + ": " + href);
+        }
+      } finally { await ctx2.close(); }
+    });
+    if (d.name.indexOf("iphone") === 0) await step("landing-inapp-ios", async () => {
+      await fresh(); const pk = await pickLink("up"); const cdp = await ctx.newCDPSession(page);
+      await cdp.send("Emulation.setUserAgentOverride", { userAgent: IPHONE_UA.replace(" Safari/604.1", "") });
+      await landOpen(pk.v); await page.click("[data-landcal]"); await page.waitForTimeout(300);
+      assert(/פתחו ב-Safari/.test(await page.textContent("#land")), "safari panel"); assert(await vis("[data-landcopy]"), "copy btn"); await snap("14_landing_inapp_ios");
+      await cdp.send("Emulation.setUserAgentOverride", { userAgent: IPHONE_UA });
+    });
+    if (d.name.indexOf("android") === 0) await step("landing-inapp-android", async () => {
+      await fresh(); const pk = await pickLink("up"); const cdp = await ctx.newCDPSession(page);
+      await cdp.send("Emulation.setUserAgentOverride", { userAgent: androidUA("SM-S911B; wv") });
+      await page.route("https://calendar.google.com/**", (r) => r.fulfill({ status: 200, contentType: "text/html", body: "<title>gcal</title>ok" }));
+      await landOpen(pk.v); await page.click("[data-landcal]"); await page.waitForURL(/calendar\.google\.com/, { timeout: 4000 });
+      assert(/action=TEMPLATE/.test(page.url()), "same-tab gcal template: " + page.url());
+      await page.unroute("https://calendar.google.com/**"); await cdp.send("Emulation.setUserAgentOverride", { userAgent: androidUA("SM-S911B") });
+    });
+    await step("dark-theme", async () => {
+      await fresh(); await page.evaluate(() => { TVG.setTheme("dark"); }); const pk = await pickLink("up"); await landOpen(pk.v); await snap("15_dark_landing_up");
+      const pe = await pickLink("rerun"); if (pe) { await landOpen(pe.v); await snap("15_dark_landing_rerun"); }
+      await fresh(); await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(400);
+      await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (b) b.click(); }); await page.waitForTimeout(600); await snap("15_dark_share_text");
+      await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("15_dark_share_card");
+      await page.evaluate(() => { TVG.setTheme("light"); });
+    });
+    // ---- ביקורת פריסה: המצבים שמסתירים באגים (תקציר ארוך פתוח, כל החלונות, הודעות עם כפתור, בהיר + כהה) ----
+    // snap() מריץ את הביקורת גם בכל הצעדים שלמעלה; כאן מוסיפים את מה שאין בהם. אין צורך בצילומים נוספים לבדיקה - snap שומר אותם בשם "A_<theme>_*".
+    const LONG_DESC = "בפרק הערב מתמודדים המשתתפים עם אתגר חדש ובלתי צפוי, בזמן שבבית מתגלים סודות ישנים שמטלטלים את כל המשפחה. אחרי שבועות של מתח, הכול מתפוצץ בסצנה אחת דרמטית שבה כל אחד נאלץ לבחור צד. אורחי הערב מגיעים עם הפתעות, והסיפור מקבל תפנית שאיש לא ציפה לה.";
+    const injectLong = () => page.evaluate((txt) => { TVG.by.forEach((a) => a.forEach((p) => { p.desc = txt; })); TVG.render(); }, LONG_DESC);
+    for (const theme of ["light", "dark"]) {
+      const A = "A_" + theme + "_";
+      await step("audit-" + theme + "-guide", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await injectLong(); await page.waitForTimeout(400);
+        await snap(A + "01_dial_longdesc");
+        const mb = await page.$("#dCard [data-more]"); if (mb) { await mb.click(); await page.waitForTimeout(300); await snap(A + "02_dial_longdesc_open"); }
+        await page.click('[data-tab="now"]'); await page.waitForTimeout(600);
+        await page.click("[data-opentog]"); await page.waitForTimeout(500); await snap(A + "03_now_synopsis_open");
+        const mb2 = await page.$(".card.open [data-more]"); if (mb2) { await mb2.click(); await page.waitForTimeout(300); await snap(A + "04_now_synopsis_more"); }
+        await page.evaluate(() => { const c = document.querySelector('.card[data-toggle]:not(.open)'); if (c) { c.classList.add("open"); const o = c.querySelector("[data-more]"); if (o) o.click(); } }); await page.waitForTimeout(300); await snap(A + "05_now_all_open");
+        await page.click('[data-tab="grid"]'); await page.waitForTimeout(600);
+        await page.evaluate(() => { const r = document.querySelector('.row[data-toggle][data-pts]:not(.past):not(.now)'); if (r) { r.scrollIntoView({ block: "center" }); r.classList.add("open"); const o = r.querySelector("[data-more]"); if (o) o.click(); } }); await page.waitForTimeout(300); await snap(A + "06_grid_row_open");
+        await page.click('[data-tab="rems"]'); await page.waitForTimeout(500); await snap(A + "07_rems");
+        await page.click("#sBtn"); await page.fill("#q", "חדשות"); await page.waitForTimeout(900);
+        await page.evaluate(() => { const r = document.querySelector("#results [data-toggle], #results .row"); if (r) r.click(); }); await page.waitForTimeout(400); await snap(A + "08_search_open_result");
+      });
+      await step("audit-" + theme + "-sheets", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await injectLong(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(500);
+        await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(600); await snap(A + "10_remsheet");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#setBtn"); await page.waitForTimeout(500); await snap(A + "11_settings_top");
+        await page.evaluate(() => { const s = document.querySelector("#setsheet"); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300); await snap(A + "11_settings_bottom");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#chBtn"); await page.waitForTimeout(500); await snap(A + "12_channels"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#fvBtn"); await page.waitForTimeout(500); await snap(A + "13_favs"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(400);
+        await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (b) b.click(); }); await page.waitForTimeout(600); await snap(A + "14_share_text");
+        await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap(A + "15_share_card");
+      });
+      await step("audit-" + theme + "-landing-nf", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); const pk = await pickLink("up"); await landOpen(pk.v); await snap(A + "20_landing_up");
+        await page.click("[data-landinst]"); await page.waitForTimeout(300); await snap(A + "21_landing_install"); await page.click("[data-landinstx]"); await page.waitForTimeout(200);
+        const pl = await pickLink("live"); if (pl) { await landOpen(pl.v); await snap(A + "22_landing_live"); }
+        const pe = await pickLink("ended"); if (pe) { await landOpen(pe.v); await snap(A + "23_landing_ended"); }
+        nfFixture = true; await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap(A + "30_nf_top");
+        await page.click(".nfhero"); await page.waitForTimeout(900); await snap(A + "31_nf_page");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(400);
+        await page.evaluate(() => document.querySelector('[data-nfopen="x_edge"]').click()); await page.waitForTimeout(900); await snap(A + "32_nf_page_edge"); nfFixture = false;
+      });
+      await step("audit-" + theme + "-toasts", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme);
+        await page.evaluate(() => TVG.pill("★ נוסף למועדפים", 30000, "ביטול", function () {}, "החזר", function () {})); await page.waitForTimeout(400); await snap(A + "40_toast_two_actions");
+        await page.evaluate(() => TVG.pill("נזכיר לך ב-20:25 לפני הפרק המיוחד של התוכנית הארוכה ביותר בעולם", 30000, "ביטול", function () {})); await page.waitForTimeout(400); await snap(A + "41_toast_long_action");
+        await page.evaluate(() => TVG.pill("עודכנת לגרסה", 30000)); await page.waitForTimeout(300); await snap(A + "42_toast_plain");
+        await page.evaluate(() => TVG.setTheme("light"));
+      });
+    }
+
     if (d.name === "iphone_375") await step("card-png", async () => {
       await fresh();
       const out = await page.evaluate(async () => {
@@ -441,9 +660,18 @@ function nfFixtureData() {
     const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     console.log(d.name, "scrollWidth/clientWidth", overflow.sw + "/" + overflow.cw, "errors:", errs.length);
     errs.forEach((e) => { console.log("   ", e); allErrors.push(d.name + " " + e); });
+    // ---- דו"ח ביקורת הפריסה: אותה בעיה (סוג + אלמנט[ים]) שחוזרת בכמה שלבים נספרת פעם אחת ----
+    const uniq = new Map(), sg = (s) => String(s || "").replace(/ ".*$/, "");
+    auditRaw.forEach((i) => { const k = i.type + "|" + sg(i.el) + "|" + sg(i.el2); const u = uniq.get(k); if (u) u.steps.push(i.step); else uniq.set(k, { type: i.type, el: i.el, el2: i.el2, msg: i.msg, steps: [i.step] }); });
+    const issues = Array.from(uniq.values()), byType = {}; issues.forEach((i) => { byType[i.type] = (byType[i.type] || 0) + 1; });
+    fs.writeFileSync(path.join(OUT, "qa-audit-" + d.name + "-" + phase + ".json"), JSON.stringify({ device: d.name, count: issues.length, byType, issues }, null, 1));
+    console.log("audit " + d.name + " " + phase + " issues: " + issues.length + " " + JSON.stringify(byType));
+    issues.slice(0, 5).forEach((i) => console.log("    audit: [" + i.type + "] " + i.el + (i.el2 ? " <> " + i.el2 : "") + " - " + i.msg + " @" + i.steps[0]));
+    auditTotal += issues.length;
     await ctx.close(); await browser.close(); browser = null;
   }
   if (browser) await browser.close(); if (srv) srv.close();
   console.log("\nscreenshots:", total, "-> " + OUT, "| step failures:", failed, "| console/page errors:", allErrors.length);
-  process.exit(allErrors.length ? 1 : 0);
+  console.log("layout audit issues:", auditTotal, process.env.TVG_AUDIT_STRICT ? "(strict)" : "(report only; TVG_AUDIT_STRICT=1 to fail)");
+  process.exit(allErrors.length || (process.env.TVG_AUDIT_STRICT && auditTotal) ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

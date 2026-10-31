@@ -26,7 +26,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25   # ביקורת הפריסה (גלילה בכל מסך) מאריכה את ריצת ה-UX
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -49,7 +49,7 @@ jobs:
           echo "mode=$(node tools/monitor/notify.mjs --print-mode --state monitor-state.json $F)" >> "$GITHUB_OUTPUT"
       - name: Health check
         run: node tools/monitor/health.mjs --out health.json > /dev/null
-      - name: UX run (summary only)
+      - name: UX run (summary only; כולל ביקורת פריסה - tools/qa/audit.cjs)
         if: steps.mode.outputs.mode != 'check'
         continue-on-error: true
         env:

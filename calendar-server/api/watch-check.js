@@ -6,6 +6,7 @@ import { listJson, delJson } from "./_db.js";
 import { runCheck } from "./_wcheck.js";
 import { SEARCH_TTL } from "./_nfs.js";
 import { fail } from "./_guard.js";
+import { cleanParties } from "./_party.js"; // 🍿 ערב צפייה
 
 // כל המשתמשים עם רשימת מעקב: אוסף wl ב-Firestore (מזהה המסמך = הטוקן). הערכים כבר נקראו: אין קריאה שנייה לכל משתמש
 export async function listUsers(list = listJson) {
@@ -42,6 +43,8 @@ export default async function handler(req, res, d = {}) {
   if (au !== 200) return res.status(au).json({ error: au === 503 ? "not configured" : "unauthorized" });
   try {
     const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: Date.now() + 60000, ...d });
+    // 🍿 ערב צפייה: ניקוי קטן (עד 100 ערבים שעברו יומיים), מכבד את הזמן שנשאר. כישלון כאן לא פוגע בבדיקה היומית
+    try { r.parties = await (d.cleanParties || cleanParties)(Date.now(), { deadline: Date.now() + 15000 }); } catch (e) { r.parties = -1; console.error("party cleanup failed"); }
     console.log("watch-check", JSON.stringify(r));
     res.setHeader("cache-control", "no-store");
     return res.status(200).json(r);

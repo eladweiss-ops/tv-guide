@@ -161,6 +161,7 @@
     // 💌 ו-🍿 יתווספו בשלב 3 (חברים); עד אז לא מציגים כפתורים מתים.
     var ok = isNf(x) && RE_LINK.test(x.link || "");
     return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
+      (TVG.partyNfBtn ? TVG.partyNfBtn() : "") + /* 🍿 ערב צפייה */
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
   function openNf(k, ev) {

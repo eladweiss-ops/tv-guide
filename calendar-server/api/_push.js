@@ -21,7 +21,7 @@ export async function sendTo(t, payload, d = {}) {
     try { await send(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); }
     catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) keep.push(s); else console.log("subscription gone", e.statusCode); }
   }
-  if (keep.length !== subs.length) await (d.setSubs || setSubs)(t, keep);
+  if (keep.length !== subs.length) { try { await (d.setSubs || setSubs)(t, keep); } catch (e) { console.error("setSubs failed (push already sent)", e && e.message); } }
   return { ok, total: subs.length };
 }
 

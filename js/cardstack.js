@@ -9,7 +9,7 @@
    קפיץ: TVG.spring (response .35, damping 1.0), מתחיל מהערך החי ומהמהירות החיה, לכן אפשר להפוך כיוון באמצע (פתיחה/סגירה/פתיחה).
    חיבור לגרירה: sheetdrag.js קורא TVG.onSheetDrag(el, p) (p = 0..1 כמה החלון ירד) ו-TVG.onSheetSettle(el): הרקע חוזר ל-1 ביחס ישר ל-p.
    חלון מעל חלון: רק הדף מצטמצם; החלון התחתון מצטמצם עדין ל-0.97 (המאפיין scale, לא מתנגש ב-transform של הגרירה).
-   הפחתת תנועה: אין שינוי גודל בכלל (נשאר רק הרקע הכהה הקיים). כניסת החלון (WAAPI): החלקה מלמטה + דעיכת scrim; מתבטלת ברגע שאוחזים בחלון. */
+   יציאת החלון: רוח רפאים חזותית (ראו ghostOut). הפחתת תנועה: אין שינוי גודל בכלל (נשאר רק הרקע הכהה הקיים). כניסת החלון (WAAPI): החלקה מלמטה + דעיכת scrim; מתבטלת ברגע שאוחזים בחלון. */
 (function (TVG) {
   TVG.files["cardstack"] = 1;
   var $ = TVG.$;
@@ -23,7 +23,7 @@
   var vw = 0, vh = 0, fx = [];
 
   function reduced() { return TVG.reducedMotion(); }
-  function openSheets() { return Array.prototype.slice.call(document.querySelectorAll(".sheet:not([hidden])")); }
+  function openSheets() { return Array.prototype.slice.call(document.querySelectorAll(".sheet:not([hidden]):not(.sgh)")); }
   function topSheet(list) { var t = TVG.topLayerEl && TVG.topLayerEl(); return t && !t.hidden && /(^|\s)sheet(\s|$)/.test(t.className) ? t : list[list.length - 1] || null; }
 
   function setOrigin() { // מרכז המסך בקואורדינטות של .page (הוא מתגלל עם החלון)
@@ -106,6 +106,53 @@
     try { var a = scrimEnt = s.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" }); a.onfinish = a.oncancel = function () { if (scrimEnt === a) scrimEnt = null; }; } catch (e) {}
   }
 
+  // ---- יציאת החלון (סגירה שאינה גרירה: כפתור, Escape, חזור, הקשה על ה-scrim) ----
+  // החלון האמיתי נסגר מיד, בדיוק כמו קודם (hidden=true דרך אותו מסלול: nav.js, היסטוריה, sheetdrag, scrim - שום מצב לא מתעכב).
+  // לפני כן מצלמים "רוח רפאים" (#sgh): עותק חזותי בלבד (בלי id, inert, בלי לחיצות) באותו מקום בדיוק, שיורד בקפיץ (response .3, damping 1)
+  // וה-scrim דועך בסנכרון, ובינתיים הדף חוזר (cardstack). פתיחה חדשה באמצע יציאה מסלקת את הרוח מיד. הפחתת תנועה: דעיכה של 140ms.
+  var hidDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "hidden"), ghosts = [];
+  function killGhost(el) {
+    for (var i = ghosts.length - 1; i >= 0; i--) if (ghosts[i].src === el) { ghosts[i].stop(); ghosts.splice(i, 1); }
+  }
+  function ghostOut(el, isScrim) {
+    var cs = getComputedStyle(el), r = el.getBoundingClientRect(), op = parseFloat(cs.opacity);
+    if (!r.height || !(op > 0.02)) return;                                   // כבר דעך (גרירה/הפחתת תנועה של sheetdrag)
+    if (!isScrim && r.top >= window.innerHeight - 2) return;                  // כבר מחוץ למסך (נסגר בגרירה)
+    killGhost(el);
+    var g = el.cloneNode(true), all = g.querySelectorAll("[id]"), i, rm = reduced();
+    for (i = 0; i < all.length; i++) all[i].removeAttribute("id"); g.removeAttribute("id");
+    g.classList.add("sgh"); g.setAttribute("aria-hidden", "true"); g.setAttribute("inert", ""); g.style.pointerEvents = "none"; g.style.transition = "none"; g.style.animation = "none";
+    var m = /matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([-\d.]+)\)/.exec(cs.transform), y0 = m ? parseFloat(m[1]) : 0;
+    g.style.transform = cs.transform === "none" ? "" : cs.transform; g.style.opacity = String(op);
+    var a = el.querySelectorAll("*"); document.body.appendChild(g);
+    var b = g.querySelectorAll("*"); if (el.scrollTop) g.scrollTop = el.scrollTop;
+    for (i = 0; i < a.length; i++) if (a[i].scrollTop) b[i].scrollTop = a[i].scrollTop;
+    var h = { src: el, sp: null, wa: null, stop: function () { if (h.sp) h.sp.stop(); if (h.wa) { try { h.wa.cancel(); } catch (e) {} } if (g.parentNode) g.parentNode.removeChild(g); } };
+    ghosts.push(h);
+    function end() { var k = ghosts.indexOf(h); if (k >= 0) ghosts.splice(k, 1); h.stop(); }
+    if (rm || !g.animate) { try { h.wa = g.animate([{ opacity: op }, { opacity: 0 }], { duration: 140, easing: "linear", fill: "forwards" }); h.wa.onfinish = end; } catch (e) { end(); } return; }
+    var off = window.innerHeight - (r.top - y0) + 6;
+    h.sp = TVG.spring({ from: isScrim ? 0 : y0, to: isScrim ? 1 : off, v: 0, response: 0.3, damping: 1.0, eps: isScrim ? 0.002 : 0.4,
+      update: function (x) { if (isScrim) g.style.opacity = String((op * (1 - x)).toFixed(3)); else g.style.transform = "translate3d(0," + x.toFixed(2) + "px,0)"; },
+      done: end });
+  }
+  function patchHidden(el, isScrim) {
+    if (!hidDesc || !hidDesc.get || !hidDesc.set) return;
+    Object.defineProperty(el, "hidden", { configurable: true, enumerable: true,
+      get: function () { return hidDesc.get.call(this); },
+      set: function (v) {
+        var was = hidDesc.get.call(this);
+        if (v && !was) { if (isScrim ? scrimEnt : ent && ent.el === this) cancelEnt(); try { ghostOut(this, isScrim); } catch (e) {} } else if (!v && was) killGhost(this);
+        hidDesc.set.call(this, v);
+      } });
+  }
+  // sheetdrag.js מבקש: אוחזים בחלון באמצע הכניסה -> המיקום החי (translateY) והפסקת האנימציה, כדי שהגרירה תתחיל משם בלי קפיצה
+  TVG.sheetEnterLive = function (el) {
+    if (!ent || ent.el !== el) return 0;
+    var m = /matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([-\d.]+)\)/.exec(getComputedStyle(el).transform), y = m ? parseFloat(m[1]) : 0;
+    cancelEnt(); return y;
+  };
+
   // ---- הקרסים של sheetdrag.js ----
   TVG.onSheetDrag = function (el, prog) {
     if (ent && ent.el === el) cancelEnt();
@@ -117,6 +164,8 @@
   function init() {
     page = document.querySelector(".page"); dock = document.querySelector(".dock"); if (!page || !dock) return;
     frame = document.createElement("div"); frame.id = "stkf"; frame.hidden = true; frame.setAttribute("aria-hidden", "true"); document.body.appendChild(frame);
+    Array.prototype.forEach.call(document.querySelectorAll(".sheet"), function (e) { patchHidden(e, false); });
+    Array.prototype.forEach.call(document.querySelectorAll(".scrim"), function (e) { patchHidden(e, true); });
     var mo = new MutationObserver(function (recs) {
       var chg = false;
       for (var i = 0; i < recs.length; i++) {

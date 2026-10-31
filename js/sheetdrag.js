@@ -15,7 +15,7 @@
 
   function now() { return window.performance && performance.now ? performance.now() : Date.now(); }
   function scrimOf(el) { return $(el.id === "sheet" ? "#scrim" : "#scrim2"); }
-  function alone() { return document.querySelectorAll(".sheet:not([hidden])").length < 2; } // יש חלון נוסף מתחת? אז הרקע המשותף לא דועך
+  function alone() { return document.querySelectorAll(".sheet:not([hidden]):not(.sgh)").length < 2; } // יש חלון נוסף מתחת? אז הרקע המשותף לא דועך
   function setY(el, y) {
     var H = el.offsetHeight || 1;
     el.style.transform = y ? "translate3d(0," + y.toFixed(2) + "px,0)" : "";
@@ -73,6 +73,8 @@
     if (d || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     var t = e.target, sheet = t && t.closest ? t.closest(".sheet") : null; if (!sheet || sheet.hidden || TVG.topLayerEl() !== sheet) return;
     if (t.closest("input,textarea,select,[contenteditable],[data-nodrag],.lnd-isheet")) return;
+    var ey = TVG.sheetEnterLive ? TVG.sheetEnterLive(sheet) : 0; // אוחזים באמצע כניסת החלון (cardstack.js): ממשיכים מהמיקום החי, בלי קפיצה
+    if (ey > 0.5 && !(an && an.el === sheet)) { if (an) an.h.stop(); an = { el: sheet, y: ey, kind: "back", to: 0, h: { stop: function () {} } }; setY(sheet, ey); }
     var r = sheet.getBoundingClientRect(), zone = e.clientY - r.top < TOP, si = scrollInfo(t, sheet), grab = !!(an && an.el === sheet);
     if (e.pointerType === "mouse" && !zone && !grab) return; // עכבר: רק מרצועת האחיזה (בלי להפריע לסימון טקסט)
     var base = 0;

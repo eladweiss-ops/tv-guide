@@ -666,6 +666,48 @@ function nfFixtureData() {
       const m2 = await page.evaluate(() => getComputedStyle(document.querySelector("#nfsheet")).scale); stkChk(m2 === "none" || Math.abs(parseFloat(m2) - 1) < 0.002, "lower sheet back to 1 after closing the top one: " + m2);
       stkChk(Math.abs((await stkSt()).page - 0.94) < 0.004, "page still 0.94 under the nf page"); await page.keyboard.press("Escape"); await page.waitForTimeout(900); stkChk((await stkSt()).page === 1, "all closed -> identity");
     });
+    await step("stack-exit-animation", async () => { // יציאת חלון בסגירה שאינה גרירה: רוח רפאים יורדת בקפיץ, החלון האמיתי נסגר מיד (היסטוריה/מצב נקיים)
+      await fluidOpen();
+      const G = () => page.evaluate(() => { const g = document.querySelectorAll(".sgh"), r = document.querySelector("#rem"), s = document.querySelector("#scrim2"); const m = g[0] && /matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*([-\d.]+)\)/.exec(getComputedStyle(g[0]).transform);
+        return { n: g.length, y: m ? +m[1] : 0, ids: document.querySelectorAll("#rem").length, hidden: r.hidden, scrim: s.hidden, hist: history.state, so: g[0] ? +getComputedStyle(g[0]).opacity : 1, inert: g[0] ? g[0].hasAttribute("inert") : false }; });
+      await page.keyboard.press("Escape"); await page.waitForTimeout(110); const a = await G();
+      stkChk(a.n === 2 && a.hidden && a.scrim && !a.hist && a.ids === 1 && a.inert, "exit: real sheet closed at once, inert ghosts (sheet + scrim), no duplicate ids, history clean: " + JSON.stringify(a));
+      stkChk(a.y > 5, "ghost is sliding down: " + a.y); await page.screenshot({ path: path.join(OUT, d.name + "_74_stack_exit_mid.png") }); // בכוונה בלי audit: באמצע היציאה הדף עדיין מוקטן (0.99), אז מרווחי 8px נמדדים 7.9
+      await page.waitForTimeout(800); const b = await G(); stkChk(b.n === 0, "ghost removed after the exit: " + JSON.stringify(b));
+      stkChk((await stkSt()).page === 1, "page back to identity after exit");
+      // פתיחה חדשה באמצע יציאה
+      await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(700);
+      await page.keyboard.press("Escape"); await page.waitForTimeout(90); await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(800);
+      const c = await G(); stkChk(c.n === 0 && !c.hidden && !c.scrim, "reopen mid-exit: ghost cleared, sheet open: " + JSON.stringify(c));
+      stkChk(Math.abs((await stkSt()).page - 0.94) < 0.004, "reopen mid-exit: page back at 0.94");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(900); stkChk((await G()).n === 0 && (await stkSt()).page === 1 && !(await page.evaluate(() => history.state)), "closed again cleanly");
+      // לחיצה על ה-scrim וכפתור "חזור" בדפדפן
+      await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(700);
+      await page.goBack(); await page.waitForTimeout(120); const d2 = await G(); stkChk(d2.hidden && d2.n === 2, "browser back: ghost exit: " + JSON.stringify(d2)); await page.waitForTimeout(800);
+      stkChk((await G()).n === 0 && (await stkSt()).page === 1, "after browser back: clean");
+    });
+    await step("stack-exit-reduced-motion", async () => { // הפחתת תנועה: דעיכה בלבד, עד 150ms, בלי תנועה
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      try {
+        await fluidOpen(); await page.keyboard.press("Escape"); await page.waitForTimeout(50);
+        const a = await page.evaluate(() => { const g = document.querySelector(".sgh"); return g ? { op: +getComputedStyle(g).opacity, tr: getComputedStyle(g).transform } : null; });
+        stkChk(!a || (a.tr === "none" && a.op < 1), "reduced motion exit: fade only: " + JSON.stringify(a));
+        await page.waitForTimeout(260); stkChk((await page.evaluate(() => document.querySelectorAll(".sgh").length)) === 0, "reduced motion exit: gone within ~150ms");
+      } finally { await page.emulateMedia({ reducedMotion: "no-preference" }); }
+    });
+    await step("stack-grab-during-entrance", async () => { // אוחזים בחלון תוך כדי הכניסה: ממשיכים מהמיקום החי, בלי קפיצה
+      const cdp = await ctx.newCDPSession(page); await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(600);
+      await page.evaluate(() => document.querySelector("[data-rem]").click());
+      await page.waitForFunction((h) => document.querySelector("#rem").getBoundingClientRect().top < h - 90, d.h, { polling: "raf" });
+      const t0 = await page.evaluate(() => document.querySelector("#rem").getBoundingClientRect().top), x = d.w / 2;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: t0 + 14, id: 1, radiusX: 2, radiusY: 2, force: 1 }] });
+      const t1 = await page.evaluate(() => document.querySelector("#rem").getBoundingClientRect().top);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: t0 + 28, id: 1, radiusX: 2, radiusY: 2, force: 1 }] });
+      await page.waitForTimeout(350); const t2 = await page.evaluate(() => document.querySelector("#rem").getBoundingClientRect().top);
+      stkChk(Math.abs(t2 - t1) < 40, "grab during entrance: sheet stays under the finger (no jump to the end): " + [t0, t1, t2].join(","));
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await page.waitForTimeout(900);
+      const f = await fluidSt("#rem"); stkChk(f.tr === "" && (f.hidden ? !f.hist : !!(f.hist && f.hist.tvgLayer)), "released: settles consistently (open with a layer entry, or closed with clean history): " + JSON.stringify(f));
+    });
     await step("title-collapse", async () => { // כותרת גדולה -> קטנה בגלילה, ובחזרה; בכל המסכים
       for (const [tab, y] of [["grid", 80], ["now", 80], ["dial", 260]]) {
         await fresh(); await page.click('[data-tab="' + tab + '"]'); await page.waitForTimeout(600);

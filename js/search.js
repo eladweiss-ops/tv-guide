@@ -154,7 +154,8 @@
     };
     // סדר המסך (לבקשת אלעד): קודם השידורים עצמם (עכשיו, ישירים, חדשים), ורק אחריהם מעקב/הצעות. aux1 = נושא+חיפושים אחרונים+הצעות, aux2 = מעקב סדרה/תזכורת לכולם
     var aux1 = "", aux2 = "";
-    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) aux1 += topicRow(TVG.qExact || TVG.q.trim());
+    // מעקב אחרי נושא: כפתור קטן בשורה אחת מעל התוצאות (לא נקבר בסוף הרשימה); התוצאות עצמן מיד אחריו
+    if ((!TVG.qExact || genericT) && term.length >= 2 && !TVG.favPick && !serFollow) { var tq = TVG.qExact || TVG.q.trim(), tf = isTopic(tq); h += '<div class="foltopic"><button type="button" class="ghost sm" data-follow="' + esc(tq) + '">' + (tf ? "✓ עוקבים אחרי \"" + esc(tq) + "\" · הפסקה" : "⭐ לעקוב אחרי כל מה שמזכיר את \"" + esc(tq) + "\"") + "</button></div>"; }
     if (!TVG.qExact) {
       var rmatch = TVG.RECENT.filter(function (r) { return r.t.toLowerCase().indexOf(term) === 0 && r.t.toLowerCase() !== term; }).slice(0, 3);
       if (rmatch.length) aux1 += '<div class="recent">' + rmatch.map(function (r) { return '<span class="rchip"><button type="button" data-recent="' + TVG.RECENT.indexOf(r) + '">🕘 ' + esc(r.t) + "</button></span>"; }).join("") + "</div>";

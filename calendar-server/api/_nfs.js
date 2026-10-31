@@ -75,17 +75,25 @@ export async function searchNf(q0, d = {}) {
   // אוסף (סדרת סרטים), לפי סדר יציאה
   let collection = null;
   // מבין התוצאות: שם זהה לשאילתה (בלי "אוסף"/"collection") קודם, אחר כך השם הקצר ביותר שמכיל אותה ("הנוקמים" ולא "הנוקמים של גרים")
-  const colBase = (n) => norm(String(n || "").replace(/s*[-–:]?s*(אוסף|סדרת סרטים|collection)s*$/i, ""));
+  // ואם אין שם זהה: האוסף של הסרט הפופולרי ביותר שתואם לשאילתה (TMDB לא תמיד מתרגם שמות אוספים לעברית)
+  const colBase = (n) => norm(String(n || "").replace(/\s*[-–:]?\s*(אוסף|סדרת סרטים|collection)\s*$/i, ""));
   const colCands = ((cols && Array.isArray(cols.results)) ? cols.results : []).slice(0, 8).filter((c) => c && Number.isInteger(c.id));
   const nq = norm(alias || q);
-  const topCol = colCands.find((c) => colBase(c.name) === nq) || colCands.filter((c) => colBase(c.name).includes(nq)).sort((x, y) => colBase(x.name).length - colBase(y.name).length)[0] || colCands[0];
-  if (topCol && Number.isInteger(topCol.id) && (norm(topCol.name).includes(norm(q)) || norm(q).includes(norm(topCol.name)) || (alias && norm(topCol.name).includes(norm(alias))) || cols.results.length === 1)) {
+  let topCol = colCands.find((c) => colBase(c.name) === nq);
+  if (!topCol && !alias) {
+    const movs = ((heM && heM.results) || []).filter((r) => r && r.media_type === "movie" && Number.isInteger(r.id) && norm(r.title || r.original_title).includes(nq)).sort((x, y) => (y.popularity || 0) - (x.popularity || 0));
+    const det = movs[0] ? await sf(tget("/movie/" + movs[0].id, { language: "he-IL" }, d)) : null;
+    const bc = det && det.belongs_to_collection;
+    if (bc && Number.isInteger(bc.id)) topCol = { id: bc.id, name: bc.name, poster_path: bc.poster_path, viaMovie: true };
+  }
+  if (!topCol) topCol = colCands.filter((c) => colBase(c.name).includes(nq)).sort((x, y) => colBase(x.name).length - colBase(y.name).length)[0] || colCands[0];
+  if (topCol && Number.isInteger(topCol.id) && (topCol.viaMovie || norm(topCol.name).includes(norm(q)) || norm(q).includes(norm(topCol.name)) || (alias && norm(topCol.name).includes(norm(alias))) || colCands.length === 1)) {
     const full = await sf(tget("/collection/" + topCol.id, { language: "he-IL" }, d));
     if (full && Array.isArray(full.parts) && full.parts.length) {
       const parts = full.parts.filter((p) => p && p.id).map((p) => ({ ...p, rel: p.release_date || "" })).sort(byRel).slice(0, MAX_PARTS);
       const keys = [];
       parts.forEach((p) => { const o = add(p, null, "movie"); if (o) keys.push(o.k); });
-      if (keys.length) collection = { id: topCol.id, name: String(full.name || topCol.name || "").slice(0, 120), poster: img(full.poster_path || topCol.poster_path, "w342"), keys };
+      if (keys.length) collection = { id: topCol.id, name: String(full.name || topCol.name || "").replace(/\s*[-–:]?\s*(אוסף|collection)\s*$/i, "").slice(0, 120), poster: img(full.poster_path || topCol.poster_path, "w342"), keys };
     }
   }
 

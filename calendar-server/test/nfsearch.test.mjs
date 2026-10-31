@@ -80,7 +80,7 @@ test("אוסף: 'הנוקמים' מחזיר את הסרטים לפי סדר יצ
   });
   const out = await searchNf("הנוקמים", { fetch: fx });
   assert.deepEqual(out.collection.keys, ["m24428", "m99861", "m299534"]);
-  assert.equal(out.collection.name, "הנוקמים - אוסף");
+  assert.equal(out.collection.name, "הנוקמים"); // הכותרת כבר אומרת "סדרת סרטים"
   assert.equal(out.items.m24428.nf, false);
   assert.deepEqual(out.items.m24428.others, ["Disney Plus"]);
 });
@@ -201,4 +201,16 @@ test("C: כשל בתת-קריאה (זמינות / אוסף / חיפוש) = parti
   const savedFetch = globalThis.fetch; globalThis.fetch = bad;
   try { await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.7" }, query: { q: "partialq" } }, res); } finally { globalThis.fetch = savedFetch; }
   assert.equal(res.headers["cache-control"], "no-store");
+});
+
+test("אוסף: בלי שם עברי זהה, נלקח האוסף של הסרט הפופולרי שתואם (לא 'הנוקמים של גרים')", async () => {
+  const fx = tmdb({
+    "/search/multi": (u) => ({ results: [{ ...mov(24428, "הנוקמים", { release_date: "2012-04-25" }), media_type: "movie", popularity: 90 }, { ...mov(323660, "הנוקמים של גרים", { release_date: "2015-03-17" }), media_type: "movie", popularity: 3 }] }),
+    "/search/collection": { results: [{ id: 522577, name: "הנוקמים של גרים", poster_path: "/grimm1234.jpg" }] },
+    "/movie/24428": { id: 24428, belongs_to_collection: { id: 86311, name: "The Avengers Collection", poster_path: "/col12345.jpg" } },
+    "/collection/86311": { name: "The Avengers Collection", poster_path: "/col12345.jpg", parts: [mov(24428, "הנוקמים", { release_date: "2012-04-25" }), mov(99861, "הנוקמים: עידן אולטרון", { release_date: "2015-04-22" })] },
+  });
+  const out = await searchNf("הנוקמים", { fetch: fx });
+  assert.equal(out.collection.id, 86311);
+  assert.deepEqual(out.collection.keys, ["m24428", "m99861"]);
 });

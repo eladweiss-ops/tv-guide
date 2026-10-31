@@ -12,7 +12,8 @@ export const PARTIAL_TTL = 5 * 60000;
 const provCache = new Map(); // k -> {t, v}  (זמינות לפי פריט, בין חיפושים)
 export const _clearCache = () => { mem.clear(); provCache.clear(); };
 
-export const hashOf = (q) => createHash("sha256").update(norm(q) || q.toLowerCase()).digest("hex").slice(0, 32);
+export const CACHE_V = "2"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
+export const hashOf = (q) => createHash("sha256").update(CACHE_V + "|" + (norm(q) || q.toLowerCase())).digest("hex").slice(0, 32);
 
 // d (לבדיקות): {fetch, key, readJson, writeJson, now}
 export async function handleSearch(q0, d = {}) {

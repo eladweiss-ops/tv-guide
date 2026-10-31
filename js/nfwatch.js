@@ -12,7 +12,7 @@
 
   var MAX = 50, API = TVG.CAL_API;
   var RE_K = /^[mt][0-9]{1,9}$/, RE_IMG = /^https:\/\/image\.tmdb\.org\/t\/p\//, RE_NF = /^https:\/\/www\.netflix\.com\//;
-  var KINDS = [["nf", "כשזה מגיע לנטפליקס", "כשזה מגיע לנטפליקס"], ["season", "עונה חדשה", "כשיוצאת עונה חדשה"], ["tv", "כשזה משודר בערוץ", "כשזה משודר בערוץ"]];
+  var KINDS = [["nf", "כשזה מגיע לנטפליקס", "כשזה מגיע לנטפליקס"], ["season", "עונה חדשה", "כשיוצאת עונה חדשה"], ["tv", "📺 כשמשודר בטלוויזיה", "כשמשודר באחד מערוצי הטלוויזיה"]];
   function kindName(k) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === k) return KINDS[i][2]; return ""; }
   // אותו קישור שהשרת בונה (calendar-server/api/_tmdb.js nfLink): חיפוש בנטפליקס לפי השם המקורי, ואם אין אז העברי
   function nfLink(title, orig) { var q = String(orig || title || "").slice(0, 100); return q ? "https://www.netflix.com/search?q=" + encodeURIComponent(q) : ""; }

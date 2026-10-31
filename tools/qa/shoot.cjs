@@ -452,7 +452,7 @@ function nfFixtureData() {
       await nfSearch("הנוקמים"); wlPosts.length = 0;
       await page.click('[data-nfopen="m24428"]'); await page.waitForTimeout(700); A(await shown("#nfsheet"), "sheet open from search result");
       const sh = await page.textContent("#nfsheet");
-      for (const s of ["לא זמין כרגע בנטפליקס", "זמין גם ב:", "Disney Plus", "🔔 תודיע לי", "כשזה מגיע לנטפליקס", "כשזה משודר בערוץ", "⏰ להזכיר לי לצפות", "הערב 21:00", "מחר 21:00", "בחירת שעה"]) A(sh.indexOf(s) >= 0, "sheet text: " + s);
+      for (const s of ["לא זמין כרגע בנטפליקס", "זמין גם ב:", "Disney Plus", "🔔 תודיע לי", "כשזה מגיע לנטפליקס", "כשמשודר בטלוויזיה", "⏰ להזכיר לי לצפות", "הערב 21:00", "מחר 21:00", "בחירת שעה"]) A(sh.indexOf(s) >= 0, "sheet text: " + s);
       A(sh.indexOf("עונה חדשה") < 0, "no season chip for a movie");
       A(await page.evaluate(() => !document.querySelector(".nfgo")), "no Netflix button for unavailable title");
       await snap("25_nfs_sheet_alerts");

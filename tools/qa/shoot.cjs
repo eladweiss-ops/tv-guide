@@ -226,7 +226,7 @@ function nfFixtureData() {
       if (IOSD) {
         await step("w-ios-safari", async () => wl("s", d.ua, null, "?from=join", async (o) => {
           await o.go(); W(await o.shown("#welcome") && await o.shown("#scrim2"), "sheet open"); W(await o.steps() === 3, "3 ios steps: " + await o.steps());
-          const t = await o.txt(); W(/ברוכים הבאים לזפזופ/.test(t) && /לוחצים על כפתור השיתוף/.test(t) && /״הוסף למסך הבית״/.test(t) && /וזפזופ מופיע במסך הבית/.test(t), "ios copy"); W(!/התקנת האפליקציה/.test(t) && !/פותחים את הקישור בספארי/.test(t), "only the ios block, no safari hint");
+          const t = await o.txt(); W(/ברוכים הבאים לזפזופ/.test(t) && /לוחצים על שיתוף/.test(t) && /״הוסף למסך הבית״/.test(t) && /זפזופ במסך הבית/.test(t), "ios copy"); W(!/התקנת האפליקציה/.test(t) && !/פותחים את הקישור בספארי/.test(t), "only the ios block, no safari hint");
           W(await o.p.evaluate(() => document.querySelectorAll("#welcome .wl-ic").length) === 2, "share + plus icons"); W(await o.p.evaluate(() => !!(history.state && history.state.tvgLayer)), "is a nav layer");
           await sheetOk(o); await o.sn("70_welcome_ios_dark");
           await o.p.evaluate(() => TVG.setTheme("light")); await o.p.waitForTimeout(300); await o.sn("70_welcome_ios_light");

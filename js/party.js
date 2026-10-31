@@ -370,9 +370,13 @@
     return '<button type="button" class="btn" data-ptycal>📅 הוספה ליומן</button>' +
       (canRem() ? '<button type="button" class="ghost" data-ptyrem>' + (has ? "✓ יש תזכורת · ביטול" : "⏰ תזכורת עם התראה") + "</button>" : "") + guide;
   }
+  // מציירים מחדש רק כשמשהו השתנה: הסקירה כל 2 שניות לא מחליפה כפתורים מתחת לאצבע (ולא מאבדת פוקוס/גלילה)
+  var landLast = "";
   function paintLand(keep) {
-    var sc = $("#ptyLBody"), top = keep ? sc.scrollTop : 0;
-    sc.innerHTML = landBody(); $("#ptyLBar").innerHTML = landBar(); sc.scrollTop = top;
+    var sc = $("#ptyLBody"), top = keep ? sc.scrollTop : 0, body = landBody(), bar = landBar();
+    if (keep && body + " " + bar === landLast) return;
+    landLast = body + " " + bar;
+    sc.innerHTML = body; $("#ptyLBar").innerHTML = bar; sc.scrollTop = top;
   }
   function openLandFor(id) {
     GV = { id: id, v: null, err: 0, safari: false, name: myName() };

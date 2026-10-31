@@ -22,7 +22,7 @@
 .pty-nm { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
 .pty-who .none, .pty-who .credit { margin: 0; }
 .pty-chips { display: flex; flex-wrap: nowrap; gap: 8px; }
-.pty-ans { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 0 4px; font-size: .92rem; line-height: 1.2; text-align: center; white-space: nowrap; }
+.pty-ans { flex: 1 1 auto; min-width: 0; min-height: 52px; padding: 4px 8px; font-size: .92rem; line-height: 1.2; text-align: center; white-space: normal; overflow: hidden; } /* בלי גלישה: אימוג׳י שגלש מעל הצ׳יפ השכן תפס את הלחיצה עליו (אנדרואיד 360) */
 .pty-ask .pin { width: 100%; box-sizing: border-box; }
 .pty-ask .credit { margin: 0; }
 .pty-note { margin: 0 4px; color: var(--muted); font-size: .92rem; line-height: 1.55; }

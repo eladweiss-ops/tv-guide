@@ -31,7 +31,7 @@ const safe = (p) => p.catch(() => null);
 const byRel = (a, b) => (a.rel || "9999").localeCompare(b.rel || "9999");
 
 // משלים זמינות (watch/providers) לפריטים; כשל בודד לא מפיל את החיפוש (הפריט נשאר "לא זמין")
-async function availAll(items, d, cache) {
+async function availAll(items, d, cache, onFail) {
   const todo = items.slice();
   const run = async () => {
     while (todo.length) {
@@ -39,7 +39,7 @@ async function availAll(items, d, cache) {
       const ck = o.k;
       let av = cache && cache.get(ck);
       if (!av || Date.now() - av.t > SEARCH_TTL) {
-        try { av = { t: Date.now(), v: await providersIL(o.type, o.id, d) }; if (cache) cache.set(ck, av); } catch (e) { av = null; }
+        try { av = { t: Date.now(), v: await providersIL(o.type, o.id, d) }; if (cache) cache.set(ck, av); } catch (e) { av = null; if (onFail) onFail(); }
       }
       if (av) applyAvail(o, av.v);
     }
@@ -52,6 +52,8 @@ export async function searchNf(q0, d = {}) {
   const q = cleanQuery(q0);
   if (!q) return null;
   const items = {}, order = [];
+  let partial = false; // כשל בכל תת-קריאה (חיפוש, אוסף, מותג, קרדיטים, זמינות): התוצאה חלקית ולא נשמרת לטווח ארוך
+  const sf = (p) => p.catch(() => { partial = true; return null; });
   const add = (he, en, type, extra) => {
     const o = shapeTitle(he, en, type); if (!o) return null;
     if (items[o.k]) return items[o.k];
@@ -61,10 +63,10 @@ export async function searchNf(q0, d = {}) {
   };
   const alias = BRANDS[q.toLowerCase()] || BRANDS[q] || "";
   const [heM, enM, cols, comps] = await Promise.all([
-    safe(tget("/search/multi", { query: q, language: "he-IL", include_adult: "false" }, d)),
-    safe(tget("/search/multi", { query: q, language: "en-US", include_adult: "false" }, d)),
-    safe(tget("/search/collection", { query: alias || q, language: "he-IL" }, d)),
-    safe(tget("/search/company", { query: alias || q }, d)),
+    sf(tget("/search/multi", { query: q, language: "he-IL", include_adult: "false" }, d)),
+    sf(tget("/search/multi", { query: q, language: "en-US", include_adult: "false" }, d)),
+    sf(tget("/search/collection", { query: alias || q, language: "he-IL" }, d)),
+    sf(tget("/search/company", { query: alias || q }, d)),
   ]);
   if (!heM && !enM) { const e = new Error("tmdb down"); e.status = 502; throw e; }
   const enById = {};
@@ -74,7 +76,7 @@ export async function searchNf(q0, d = {}) {
   let collection = null;
   const topCol = cols && Array.isArray(cols.results) && cols.results[0];
   if (topCol && Number.isInteger(topCol.id) && (norm(topCol.name).includes(norm(q)) || norm(q).includes(norm(topCol.name)) || (alias && norm(topCol.name).includes(norm(alias))) || cols.results.length === 1)) {
-    const full = await safe(tget("/collection/" + topCol.id, { language: "he-IL" }, d));
+    const full = await sf(tget("/collection/" + topCol.id, { language: "he-IL" }, d));
     if (full && Array.isArray(full.parts) && full.parts.length) {
       const parts = full.parts.filter((p) => p && p.id).map((p) => ({ ...p, rel: p.release_date || "" })).sort(byRel).slice(0, MAX_PARTS);
       const keys = [];
@@ -89,8 +91,8 @@ export async function searchNf(q0, d = {}) {
   const want = norm(alias || q);
   if (topCo && Number.isInteger(topCo.id) && want.length >= 3 && norm(topCo.name).includes(want)) {
     const [dm, dt] = await Promise.all([
-      safe(tget("/discover/movie", { with_companies: topCo.id, sort_by: "popularity.desc", language: "he-IL", include_adult: "false" }, d)),
-      safe(tget("/discover/tv", { with_companies: topCo.id, sort_by: "popularity.desc", language: "he-IL" }, d)),
+      sf(tget("/discover/movie", { with_companies: topCo.id, sort_by: "popularity.desc", language: "he-IL", include_adult: "false" }, d)),
+      sf(tget("/discover/tv", { with_companies: topCo.id, sort_by: "popularity.desc", language: "he-IL" }, d)),
     ]);
     const mix = [];
     ((dm && dm.results) || []).slice(0, 8).forEach((r) => mix.push([r, "movie"]));
@@ -125,7 +127,7 @@ export async function searchNf(q0, d = {}) {
       if (kf && (kf.media_type === "movie" || kf.media_type === "tv")) { const o = add(kf, null, kf.media_type); if (o && keys.indexOf(o.k) < 0) keys.push(o.k); }
     });
     if (i === 0) {
-      const cc = await safe(tget("/person/" + r.id + "/combined_credits", { language: "he-IL" }, d));
+      const cc = await sf(tget("/person/" + r.id + "/combined_credits", { language: "he-IL" }, d));
       if (cc) {
         const dir = r.known_for_department === "Directing";
         const pool = (dir ? (cc.crew || []).filter((c) => c.job === "Director") : (cc.cast || []))
@@ -142,10 +144,11 @@ export async function searchNf(q0, d = {}) {
     outPersons.push({ id: r.id, name: String(r.name || "").slice(0, 80), photo: img(r.profile_path, "w185"), dept: r.known_for_department === "Directing" ? "בימוי" : r.known_for_department === "Acting" ? "משחק" : "", keys: keys.slice(0, CREDITS) });
   }
 
-  await availAll(order.map((k) => items[k]), d, d.provCache);
+  await availAll(order.map((k) => items[k]), d, d.provCache, () => { partial = true; });
   const out = { v: 1, q, collection, brand, titles, persons: outPersons.filter((p) => p.name), items: {} };
   // רק פריטים שמופיעים באחת הקבוצות
   const used = new Set([...(collection ? collection.keys : []), ...(brand ? brand.keys : []), ...titles, ...outPersons.flatMap((p) => p.keys)]);
   order.forEach((k) => { if (used.has(k)) out.items[k] = items[k]; });
+  if (partial) out.partial = true;
   return out;
 }

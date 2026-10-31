@@ -107,6 +107,7 @@ test("runHealth עם fetch מזויף: הכול תקין, ורק GET", async () 
     if (u.endsWith("/api/push")) return res({ scheduler: true });
     if (u.endsWith("/api/rems")) { assert.match(url, /t=[a-z0-9]{30}$/); return res({ rems: [] }); }
     if (u.endsWith(".ics")) return res("BEGIN", "text/calendar; charset=utf-8");
+    if (u.endsWith("/api/watch-check")) return { status: 401, headers: { get: () => "application/json" }, json: async () => ({}), text: async () => "" }; // בלי הרשאה: 401 = ה-cron מוגן ו-CRON_SECRET מוגדר
     return res("x", "text/plain");
   };
   const r = await runHealth({ fetchFn, now: NOW });
@@ -128,6 +129,20 @@ test("runHealth: 404 על קובץ js וה-scheduler כבוי", async () => {
   assert.ok(r.problems.includes("js/core.js: HTTP 404"));
   assert.ok(r.problems.some((p) => p.includes("scheduler")));
   assert.equal(r.ok, false);
+});
+
+test("runHealth: /api/watch-check בלי הרשאה — 401 תקין, 503 = CRON_SECRET חסר, אחר = תקלה", async () => {
+  const mk = (st) => async (url) => {
+    const u = url.replace(/\?.*/, ""), res = (body, status = 200, ct = "application/json") => ({ status, headers: { get: () => ct }, json: async () => body, text: async () => body });
+    if (u.endsWith("index.html")) return res('BUILD = "B1"; TVG.list = [];', 200, "text/html");
+    if (u.endsWith("/api/watch-check")) return res({}, st);
+    return res({}, 500);
+  };
+  const has = (r, re) => r.problems.some((p) => re.test(p));
+  assert.ok(!has(await runHealth({ fetchFn: mk(401), now: NOW }), /watch-check/));
+  assert.ok(has(await runHealth({ fetchFn: mk(503), now: NOW }), /CRON_SECRET/));
+  assert.ok(has(await runHealth({ fetchFn: mk(200), now: NOW }), /watch-check: HTTP 200/));
+  assert.ok(has(await runHealth({ fetchFn: mk(404), now: NOW }), /watch-check: HTTP 404/));
 });
 
 test("המחשב בבית מחכה לאישור קוד", async () => {

@@ -2,25 +2,30 @@
 // POST /api/watch {t, items:[...]} → שמירת הרשימה כולה (עד 50). פריט: {k:"m603"|"t1396", title, orig?, poster?, on:["nf","season","tv"], bn?:bool}
 // אימות כמו /api/rems: טוקן אישי, קצב (60 ל-IP, 30 לטוקן בדקה), גוף עד 32KB. הבדיקה היומית: /api/watch-check
 import { okToken } from "./_store.js";
-import { readJson, writeJson } from "./_push.js";
+import { readJson, writeJson, getSubs } from "./_push.js";
+import { delJson } from "./_db.js";
 import { cleanWl, publicWl } from "./_wl.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
 
 export const MAX_BODY = 32768;
 const path = (t) => `wl/${t}.json`;
 
-// d (לבדיקות): {readJson, writeJson, now}
+// d (לבדיקות): {readJson, writeJson, delJson, getSubs, now}
 export async function handleWatch(method, input, d = {}) {
-  const rj = d.readJson || readJson, wj = d.writeJson || writeJson;
+  const rj = d.readJson || readJson, wj = d.writeJson || writeJson, dj = d.delJson || delJson, gs = d.getSubs || getSubs;
   if (method === "GET") {
     if (!okToken(input.t)) return { status: 400, json: { error: "bad token" } };
     const cur = await rj(path(input.t), { items: [] });
     return { status: 200, json: { items: publicWl(cur && cur.items) } };
   }
   if (!okToken(input.t)) return { status: 400, json: { error: "bad token" } };
+  // כתיבה רק למי שיש לו מנוי פוש (בלי פוש אין מה לשלוח, וזה חוסם יצירת מסמכים בכמות ע"י טוקנים אקראיים)
+  const subs = await gs(input.t);
+  if (!Array.isArray(subs) || !subs.length) return { status: 403, json: { error: "no push" } };
   const cur = await rj(path(input.t), { items: [] });
   const { items, capped } = cleanWl(input.items, cur && cur.items, d.now ? d.now() : Date.now());
-  await wj(path(input.t), { items });
+  if (!items.length) { if (cur && Array.isArray(cur.items) && cur.items.length) await dj(path(input.t)); } // רשימה ריקה = מוחקים את המסמך
+  else await wj(path(input.t), { items });
   const out = { ok: true, n: items.length };
   if (capped) out.capped = capped;
   return { status: 200, json: out };

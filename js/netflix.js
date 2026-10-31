@@ -147,7 +147,13 @@
     return h + "</div>";
   }
   // פריט לפי מפתח: רשימות נטפליקס, תוצאות חיפוש מלא, או פריט ברשימת ההתראות (כשפותחים מהודעה)
-  function getItem(k) { return (TVG.NF && TVG.NF.items && TVG.NF.items[k]) || (TVG.nfX && TVG.nfX[k]) || (TVG.wlItem && TVG.wlItem(k)) || null; }
+  // ev: "nf" (נפתח מהודעת "הגיע לנטפליקס") / "rem" (מתזכורת צפייה). לפריט שההודעה אמרה שהגיע: תמיד זמין עם קישור, גם אם החיפוש (במטמון) עדיין אומר אחרת
+  function getItem(k) {
+    var ev = TVG.nfOpenEv, x = (TVG.NF && TVG.NF.items && TVG.NF.items[k]) || (TVG.nfX && TVG.nfX[k]) || null, w = TVG.wlItem ? TVG.wlItem(k, ev) : null;
+    if (!x) return w;
+    if (ev === "nf" && x.nf === false) x = Object.assign({}, x, { nf: true, link: x.link || (w && w.link) || "" });
+    return x;
+  }
   // פריט מרשימות נטפליקס (netflix.json) זמין בנטפליקס מעצם היותו שם; בתוצאות חיפוש יש שדה nf מפורש
   function isNf(x) { return !x || x.nf !== false; }
   function barHtml(x) {
@@ -156,8 +162,9 @@
     return (ok ? '<a class="btn nfgo" href="' + esc(x.link) + '" target="_blank" rel="noopener">▶ פתח בנטפליקס</a>' : '<p class="none nfnolink">אין קישור ישיר לנטפליקס לתוכן הזה.</p>') +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
-  function openNf(k) {
-    var x = getItem(k); if (!x) { if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
+  function openNf(k, ev) {
+    TVG.nfOpenEv = ev || null;
+    var x = getItem(k); if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
     TVG.nfOpen = k;
     $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x); $("#nfsBody").scrollTop = 0;
     $("#nfsheet").hidden = false; $("#scrim2").hidden = false;

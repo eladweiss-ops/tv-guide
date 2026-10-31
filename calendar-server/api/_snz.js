@@ -68,6 +68,11 @@ export const hhmm = (ts) => fmt.format(ts);
 export function remPayload(r, o = {}) {
   const now = o.now || Date.now(), mins = Math.round((r.ts - now) / 60000);
   const when = mins <= 0 ? (r.ts < now - 90000 ? `התחיל ב-${hhmm(r.ts)}` : "מתחיל עכשיו") : mins < 60 ? `מתחיל בעוד ${mins} דק׳ (${hhmm(r.ts)})` : `מתחיל ב-${hhmm(r.ts)}`;
+  if (String(r.k).startsWith("nf|")) { // תזכורת צפייה בנטפליקס: לא "מתחיל עכשיו". ההקשה פותחת את דף התוכן (nav.js)
+    const q = { title: "⏰ הגיע הזמן לצפות ב־" + r.title, body: (o.snooze ? "💤 " : "") + (r.ch === "נטפליקס" ? "▶ בנטפליקס" : r.ch || "צפייה"), tag: r.k, url: "./?rem=" + encodeURIComponent(r.k) };
+    const z = snzField(o.t, r.k, o.at || now); if (z) q.snz = z;
+    return q;
+  }
   const p = { title: "⏰ " + r.title, body: (o.snooze ? "💤 " : "") + (r.ch ? r.ch + " · " : "") + when, tag: r.k, url: "./?rem=" + encodeURIComponent(r.k) };
   const snz = snzField(o.t, r.k, o.at || now);
   if (snz) p.snz = snz;

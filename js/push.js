@@ -45,8 +45,14 @@
         TVG.pushOn = true; TVG.store("tvg.push", "1");
         return TVG.syncRems().then(function () {
           TVG.closeRem();
-          if (pendRec) { TVG.REMS.push(pendRec); TVG.saveRems(); TVG.syncRems(); TVG.pill("⏰ נזכיר לך " + TVG.leadTxt(pendRec.lead, pendRec.ts), 2200); pendRec = null; TVG.render(); }
+          if (TVG.wlSync) TVG.wlSync(); // רשימת "🔔 תודיע לי" שנשמרה בזמן שההתראות היו כבויות עולה עכשיו לשרת
+          if (pendRec) {
+            var pr = pendRec; pendRec = null; TVG.REMS.push(pr); TVG.saveRems(); TVG.syncRems(); TVG.render();
+            // עם ביטול (גם לתזכורת צפייה מדף נטפליקס, שנשארת פתוח ומתעדכנת)
+            TVG.pill("⏰ נזכיר לך " + (pr.k.indexOf("nf|") === 0 ? "ב־" + hhmm(new Date(pr.ts)) : TVG.leadTxt(pr.lead, pr.ts)), 5000, "ביטול", function () { TVG.REMS = TVG.REMS.filter(function (x) { return x.k !== pr.k; }); TVG.saveRems(); TVG.syncRems(); TVG.render(); if (TVG.nfReopen) TVG.nfReopen(); TVG.pill("בוטל", 1200); });
+          }
           else if (pend && !TVG.hasRem(TVG.remKey(pend.id, pend.p.s))) TVG.quickAdd([pend]); else TVG.render();
+          if (TVG.nfReopen) TVG.nfReopen(); // דף נטפליקס פתוח: מתעדכן (רמז ההתראות נעלם)
           fetch(CAL_API + "/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.calTok, test: 1 }) });
           if (!pend && !TVG.REMS.length) TVG.pill("🔔 ההתראות הופעלו! שלחנו התראת בדיקה", 3000);
           offerInstall();

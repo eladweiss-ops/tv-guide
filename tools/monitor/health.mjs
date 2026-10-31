@@ -191,6 +191,13 @@ export async function runHealth({ base = SITE, server = SERVER, fetchFn = fetch,
   await check("/api/rems", server + "/api/rems?t=" + rnd(30), async (r) => { const j = await r.json().catch(() => null); if (!j || !Array.isArray(j.rems) || j.rems.length) { problems.push("/api/rems: תשובה לא צפויה"); return false; } return true; });
   await check("/cal/*.ics", server + "/cal/" + rnd(30) + ".ics", async (r) => { if (!/text\/calendar/i.test(r.headers.get("content-type") || "")) { problems.push("/cal/*.ics: סוג התוכן אינו text/calendar"); return false; } return true; });
 
+  // cron של התראות המעקב: בלי הרשאה צריך להחזיר 401. 503 = CRON_SECRET לא מוגדר בפרויקט (ההתראות לא ירוצו). GET בלבד, בלי סוד
+  try {
+    const r = await get(fetchFn, server + "/api/watch-check");
+    if (r.status === 503) problems.push("/api/watch-check: CRON_SECRET לא מוגדר ב-Vercel (התראות המעקב לא ירוצו)");
+    else if (r.status !== 401) problems.push("/api/watch-check: HTTP " + r.status + " (צפוי 401 בלי הרשאה)");
+  } catch (e) { problems.push("/api/watch-check: " + (e.name === "AbortError" ? "תם הזמן" : e.message)); }
+
   return { ok: problems.length === 0, at: now.toISOString(), problems, info };
 }
 

@@ -170,3 +170,35 @@ test("norm: נרמול עברית/לטינית זהה ללקוח (הדגשים �
   assert.equal(norm("Amélie: The Movie!"), "ameliethemovie");
   assert.equal(norm("הנוקמים: סוף המשחק"), "הנוקמיםסוףהמשחק");
 });
+
+test("C: כשל בתת-קריאה (זמינות / אוסף / חיפוש) = partial, לא נשמר ל-Firestore, ובזיכרון רק 5 דקות", async () => {
+  const { PARTIAL_TTL } = await import("../api/nf-search.js");
+  const mk = (failPath) => tmdb({
+    "/search/multi": { results: [{ media_type: "movie", ...mov(1, "א") }] },
+    [failPath]: { __status: 500 },
+  });
+  for (const failPath of ["/movie/1/watch/providers", "/search/collection", "/search/company"]) {
+    const out = await searchNf("matrix", { fetch: mk(failPath) });
+    assert.equal(out.partial, true, failPath);
+  }
+  assert.equal((await searchNf("matrix", { fetch: tmdb({ "/search/multi": { results: [{ media_type: "movie", ...mov(1, "א") }] } }) })).partial, undefined, "תשובה שלמה: בלי partial");
+  // en-US נופל (he בסדר): גם חלקי
+  const fxEn = tmdb({ "/search/multi": (u) => (u.searchParams.get("language") === "en-US" ? { __status: 500 } : { results: [{ media_type: "movie", ...mov(1, "א") }] }) });
+  assert.equal((await searchNf("matrix", { fetch: fxEn })).partial, true);
+  // handleSearch: חלקי לא נכתב לאחסון, ופג אחרי 5 דקות; שלם נכתב
+  const store = {}, wr = async (p, o) => { store[p] = o; };
+  const base = { readJson: async () => null, writeJson: wr, now: () => 1_000_000 };
+  const bad = mk("/movie/1/watch/providers");
+  let r = await handleSearch("matrix", { ...base, fetch: bad }); assert.equal(r.json.partial, true); assert.deepEqual(store, {}, "לא נכתב");
+  const n = bad.calls.length;
+  r = await handleSearch("matrix", { ...base, fetch: bad, now: () => 1_000_000 + PARTIAL_TTL - 1 }); assert.equal(r.cache, "mem"); assert.equal(bad.calls.length, n);
+  r = await handleSearch("matrix", { ...base, fetch: bad, now: () => 1_000_000 + PARTIAL_TTL + 1 }); assert.equal(r.cache, "miss", "אחרי 5 דקות: חיפוש חי");
+  _clearCache();
+  const good = tmdb({ "/search/multi": { results: [{ media_type: "movie", ...mov(1, "א") }] } });
+  await handleSearch("matrix", { ...base, fetch: good }); assert.equal(Object.keys(store).length, 1, "שלם נכתב");
+  // כותרת מטמון: חלקי no-store
+  _clearCache(); const res = mockRes();
+  const savedFetch = globalThis.fetch; globalThis.fetch = bad;
+  try { await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.7" }, query: { q: "partialq" } }, res); } finally { globalThis.fetch = savedFetch; }
+  assert.equal(res.headers["cache-control"], "no-store");
+});

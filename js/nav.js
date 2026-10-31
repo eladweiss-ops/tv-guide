@@ -11,7 +11,7 @@
   TVG.handleUrl = handleUrl;
   TVG.afterBoot = afterBoot;
 
-  var URL_PARAMS = ["tab", "rem", "nf", "p", "q"];
+  var URL_PARAMS = ["tab", "rem", "nf", "e", "p", "q"];
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -114,8 +114,9 @@
     // קדימות (מקום אחד): rem > nf > p > q > tab. rem: נודניק; nf: דף תוכן נטפליקס מהודעת התראה (netflix.js openNf); p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
     var tab = p.get("tab"), rem = p.get("rem"), nfk = p.get("nf"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
     if (tab && !isBoot && !rem && !nfk && pp == null) switchTab(tab);
-    if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
-    else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk); }
+    if (rem && /^nf\|[mt][0-9]{1,9}\|/.test(rem)) { if (TVG.openNf) TVG.openNf(rem.split("|")[1], "rem"); } // תזכורת צפייה בנטפליקס: דף התוכן, לא חלון הנודניק של שידור
+    else if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
+    else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk, p.get("e") === "nf" ? "nf" : null); }
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);
     if (isBoot) cleanUrl(URL_PARAMS);

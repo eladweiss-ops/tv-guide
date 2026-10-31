@@ -18,7 +18,7 @@ const bodyShare = `
 const bodyJoin = `
   <div class="jwrap">
     <img class="jicon" src="${icon}" alt="">
-    <div class="jtxt"><div class="jname">זפזופ</div><div class="jline">לוח שידורים חכם · כל הערוצים</div></div>
+    <div class="jtxt"><div class="jname">זפזופ</div><div class="jline">תזפזפו פחות. תראו יותר.</div></div>
   </div>
   <div class="jchips"><span>⏰ תזכורת לפני השידור</span><span>📺 מעקב אחרי סדרות</span><span>🍿 נטפליקס וערב צפייה</span></div>
   <div class="jcta">חינם · בלי הרשמה · לחצו להתחלה 👆</div>`;

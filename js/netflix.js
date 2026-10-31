@@ -100,7 +100,8 @@
       // חיפוש מלא (שרת, nfsearch.js): מתחיל אחרי 400ms ו-2 תווים. תוצאות מקומיות מופיעות מיד.
       var rem = TVG.nfRemote ? TVG.nfRemote(res) : { html: "", any: false };
       h = (res.length ? '<h2 class="sech">נמצאו ' + res.length + " ברשימות נטפליקס</h2>" + '<div class="nfgrid">' + res.map(function (k) { return card(k, NF.items[k]); }).join("") + "</div>" : "") + rem.html;
-      if (!res.length && !rem.any) h = '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> בנטפליקס</b><span>מחפשים בשם בעברית, בשם המקורי, בשחקן או בבמאי.</span></div>';
+      if (!res.length && !rem.any) h = '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> במאגר</b><span>לפעמים השם בעברית בנטפליקס שונה מהשם במאגר. נסו את השם באנגלית, שחקן או במאי, או חפשו ישירות בנטפליקס.</span>' +
+        '<a class="ghost" href="https://www.netflix.com/search?q=' + encodeURIComponent(TVG.q.trim()) + '" target="_blank" rel="noopener">🔎 חיפוש בנטפליקס</a></div>';
     } else {
       if (NF.hero && NF.items[NF.hero]) h += heroHtml(NF.hero, NF.items[NF.hero]);
       ROWS.forEach(function (r) {

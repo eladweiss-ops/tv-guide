@@ -74,7 +74,7 @@ test("חיפוש רגיל: he-IL עם נפילה לאנגלית, זמינות נ
 test("אוסף: 'הנוקמים' מחזיר את הסרטים לפי סדר יציאה", async () => {
   const fx = tmdb({
     "/search/multi": { results: [] },
-    "/search/collection": { results: [{ id: 86311, name: "הנוקמים - אוסף", poster_path: "/col12345.jpg" }] },
+    "/search/collection": { results: [{ id: 522577, name: "הנוקמים של גרים", poster_path: "/grimm1234.jpg" }, { id: 86311, name: "הנוקמים - אוסף", poster_path: "/col12345.jpg" }] }, // התוצאה הראשונה ב-TMDB היא אוסף אחר
     "/collection/86311": { name: "הנוקמים - אוסף", poster_path: "/col12345.jpg", parts: [mov(299534, "הנוקמים: סוף המשחק", { release_date: "2019-04-24" }), mov(24428, "הנוקמים", { release_date: "2012-04-25" }), mov(99861, "הנוקמים: עידן אולטרון", { release_date: "2015-04-22" })] },
     "/movie/24428/watch/providers": { results: { IL: { flatrate: [{ provider_id: 337, provider_name: "Disney Plus" }] } } },
   });

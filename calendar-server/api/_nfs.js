@@ -74,7 +74,11 @@ export async function searchNf(q0, d = {}) {
 
   // אוסף (סדרת סרטים), לפי סדר יציאה
   let collection = null;
-  const topCol = cols && Array.isArray(cols.results) && cols.results[0];
+  // מבין התוצאות: שם זהה לשאילתה (בלי "אוסף"/"collection") קודם, אחר כך השם הקצר ביותר שמכיל אותה ("הנוקמים" ולא "הנוקמים של גרים")
+  const colBase = (n) => norm(String(n || "").replace(/s*[-–:]?s*(אוסף|סדרת סרטים|collection)s*$/i, ""));
+  const colCands = ((cols && Array.isArray(cols.results)) ? cols.results : []).slice(0, 8).filter((c) => c && Number.isInteger(c.id));
+  const nq = norm(alias || q);
+  const topCol = colCands.find((c) => colBase(c.name) === nq) || colCands.filter((c) => colBase(c.name).includes(nq)).sort((x, y) => colBase(x.name).length - colBase(y.name).length)[0] || colCands[0];
   if (topCol && Number.isInteger(topCol.id) && (norm(topCol.name).includes(norm(q)) || norm(q).includes(norm(topCol.name)) || (alias && norm(topCol.name).includes(norm(alias))) || cols.results.length === 1)) {
     const full = await sf(tget("/collection/" + topCol.id, { language: "he-IL" }, d));
     if (full && Array.isArray(full.parts) && full.parts.length) {

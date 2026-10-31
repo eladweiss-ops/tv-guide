@@ -90,6 +90,7 @@ GitHub Actions רץ בארה״ב. אתה רץ על המחשב של אלעד בי
 ## 6. שרת, תזכורות והתראות
 
 - **Vercel:** פרויקט `tv-guide-cal` (team `team_3ZTTTE9reTK9EYwXO6t5y0mH`, project `prj_IJJcborobtVWvo155wvHm6HaxtKA`). קוד ב-`calendar-server/`. אחסון: **Google Cloud Firestore** (פרויקט `tv-guide-8f736`, `(default)`, europe-west3, חוקים deny-all, גישה רק מהשרת דרך Admin SDK; קוד ב-`api/_db.js`). Vercel Blob הושעה (מכסה) ולא בשימוש; נתונים ישנים מועברים עם `tools/migrate-blob-to-firestore.mjs`.
+  - **פריסה (רק אלעד מריץ; לסוכן אין הרשאה):** קודם push ל-`main`, ואז `powershell -ExecutionPolicy Bypass -File C:\Users\eladw\tv-guide\tools\deploy-server.ps1`. הסקריפט פורס תמיד את `origin/main` מ-GitHub (לא עותק מקומי), מריץ את בדיקות השרת ולא פורס אם הן נכשלות, ומדפיס `DEPLOY OK @ <sha>`. אחרי הפריסה לבדוק את ה-sha מול הקומיט שנדחף. בשינוי לוגיקה של החיפוש: להעלות `CACHE_V` ב-`api/nf-search.js`.
   - `POST/GET /api/rems` – רשימת התזכורות (מתזמן מחדש בכל שמירה)
   - `/cal/<token>.ics` – יומן מנוי "לוח שידורים" (בלי התראות כשיש פוש)
   - `POST/GET /api/backup` – גיבוי אוטומטי. קישור אישי `?r=<token>` משחזר במכשיר חדש

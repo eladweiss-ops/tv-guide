@@ -9,6 +9,7 @@
   TVG.openShared = openLanding;
   TVG.openLanding = openLanding;
   TVG.closeLand = closeLand;
+  TVG.inApp = inApp; // גם welcome.js
   TVG.landCh = null;    // הערוץ שמוצג בדף הנחיתה: נוסף לערוצים שלי רק אם מגדירים תזכורת (reminder-sheet.js recOf), עם הודעה
   TVG.landAdded = null; // שם הערוץ שנוסף כך, להודעה אחרי סגירת חלון התזכורת
 

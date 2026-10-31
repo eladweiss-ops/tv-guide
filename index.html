@@ -112,11 +112,13 @@ document.write('<link rel="stylesheet" href="css/party.css?v=' + TVG.v + '">'); 
 <!-- 🍿 ערב צפייה (js/party.js): אחרי #nfsheet בכוונה, כדי שייפתחו מעליו -->
 <section class="sheet" id="party" hidden role="dialog" aria-label="ערב צפייה"><div class="sheet-in" id="ptyBody"></div></section>
 <section class="sheet land" id="ptyL" hidden role="dialog" aria-label="הזמנה לערב צפייה"><div class="lnd-scroll" id="ptyLBody"></div><div class="lnd-bar" id="ptyLBar"></div></section>
+<!-- 👋 קבלת פנים והתקנה למוזמנים (js/welcome.js) -->
+<section class="sheet wlc" id="welcome" hidden role="dialog" aria-labelledby="wlT"><div class="sheet-in" id="wlBody"></div></section>
 
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","motion","reminder-sheet","push","series","render-rems","render-common","render-now","render-grid","netflix","nfsearch","nfwatch","render-dial","swipe","settings","search","favs","render","channels","nav","sheetdrag","snooze","events","share","landing","party","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","motion","reminder-sheet","push","series","render-rems","render-common","render-now","render-grid","netflix","nfsearch","nfwatch","render-dial","swipe","settings","search","favs","render","channels","nav","sheetdrag","snooze","events","share","landing","welcome","party","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

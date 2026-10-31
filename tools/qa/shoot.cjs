@@ -195,6 +195,94 @@ function nfFixtureData() {
     await step("dial-drag-day", async () => { await fresh(); const nx = await page.$("[data-day]"); if (nx) { await nx.click(); await page.waitForTimeout(600); } await snap("09_dial_day"); });
     await step("dark", async () => { await fresh(); await page.click("#setBtn"); await page.waitForTimeout(500); await page.click('[data-theme-set="dark"]'); await page.waitForTimeout(400); await page.click("[data-setclose]"); await page.waitForTimeout(500); await snap("10_dark_dial"); await page.evaluate(() => localStorage.setItem("tvg.theme", "light")); });
 
+    // ---- 👋 קבלת פנים והתקנה למוזמנים (js/welcome.js): הקשר נפרד לכל תרחיש, עם UA משלו, בלי storage משותף ----
+    {
+      const IOSD = d.ua === IPHONE_UA;
+      const WA_IOS_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 WhatsApp/24.10.80";
+      const CHROME_IOS_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1";
+      const WA_AND_UA = androidUA("SM-S911B").replace("Chrome/130.0.0.0 Mobile Safari", "Version/4.0 Chrome/130.0.0.0 Mobile Safari").replace("; SM-S911B)", "; SM-S911B; wv)");
+      const BIP = () => window.addEventListener("DOMContentLoaded", () => { const e = new Event("beforeinstallprompt"); e.prompt = () => { window.__prompted = 1; return Promise.resolve(); }; e.userChoice = Promise.resolve({ outcome: "dismissed" }); window.dispatchEvent(e); });
+      const STANDALONE = () => { Object.defineProperty(navigator, "standalone", { get: () => true }); const mm = window.matchMedia.bind(window); window.matchMedia = (q) => (/display-mode:\s*standalone/.test(q) ? (() => { const o = mm("all"); Object.defineProperty(o, "matches", { value: true }); return o; })() : mm(q)); };
+      const W = (c, m) => { if (!c) throw new Error("assert: " + m); };
+      const wl = async (name, ua, init, q, fn) => {
+        const c = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: ua, locale: "he-IL", timezoneId: "Asia/Jerusalem" });
+        await c.route(/tv-guide-cal\.vercel\.app/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" }));
+        if (init) await c.addInitScript(init);
+        const p = await c.newPage();
+        p.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
+        p.on("console", (m) => { if (m.type() === "error") errs.push("console: " + m.text().slice(0, 160)); });
+        await p.clock.setFixedTime(new Date(FIXED_NOW));
+        const go = async (qs) => { await p.goto(base + "index.html" + (qs === undefined ? q : qs), { waitUntil: "networkidle" }); await p.waitForTimeout(1300); };
+        const sn = async (n) => { total++; await p.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await runAudit(p, n, auditRaw); };
+        const shown = (s) => p.evaluate((x) => { const e = document.querySelector(x); return !!e && !e.hidden; }, s);
+        const txt = () => p.evaluate(() => (document.querySelector("#welcome") || {}).innerText || "");
+        const steps = () => p.evaluate(() => document.querySelectorAll("#welcome .wl-step").length);
+        try { await fn({ p, c, go, sn, shown, txt, steps }); } finally { await c.close(); }
+      };
+      const sheetOk = async (o) => { // מידות בסיסיות: כפתורים 44+, רווח 8, בלי גלישה אופקית
+        const r = await o.p.evaluate(() => { const b = Array.from(document.querySelectorAll("#welcome button")).map((e) => e.getBoundingClientRect()); const w = document.querySelector("#welcome"); return { h: b.map((x) => Math.round(x.height)), gap: b.length > 1 ? Math.round(b[1].top - b[0].bottom) : 8, ov: w.scrollWidth - w.clientWidth, top: Math.round(w.getBoundingClientRect().top), vh: innerHeight }; });
+        W(r.h.every((x) => x >= 44), "buttons >= 44px " + r.h); W(r.gap === 8, "gap 8px " + r.gap); W(r.ov <= 0, "no horizontal overflow " + r.ov); W(r.top > 40, "sheet fits the screen " + r.top);
+      };
+      if (IOSD) {
+        await step("w-ios-safari", async () => wl("s", d.ua, null, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome") && await o.shown("#scrim2"), "sheet open"); W(await o.steps() === 3, "3 ios steps: " + await o.steps());
+          const t = await o.txt(); W(/ברוכים הבאים לזפזופ/.test(t) && /לוחצים על כפתור השיתוף/.test(t) && /״הוסף למסך הבית״/.test(t) && /וזפזופ מופיע במסך הבית/.test(t), "ios copy"); W(!/התקנת האפליקציה/.test(t) && !/פותחים את הקישור בספארי/.test(t), "only the ios block, no safari hint");
+          W(await o.p.evaluate(() => document.querySelectorAll("#welcome .wl-ic").length) === 2, "share + plus icons"); W(await o.p.evaluate(() => !!(history.state && history.state.tvgLayer)), "is a nav layer");
+          await sheetOk(o); await o.sn("70_welcome_ios_dark");
+          await o.p.evaluate(() => TVG.setTheme("light")); await o.p.waitForTimeout(300); await o.sn("70_welcome_ios_light");
+        }));
+        await step("w-ios-whatsapp", async () => wl("w", WA_IOS_UA, null, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome"), "sheet open"); W(await o.steps() === 4, "4 steps: " + await o.steps());
+          const t = await o.txt(); W(/1\s*פותחים את הקישור בספארי/.test(t.replace(/\n/g, " ")) && /בוואטסאפ: ⋯ ← פתיחה בספארי/.test(t), "open in safari first"); await sheetOk(o); await o.sn("71_welcome_ios_whatsapp_dark");
+          await o.p.evaluate(() => TVG.setTheme("light")); await o.p.waitForTimeout(300); await o.sn("71_welcome_ios_whatsapp_light");
+        }));
+        await step("w-ios-chrome", async () => wl("c", CHROME_IOS_UA, null, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome") && await o.steps() === 4 && /פותחים את הקישור בספארי/.test(await o.txt()), "chrome ios: open in safari first");
+        }));
+      } else {
+        await step("w-and-install", async () => wl("i", d.ua, BIP, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome"), "sheet open"); W(await o.steps() === 0, "no steps when the prompt is available");
+          const t = await o.txt(); W(/📲 התקנת האפליקציה/.test(t) && /אחר כך/.test(t) && !/הבנתי/.test(t), "install primary + later");
+          W(await o.p.evaluate(() => document.querySelector("#welcome .btn").getBoundingClientRect().height >= 44), "primary 44px"); await sheetOk(o); await o.sn("72_welcome_android_install_dark");
+          await o.p.evaluate(() => TVG.setTheme("light")); await o.p.waitForTimeout(300); await o.sn("72_welcome_android_install_light");
+          await o.p.click("#welcome [data-wlinst]"); await o.p.waitForTimeout(500);
+          W(await o.p.evaluate(() => window.__prompted === 1), "TVG.install() called prompt()"); W(!(await o.shown("#welcome")), "closed after install"); W(await o.p.evaluate(() => localStorage.getItem("tvg.welcome")) === "1", "dismissed flag");
+        }));
+        await step("w-and-steps", async () => wl("s", d.ua, null, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome") && await o.steps() === 2, "2 steps: " + await o.steps());
+          const t = await o.txt(); W(/⋮ בפינת הדפדפן/.test(t) && /התקנת אפליקציה״ או ״הוספה למסך הבית/.test(t) && /הבנתי, להתחיל/.test(t) && !/📲/.test(t), "android steps copy"); await sheetOk(o); await o.sn("73_welcome_android_steps_dark");
+          await o.p.evaluate(() => TVG.setTheme("light")); await o.p.waitForTimeout(300); await o.sn("73_welcome_android_steps_light");
+        }));
+        await step("w-and-whatsapp", async () => wl("w", WA_AND_UA, BIP, "?from=join", async (o) => {
+          await o.go(); W(await o.shown("#welcome") && await o.steps() === 3, "3 steps: " + await o.steps());
+          W(/1\s*פותחים את הקישור בכרום/.test((await o.txt()).replace(/\n/g, " ")), "open in chrome first"); await sheetOk(o); await o.sn("74_welcome_android_whatsapp_dark");
+        }));
+      }
+      await step("w-dismiss-once", async () => wl("d", d.ua, null, "?from=join", async (o) => { // "אחר כך" סוגר וסומן; טעינה שנייה (גם עם from=join) לא מציגה; בורר הערוצים נפתח אחרי
+        await o.go(); W(await o.shown("#welcome"), "first visit shows"); W(!(await o.shown("#sheet")), "channel picker waits behind the welcome");
+        await o.p.click("#welcome [data-wlclose]"); await o.p.waitForTimeout(700);
+        W(!(await o.shown("#welcome")) && await o.p.evaluate(() => localStorage.getItem("tvg.welcome")) === "1", "closed + flagged"); W(await o.shown("#sheet"), "channel picker opens after the welcome");
+        W(await o.p.evaluate(() => !!(history.state && history.state.tvgLayer)), "history has the picker layer only");
+        await o.go(); W(!(await o.shown("#welcome")), "second load with from=join: no welcome");
+      }));
+      for (const way of ["esc", "scrim", "back"]) await step("w-close-" + way, async () => wl("x", d.ua, null, "?from=join", async (o) => { // Escape / הקשה על הרקע / חזור: כולם סוגרים ומסמנים
+        await o.go(); W(await o.shown("#welcome"), way + ": shown");
+        if (way === "esc") await o.p.keyboard.press("Escape"); else if (way === "scrim") await o.p.mouse.click(d.w / 2, 60); else await o.p.goBack();
+        await o.p.waitForTimeout(700); W(!(await o.shown("#welcome")) && await o.p.evaluate(() => localStorage.getItem("tvg.welcome")) === "1", way + ": closed + flagged"); W(/index\.html/.test(o.p.url()), way + ": still in the app " + o.p.url());
+      }));
+      await step("w-drag-close", async () => wl("g", d.ua, null, "?from=join", async (o) => { // גרירה מטה סוגרת (sheetdrag) ומסמנת
+        await o.go(); W(await o.shown("#welcome"), "shown"); const r = await o.p.evaluate(() => { const b = document.querySelector("#welcome").getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + 10 }; });
+        const cdp = await o.c.newCDPSession(o.p); await touch.drag(cdp, [[r.x, r.y], [r.x, r.y + 320]], 160); await o.p.waitForTimeout(900);
+        W(!(await o.shown("#welcome")) && await o.p.evaluate(() => localStorage.getItem("tvg.welcome")) === "1", "drag closed + flagged");
+      }));
+      await step("w-not-shown", async () => {
+        await wl("p", d.ua, null, "", async (o) => { await o.go(); W(!(await o.shown("#welcome")), "plain visit: no welcome"); });
+        await wl("a", d.ua, null, "", async (o) => { await o.go("?from=whatsapp"); W(!(await o.shown("#welcome")), "other source: no welcome"); });
+        await wl("o", d.ua, null, "", async (o) => { await o.go("?from=join&p=999.2611010000"); W(!(await o.shown("#welcome")), "program link wins: no welcome"); });
+        await wl("st", d.ua, STANDALONE, "", async (o) => { await o.go("?from=join"); W(await o.p.evaluate(() => TVG.isStandalone), "stub: standalone"); W(!(await o.shown("#welcome")), "installed app: no welcome"); W(await o.p.evaluate(() => localStorage.getItem("tvg.welcome")) == null, "not flagged when not shown"); });
+      });
+    }
+
     // ---- נטפליקס ----
     await step("nf-top", async () => { nfFixture = false; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap("11_nf_top"); });
     await step("nf-row", async () => {

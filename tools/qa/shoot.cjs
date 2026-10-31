@@ -84,7 +84,8 @@ function nfFixtureData() {
   if (!base.endsWith("/")) base += "/";
   let browser = null; // דפדפן חדש לכל מכשיר: ריצה ארוכה של כמה מכשירים ברצף עלולה להפיל את הרנדרר (Target crashed)
   let total = 0, failed = 0; const allErrors = [];
-  for (const d of DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0))) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
+  const RUNS = []; DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0)).forEach((x) => ["main", "nfs"].forEach((p) => RUNS.push([x, p]))); // שני שלבים לכל מכשיר, בדפדפן נפרד: ריצה אחת ארוכה מדי מפילה את הרנדרר בזיכרון
+  for (const [d, phase] of RUNS) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
     browser = await chromium.launch({ channel: "chrome", headless: true, args: process.env.TVG_CHROME_ARGS ? process.env.TVG_CHROME_ARGS.split(" ") : [] });
     const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem" });
     await ctx.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
@@ -103,23 +104,27 @@ function nfFixtureData() {
       if (r.request().method() === "POST") wlPosts.push(JSON.parse(r.request().postData() || "{}"));
       return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":1}' });
     });
-    await ctx.route(/\/api\/backup/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"at":0,"data":{}}' })); // גיבוי אוטומטי: לא כותבים לשרת החי מהבדיקות
-    await ctx.route(/\/api\/rems/,(r) => r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":0,"rems":[]}' }));
-    const page = await ctx.newPage();
+    let page = null;
     const errs = [];
-    page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
-    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); });
+    const hookPage = () => { page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
+    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => console.log("  !! renderer crashed", d.name)); };
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
     const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); };
-    page.on("crash", () => console.log("  !! renderer crashed", d.name));
-    const step = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
-    await page.clock.setFixedTime(new Date(FIXED_NOW));
+    const step = (n, f) => (phase === "main" ? runStep(n, f) : Promise.resolve());
+    const runStep = async (name, fn) => { if (process.env.TVG_LOG) console.log("  step", name); try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); if (process.env.TVG_LOG) console.log("    FAIL", e.message.split("\n").slice(0, 5).join(" | ")); } };
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
     let nfFixture = false;
-    await page.route("**/netflix.json*", async (route) => {
-      if (!nfFixture) return route.continue();
-      await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(nfFixtureData()) });
-    });
+    // עמוד חדש (גם באמצע הריצה: ריצה ארוכה מאוד בעמוד אחד מפילה את הרנדרר בגלל זיכרון, ראו "fresh page" אחרי בלוק נטפליקס)
+    const setupPage = async () => {
+      if (page) await page.close();
+      page = await ctx.newPage(); hookPage();
+      await page.clock.setFixedTime(new Date(FIXED_NOW));
+      await page.route("**/netflix.json*", async (route) => {
+        if (!nfFixture) return route.continue();
+        await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(nfFixtureData()) });
+      });
+    };
+    await setupPage();
 
     await step("dial", async () => { await fresh(); await snap("01_dial"); });
     for (const t of ["now", "grid", "rems"]) {
@@ -159,7 +164,10 @@ function nfFixtureData() {
     await step("nf-dark", async () => { nfFixture = true; await fresh(); await page.click("#setBtn"); await page.waitForTimeout(400); await page.click('[data-theme-set="dark"]'); await page.waitForTimeout(300); await page.click("[data-setclose]"); await page.waitForTimeout(300); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap("19_nf_dark_top"); await page.click(".nfhero"); await page.waitForTimeout(800); await snap("19_nf_dark_page"); await page.evaluate(() => localStorage.setItem("tvg.theme", "light")); });
     nfFixture = false;
     // ---- חיפוש מלא בנטפליקס + התראות + תזכורת צפייה (כל השרת מדומה) ----
-    const nfsStep = process.env.TVG_NO_NFS ? async () => {} : step;
+    const nfsStep = (n, f) => (phase !== "nfs" || process.env.TVG_NO_NFS || (process.env.TVG_SKIP && new RegExp(process.env.TVG_SKIP).test(n)) ? Promise.resolve() : runStep(n, f));
+    // סנכרון תזכורות/גיבוי בזמן בדיקות נטפליקס: מדומה רק בתוך הבלוק הזה (נתב ברמת העמוד), כדי שלא ייכתב דבר לשרת החי
+    const stubSrv = (r) => r.request().method() !== "POST" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true}' });
+    await page.route(/\/api\/(rems|backup)/, stubSrv);
     const A = (c, m) => { if (!c) throw new Error("assert: " + m); };
     const shown = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
     const nfSearch = async (q) => { await page.evaluate(() => { try { ["tvg.wl", "tvg.rem", "tvg.wlDirty"].forEach((k) => localStorage.removeItem(k)); } catch (e) {} }); await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(500); await page.click("#sBtn"); await page.fill("#q", q); await page.waitForTimeout(1600); };
@@ -254,6 +262,7 @@ function nfFixtureData() {
       await page.goto(base + "index.html?nf=m1", { waitUntil: "networkidle" }); await page.waitForTimeout(800); A(!(await shown("#nfsheet")), "unknown key does not open"); A(/לא מצאנו/.test(await page.textContent("#pill")), "friendly toast");
     });
     await page.evaluate(() => { try { localStorage.removeItem("tvg.wl"); localStorage.removeItem("tvg.rem"); localStorage.removeItem("tvg.wlDirty"); localStorage.removeItem("tvg.calTok"); } catch (e) {} });
+    await setupPage(); // עמוד חדש אחרי בלוק החיפוש (זיכרון)
     await step("nf-back-closes", async () => { // חזרה/Escape סוגרים את דף התוכן ולא יוצאים מהאפליקציה; סגירה מהממשק לא משאירה היסטוריה
       const okv = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
       const chk = (c, m) => { if (!c) throw new Error("assert: " + m); };

@@ -80,8 +80,8 @@
     var cn = (TVG.G.channels.filter(function (c) { return c.id === TVG.chId; })[0] || {}).name || "";
     var live = s && isToday && s.p.s <= now && now < s.p.e;
     $("#dCard").className = "card dcard pc k-" + (s ? kindOf(TVG.chId, s.p.title) : "oth");
-    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + esc(s.p.title) + '</h2><div class="meta"><span dir="ltr">' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, TVG.chId, true) +
-      (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + esc(nx.p.title) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
+    $("#dCard").innerHTML = s ? '<div class="chn">' + esc(cn) + (live ? " · משודר עכשיו" : "") + "</div><h2 class=\"cur\">" + TVG.ttlHtml(s.p) + '</h2><div class="meta"><span dir="ltr">' + hhmm(s.p.s) + "–" + hhmm(s.p.e) + "</span><span>" + KIND[pgOf(s.p.title)] + "</span></div>" + descHtml(s.p, TVG.chId, true) +
+      (nx ? '<p class="next"><b>' + hhmm(nx.p.s) + "</b>" + TVG.ttlHtml(nx.p) + "</p>" : "") : '<p class="none">אין נתוני שידור לשעה הזו.</p>';
     $("#dNow").hidden = !(isToday && TVG.scrub != null);
   }
   function dialMin(e) {

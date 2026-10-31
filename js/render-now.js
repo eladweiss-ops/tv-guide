@@ -26,9 +26,9 @@
     var label = live ? "" : '<span class="badge">' + (k - i === 1 ? "הבא בתור" : "בעוד " + (k - i) + " תוכניות") + "</span>";
     var meta = '<span dir="ltr">' + hhmm(p.s) + "–" + hhmm(p.e) + "</span><span>" + (live ? "נותרו " + Math.max(1, Math.round((p.e - now) / 60000)) + " דק׳" : "מתחיל בעוד " + TVG.inMin(p.s, now) + (dstr(p.s) !== dstr(now) ? " · " + TVG.dayLabel(dstr(p.s)) : "")) + "</span>";
     var nav = (k > i ? '<button type="button" class="ghost step" data-step="-1|' + esc(c.id) + '">› חזרה</button>' : "") +
-      (n ? '<button type="button" class="ghost step" data-step="1|' + esc(c.id) + '"><b>' + hhmm(n.s) + "</b>" + esc(n.title) + " ‹</button>" : "");
+      (n ? '<button type="button" class="ghost step" data-step="1|' + esc(c.id) + '"><b>' + hhmm(n.s) + "</b>" + TVG.ttlHtml(n) + " ‹</button>" : "");
     return '<article class="card pc k-' + TVG.kindOf(c.id, p.title) + '" data-toggle data-cid="' + esc(c.id) + '" tabindex="0"><div class="chn">' + esc(c.name) + label + "</div>" +
-      '<h2 class="cur">' + esc(p.title) + "</h2>" + '<div class="meta">' + meta + "</div>" +
+      '<h2 class="cur">' + TVG.ttlHtml(p) + "</h2>" + '<div class="meta">' + meta + "</div>" +
       (live ? '<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' : "") +
       '<div class="acts">' + (live ? "" : TVG.remBtn(p, c.id, false)) + '<button type="button" class="ghost synt" data-opentog>📖 תקציר</button></div>' +
       (nav ? '<div class="nav' + (k > i && n ? " two" : "") + '">' + nav + "</div>" : "") +

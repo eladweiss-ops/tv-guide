@@ -182,7 +182,7 @@
     var g1 = hits.filter(liveNow), gl = hits.filter(function (x) { return !liveNow(x) && x.lv; }), g2 = hits.filter(function (x) { return !liveNow(x) && !x.rr && !x.lv; }), g3 = hits.filter(function (x) { return !liveNow(x) && x.rr; });
     var row = function (x) {
       var v = x.c.id + "|" + x.p.s.getTime();
-      var tag = liveNow(x) ? '<span class="tagk now">● עכשיו</span> ' : (x.lv || isLive(x)) ? '<span class="tagk live">ישיר</span> ' : x.rr ? '<span class="tagk rr">' + (TVG.kindOf(x.c.id, x.p.title) === "sport" ? "📼 מוקלט" : "🔁 חוזר") + "</span> " : (series ? '<span class="tagk nw">✨ חדש</span> ' : "");
+      var tag = liveNow(x) ? '<span class="tagk now">● עכשיו</span> ' : (x.lv || isLive(x)) ? '<span class="tagk live">🟢 שידור ישיר</span> ' : x.rr ? '<span class="tagk rr">' + (TVG.kindOf(x.c.id, x.p.title) === "sport" ? "📼 מוקלט" : "🔁 חוזר") + "</span> " : (series ? '<span class="tagk nw">✨ חדש</span> ' : "");
       return '<div class="srow k-' + TVG.kindOf(x.c.id, x.p.title) + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl">' + tag + esc(x.p.title) + (x.viaDesc ? '<br><span class="sub">' + esc(x.p.desc.length > 70 ? x.p.desc.slice(0, 68) + "…" : x.p.desc) + "</span>" : "") + '<br><span class="sub">' + esc(x.c.name) + " · " + TVG.dayLabel(dstr(x.p.s)) + "</span></span></button>" + starBtn(x.p.title) +
         TVG.synBtn(v) + '<button type="button" class="rbt' + (TVG.hasRem(v) ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="תזכורת: ' + esc(x.p.title) + '">' + (TVG.hasRem(v) ? "✓" : "⏰") + "</button></div>" + TVG.synBox(v, x.p, x.c.id);
     };

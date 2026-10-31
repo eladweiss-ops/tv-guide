@@ -631,3 +631,6 @@
   .folnext .fskip { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; width: 100%; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 16px; background: transparent; text-align: start; color: inherit; font: inherit; }
   .folnext .fskip.off { opacity: .55; text-decoration: line-through; }
   .folrow .go .time { color: inherit; font-size: 1.25rem; text-align: center; }
+  .appshare { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 8px; padding: 16px; border-radius: 22px; background: var(--soft); }
+  .appshare > span { color: var(--muted); font-size: .95rem; line-height: 1.45; margin-bottom: 4px; }
+  .appshare .btn, .appshare .ghost { width: 100%; min-height: 48px; margin: 0; }

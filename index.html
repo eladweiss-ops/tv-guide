@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap">
 <script>
 /* גרסה ועדכון: כאן, ורק כאן, מעלים VERSION ו-BUILD בכל שינוי. BUILD משמש גם כ-?v= לקובצי css/js (cache busting). */
-var VERSION = "1.46", BUILD = "2026-10-31.46";
+var VERSION = "1.47", BUILD = "2026-10-31.47";
 window.TVG = { VERSION: VERSION, BUILD: BUILD, files: {}, failed: [], list: [] };
 /* ?r2=<זמן> מופיע רק אחרי כשל טעינה (ראו הסקריפט האחרון); הוא עוקף מטמון של css/js */
 var BUST = (location.search.match(/[?&]r2=(\d+)/) || [])[1];
@@ -77,6 +77,9 @@ document.write('<link rel="stylesheet" href="css/party.css?v=' + TVG.v + '">'); 
 <section class="sheet" id="setsheet" hidden aria-label="הגדרות">
   <div class="sheet-in">
     <div style="display:flex;align-items:center;justify-content:space-between"><h2 style="margin:0">הגדרות</h2><span class="vertag" id="verTag"></span></div>
+    <div class="appshare"><b>💌 אהבתם? שתפו עם חברים</b><span>חינם, בלי הרשמה. החברים מקבלים קישור שנפתח ישר באפליקציה.</span>
+      <button type="button" class="btn wa" id="appWa">🟢 שליחה בוואטסאפ</button>
+      <button type="button" class="ghost" id="appShare">שיתוף או העתקת קישור</button></div>
     <h2>תצוגה</h2>
     <div class="seg">
       <button type="button" data-theme-set="light" aria-pressed="true">בהיר</button>

@@ -1,4 +1,4 @@
-/* js/share.js - שיתוף תוכנית: חלון תחתון עם תצוגה מקדימה של מה שיישלח (טקסט קצר, או כרטיס 1200x630 עם קוד QR וקישור), וקישור קצר ?p=<ערוץ>.<YYMMDDHHMM>. דף הנחיתה של הקישור: landing.js.
+/* js/share.js - שיתוף תוכנית: חלון תחתון עם תצוגה מקדימה של מה שיישלח (טקסט קצר, או כרטיס 1200x630 עם קישור קצר), וקישור קצר ?p=<ערוץ>.<YYMMDDHHMM>. דף הנחיתה של הקישור: landing.js.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, render-common, render-dial, events. */
 (function (TVG) {
   TVG.files["share"] = 1;
@@ -132,8 +132,8 @@
       ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 5;
       lay.lines.forEach(function (ln, k) { ctx.fillText("\u2067" + ln + "\u2069", R, y + k * lh); });
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      // לוח זכוכית תחתון: ערוץ + יום (ימין), שעה גדולה (שמאל). משמאל ללוח: קוד QR לדף הנחיתה. מתחת: הקישור הקצר
-      var py = 392, ph = 168, qs = ph, q = TVG.qr ? TVG.qr(x.link) : null, px = PAD, pw = MW;
+      // לוח זכוכית תחתון: ערוץ + יום (ימין), שעה גדולה (שמאל). מתחת: הקישור הקצר
+      var py = 392, ph = 168, qs = ph, q = null, px = PAD, pw = MW; // בלי QR: אי אפשר לסרוק אותו מאותו טלפון (החלטת אלעד 31.10). הקישור הקצר מודפס בתחתית
       if (q) { px = PAD + qs + 20; pw = MW - qs - 20; }
       ctx.fillStyle = "rgba(255,255,255,.22)"; rr(ctx, px, py, pw, ph, 44); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 2; rr(ctx, px + 1, py + 1, pw - 2, ph - 2, 43); ctx.stroke();

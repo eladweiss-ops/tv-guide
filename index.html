@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap">
 <script>
 /* גרסה ועדכון: כאן, ורק כאן, מעלים VERSION ו-BUILD בכל שינוי. BUILD משמש גם כ-?v= לקובצי css/js (cache busting). */
-var VERSION = "1.36", BUILD = "2026-10-30.36";
+var VERSION = "1.37", BUILD = "2026-10-31.37";
 window.TVG = { VERSION: VERSION, BUILD: BUILD, files: {}, failed: [], list: [] };
 /* ?r2=<זמן> מופיע רק אחרי כשל טעינה (ראו הסקריפט האחרון); הוא עוקף מטמון של css/js */
 var BUST = (location.search.match(/[?&]r2=(\d+)/) || [])[1];
@@ -106,7 +106,7 @@ document.write('<link rel="stylesheet" href="css/app.css?v=' + TVG.v + '">');
 <script>
 /* סדר הטעינה קבוע (כל קובץ יכול להשתמש בקודמיו). קובץ חדש = להוסיף לרשימה במקום המתאים. */
 (function () {
-  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","qr","share","landing","update","backup","boot"];
+  var files = TVG.list = ["core","data","reminders","ui","reminder-sheet","push","render-rems","render-common","render-now","render-grid","netflix","render-dial","swipe","settings","search","favs","render","channels","nav","snooze","events","share","landing","update","backup","boot"];
   for (var i = 0; i < files.length; i++) document.write('<script src="js/' + files[i] + '.js?v=' + TVG.v + '" onerror="TVG.failed.push(\'' + files[i] + '\')"><\/script>');
 })();
 </script>

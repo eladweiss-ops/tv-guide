@@ -18,24 +18,30 @@
 
   // ---- עזרים ----
   function bdi(s) { return "<bdi>" + esc(s) + "</bdi>"; }
-  function ilWall(ms) { return new Date(TVG.ilNow().getTime() + (ms - Date.now())); } // רגע אמיתי -> שעון קיר ישראלי (לתצוגה)
+  function ilWall(ms) { // רגע אמיתי -> Date שרכיביו (getHours...) הם שעון קיר ישראלי באותו רגע (הקיזוז של מועד האירוע, כולל מעבר שעון קיץ)
+    var u = new Date(ms + TVG.ilOffMin(ms) * 60000);
+    return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes());
+  }
+  TVG.partyWall = ilWall;
   function dayShort(w) { return w.getDay() === 6 ? "שבת" : "יום " + DS[w.getDay()]; }
   function dateTxt(ms) { var w = ilWall(ms); return dayShort(w) + " " + w.getDate() + "." + (w.getMonth() + 1); }
   function whenTxt(ms) { var w = ilWall(ms); return dayShort(w) + " " + hhmm(w); }
   function at21(add) { var w = TVG.ilNow(); w.setDate(w.getDate() + add); w.setHours(21, 0, 0, 0); return TVG.ilTs(w); }
   function tzDiff(ms) { return TVG.ilOffMin(ms) !== -new Date(ms).getTimezoneOffset(); }
+  var RE_GID = /^[A-Za-z0-9][A-Za-z0-9_-]{14,30}[A-Za-z0-9]$/;
   function rndId() {
     var a = new Uint8Array(16), i, s = "";
     try { crypto.getRandomValues(a); } catch (e) { for (i = 0; i < 16; i++) a[i] = Math.floor(Math.random() * 256); }
     for (i = 0; i < 16; i++) s += String.fromCharCode(a[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    var r = btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return RE_GID.test(r) ? r : rndId();
   }
-  function myGid() { var g = TVG.store("tvg.gid"); if (!g || !/^[A-Za-z0-9_-]{16,32}$/.test(g)) { g = rndId(); TVG.store("tvg.gid", g); } return g; }
+  function myGid() { var g = TVG.store("tvg.gid"); if (!g || !RE_GID.test(g)) { g = rndId(); TVG.store("tvg.gid", g); } return g; }
   function myName() { return String(TVG.store("tvg.name") || "").slice(0, 24); }
   function cleanName(s) { return String(s || "").replace(/[\u0000-\u001f​-‏‪-‮⁦-⁩]/g, "").replace(/\s+/g, " ").trim().slice(0, 24); }
   function link(id) { return APP + "?w=" + id; }
   function inApp() { var UA = navigator.userAgent; // דפדפן פנימי של אפליקציה (כמו ב-landing.js): הורדת קובץ יומן לא עובדת בו
-    if (TVG.isIOS) return !TVG.isStandalone && !/CriOS|FxiOS|EdgiOS/.test(UA) && (!/Safari\//.test(UA) || /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|TikTok|Twitter|GSA\//.test(UA));
+    if (TVG.isIOS) return !TVG.isStandalone && !/CriOS|FxiOS|EdgiOS/.test(UA) && (!/Safari\//.test(UA) || /WhatsApp|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|TikTok|Twitter|GSA\//.test(UA));
     return /; wv\)|FBAN|FBAV|Instagram|Line\/|WhatsApp|Snapchat|TikTok|Twitter/.test(UA);
   }
   function canRem() { return !!TVG.canPush && (!TVG.isIOS || !!TVG.isStandalone) && !inApp(); }
@@ -47,6 +53,9 @@
   function errMsg(e) {
     var c = e && e.code, st = e && e.status;
     if (st === 429) return "יותר מדי ניסיונות, נסו שוב בעוד דקה";
+    if (c === "unknown token") return "עוד רגע מכינים את החשבון. נסו שוב בעוד כמה שניות";
+    if (c === "removed") return "המארח הסיר את התשובה הזו";
+    if (c === "bad title") return "בכותרת אי אפשר לשים קישור או מספר טלפון";
     if (c === "too many") return "יש כבר 10 ערבי צפייה פעילים. אפשר לבטל אחד בלשונית התזכורות";
     if (c === "full") return "הערב מלא, אי אפשר להוסיף עוד תשובות";
     if (c === "cancelled") return "הערב בוטל";
@@ -63,7 +72,7 @@
     });
   }
   function apiPost(body) { return fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(same); }
-  function apiGet(id) { return fetch(API + "?id=" + encodeURIComponent(id) + "&g=" + encodeURIComponent(myGid()), { cache: "no-store" }).then(same); }
+  function apiGet(id) { return apiPost({ action: "get", id: id, gid: myGid() }); } // POST: ה-gid לא בכתובת
   function copyText(l, ok) {
     function old() { var t = document.createElement("textarea"); t.value = l; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;opacity:0"; document.body.appendChild(t); t.select(); var g = false; try { g = document.execCommand("copy"); } catch (e) {} t.remove(); if (g) ok(); else TVG.pill("לא הצלחנו להעתיק", 1800); }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(ok, old); else old();
@@ -171,6 +180,7 @@
   }
   function createFail(e) {
     if (CR) CR.busy = false;
+    if (e && e.code === "unknown token") { try { TVG.store("tvg.sel", TVG.store("tvg.sel") || "[]"); } catch (x) {} } // מעורר גיבוי, והשרת יכיר את הטוקן
     TVG.pill(e && e.msg ? e.msg : errMsg(e), 2800);
   }
   function sendWa() {
@@ -189,19 +199,27 @@
   // ---- חלון מארח (#party) ----
   var HS = null; // {id, v}
   function names(rs, ans) { return rs.filter(function (r) { return r.ans === ans; }).map(function (r) { return '<span class="pty-nm">' + bdi(r.name) + "</span>"; }).join(""); }
-  function whoHtml(v) {
+  function whoHtml(v) { // אורח: מי בפנים
     var rs = v.rsvps || [], y = names(rs, "yes"), m = names(rs, "maybe"), n = v.counts ? v.counts.no : 0, h = "";
-    if (y) h += '<div class="pty-grp"><b>👍 מגיעים (' + v.counts.yes + ')</b><div class="pty-nms">' + y + "</div></div>";
+    if (y) h += '<div class="pty-grp"><b>👍 בפנים (' + v.counts.yes + ')</b><div class="pty-nms">' + y + "</div></div>";
     if (m) h += '<div class="pty-grp"><b>🤔 אולי (' + v.counts.maybe + ')</b><div class="pty-nms">' + m + "</div></div>";
-    if (n) h += '<p class="credit">' + n + " לא יוכלו הפעם</p>";
-    return h || '<p class="none">עדיין אין תשובות. שלחו את ההזמנה בוואטסאפ ונעדכן כאן.</p>';
+    if (n) h += '<p class="credit">' + n + " לא הפעם</p>";
+    return h || '<p class="none">עדיין אף אחד לא ענה. אפשר להיות הראשונים 🙂</p>';
+  }
+  function hostWho(v) { // מארח: כל התשובות עם הסרה
+    var rs = v.rsvps || [];
+    if (!rs.length) return '<p class="none">עדיין אין תשובות. שלחו את ההזמנה בוואטסאפ ונעדכן כאן.</p>';
+    var c = v.counts, h = '<div class="pty-cnt">👍 ' + c.yes + " · 🤔 " + c.maybe + (c.no ? " · לא הפעם " + c.no : "") + "</div>";
+    return h + rs.map(function (r) {
+      return '<div class="pty-rr"><span class="pty-rn">' + (r.ans === "yes" ? "👍" : r.ans === "maybe" ? "🤔" : "✖️") + " " + bdi(r.name) + '</span><button type="button" class="ghost sm" data-ptyrm="' + esc(r.rid || "") + '" data-n="' + esc(r.name) + '" aria-label="הסרת ' + esc(r.name) + ' מהרשימה">הסרה</button></div>';
+    }).join("");
   }
   function inWindow(at) { var n = Date.now(); return n >= at - GO_BEFORE && n <= at + GO_AFTER; }
   function paintHost() {
     var p = mine(HS.id), v = HS.v || PC[HS.id]; if (!p) return;
     var at = p.at, where = p.place === "home" ? "אצלי" : "כל אחד מהבית";
     var h = "<h2>🍿 ערב צפייה</h2><p class=\"shsub\">" + bdi(p.title) + '</p><div class="meta"><span>' + esc(whenTxt(at)) + "</span><span>" + esc(where) + "</span></div>";
-    h += v ? whoHtml(v) : '<p class="none">טוענים את התשובות…</p>';
+    h += v ? hostWho(v) : '<p class="none">טוענים את התשובות…</p>';
     if (HS.askCancel) h += '<div class="confirm"><span>לבטל את הערב?</span><button type="button" class="btn sm danger" data-ptycancelyes>כן, לבטל</button><button type="button" class="ghost sm" data-ptycancelno>להשאיר</button></div>';
     else {
       if (inWindow(at) && !(v && v.cancelled)) h += '<button type="button" class="btn" data-ptygo>🍿 פליי: <bdi dir="ltr">3, 2, 1</bdi></button>';
@@ -234,6 +252,19 @@
       });
     }).catch(function (e) { HS.askCancel = false; paintHost(); TVG.pill(errMsg(e), 2500); });
   }
+  function doRemove(rid, name) {
+    var id = HS.id;
+    apiPost({ action: "remove", t: TVG.myTok(), id: id, rid: rid }).then(function () {
+      return apiPost({ action: "view", t: TVG.myTok(), id: id });
+    }).then(function (v) {
+      if (HS && HS.id === id) { HS.v = v; PC[id] = v; paintHost(); }
+      TVG.pill("הוסרה התשובה של " + name, 6000, "החזר", function () {
+        apiPost({ action: "remove", t: TVG.myTok(), id: id, rid: rid, undo: true }).then(function () { return apiPost({ action: "view", t: TVG.myTok(), id: id }); }).then(function (v2) {
+          PC[id] = v2; if (HS && HS.id === id) { HS.v = v2; paintHost(); } TVG.pill("הוחזרה ✓", 1500);
+        }).catch(function (e) { TVG.pill(errMsg(e), 2500); });
+      });
+    }).catch(function (e) { TVG.pill(errMsg(e), 2500); });
+  }
   function doGo() {
     var id = HS.id, p = mine(id); if (!p) return;
     apiPost({ action: "go", t: TVG.myTok(), id: id }).then(function (r) {
@@ -243,9 +274,18 @@
   }
 
   // ---- שורות בלשונית התזכורות (עוטף את TVG.vRems, בלי לגעת ב-render-rems.js) ----
-  var lastRefresh = 0;
+  var lastRefresh = 0, listed = 0;
+  function listMine() { // מכשיר חדש/אחרי שחזור: הערבים שלי מהשרת (לפי hash הטוקן)
+    listed = Date.now();
+    return apiPost({ action: "list", t: TVG.myTok() }).then(function (j) {
+      var add = 0;
+      (j.parties || []).forEach(function (q) { if (RE_ID.test(q.id) && !mine(q.id)) { addMine({ id: q.id, title: q.title, at: q.at, place: q.place, kind: q.kind, ref: q.ref, ch: q.ch, img: q.img, link: q.link, name: q.name }); add++; } });
+      if (add && TVG.tab === "rems") TVG.render();
+    }).catch(function () {});
+  }
   function refresh() {
     var n = Date.now(); if (n - lastRefresh < 25000) return; lastRefresh = n;
+    if (!listed || n - listed > 6 * HOUR) listMine();
     PL.slice().forEach(function (p) {
       apiGet(p.id).then(function (v) {
         var old = PC[p.id]; PC[p.id] = v;
@@ -258,12 +298,12 @@
     if (!v) return "";
     var y = v.counts.yes, m = v.counts.maybe;
     if (!y && !m) return "עדיין אין תשובות";
-    return (y ? (y === 1 ? "1 מגיע/ה" : y + " מגיעים") : "") + (y && m ? " · " : "") + (m ? m + " אולי" : "");
+    return "👍 " + y + " · 🤔 " + m;
   }
   function rows() {
     var n = Date.now(), L = PL.filter(function (p) { return p.at + GO_AFTER > n; }).sort(function (a, b) { return a.at - b.at; });
-    if (!L.length) return "";
     refresh();
+    if (!L.length) return "";
     return '<h2 class="sech">🍿 ערבי צפייה</h2>' + L.map(function (p) {
       var w = ilWall(p.at), c = countTxt(PC[p.id]);
       return '<div class="srow k-ent"><button type="button" class="go" data-party="' + esc(p.id) + '"><span class="time">' + hhmm(w) + '</span><span class="ttl">🍿 ' + bdi(p.title) + '<br><span class="sub">ערב צפייה · ' + esc(dayShort(w)) + (c ? " · " + esc(c) : "") + "</span></span></button></div>";
@@ -282,34 +322,40 @@
   var poll = 0;
   function whereTxt(v) { return v.place === "home" ? (v.host.name ? "אצל " + v.host.name : "אצל המארח") : "כל אחד מהבית"; }
   function topBar() { return '<div class="lnd-top"><span class="lnd-brand">📺 לוח שידורים</span><button type="button" class="glass round lnd-x" data-ptyclose aria-label="סגירה">✕</button></div>'; }
+  function hasWatch(v) { return v.kind === "nf" && RE_NF.test(v.link || ""); }
   function landBody() {
     var v = GV.v, h = topBar();
     if (!v) {
       if (GV.err === 404) return h + '<div class="lnd-empty"><div class="lnd-big">🔎</div><h1>לא מצאנו את הערב</h1><p>ייתכן שהקישור לא נכון, או שהערב כבר עבר.</p></div>';
       return h + '<div class="lnd-empty"><div class="lnd-big">⏳</div><h1>' + (GV.err ? "אין חיבור" : "רגע, טוענים…") + "</h1>" + (GV.err ? "<p>בדקו את החיבור ופתחו שוב את הקישור.</p>" : "") + "</div>";
     }
-    var over = Date.now() > v.at + GO_AFTER;
-    if (v.cancelled) h += '<div class="lnd-note">❌ הערב בוטל על ידי המארח/ת.</div>';
+    var over = Date.now() > v.at + GO_AFTER, mn = v.mine || null, a = mn ? mn.ans : "";
+    if (v.cancelled) h += '<div class="lnd-note">❌ הערב בוטל.</div>';
     else if (over) h += '<div class="lnd-note">⏱ הערב הזה כבר עבר.</div>';
-    var inv = v.host.name ? "🍿 " + bdi(v.host.name) + " מזמין/ה אותך לערב צפייה" : "🍿 הוזמנת לערב צפייה";
+    var inv = v.host.name ? "🍿 הזמנה מ" + bdi(v.host.name) + " לערב צפייה" : "🍿 הזמנה לערב צפייה";
     h += '<div class="lnd-hero k-ent pty-hero">' + (v.img ? '<img class="pty-pos" alt="" src="' + esc(v.img) + '">' : '<div class="lnd-em" aria-hidden="true">🍿</div>') +
-      '<div class="pty-inv">' + inv + '</div><h1 class="lnd-ttl"><bdi dir="auto">' + esc(v.title) + "</bdi></h1></div>";
+      '<div class="pty-ht"><div class="pty-inv">' + inv + '</div><h1 class="lnd-ttl"><bdi dir="auto">' + esc(v.title) + "</bdi></h1></div></div>";
+    // התשובה קודם: זו הפעולה הראשית של הדף, וצריכה להיות על המסך בלי לגלול. שם קודם, ואז הבחירה
+    if (!v.cancelled && !over) {
+      var pend = GV.pending || "";
+      h += '<div class="lnd-meta glass pty-ask"><label class="pty-h" for="ptyGName">איך קוראים לכם?</label>' +
+        '<input id="ptyGName" class="pin" type="text" maxlength="24" autocomplete="given-name" enterkeyhint="done" placeholder="שם פרטי (יופיע ברשימה)" value="' + esc(GV.name) + '">' +
+        '<p class="pty-hint" id="ptyHint"' + (pend && !GV.name ? "" : " hidden") + ">רק השם ונשלח</p>" +
+        '<div class="pty-h">אתם בפנים?</div><div class="chips pty-chips" role="group" aria-label="התשובה שלכם">' +
+        [["yes", "אני בפנים 👍"], ["maybe", "אולי 🤔"], ["no", "לא הפעם"]].map(function (x) { return '<button type="button" class="chip pty-ans" data-ptyans="' + x[0] + '" aria-pressed="' + (a === x[0] || pend === x[0]) + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+        (a ? '<p class="credit">✓ התשובה נשמרה. אפשר לשנות אותה בכל רגע.</p>' : "") + "</div>";
+    }
     var tz = tzDiff(v.at) ? ' <small class="lnd-tz">(שעון ישראל)</small>' : "", w = ilWall(v.at);
     h += '<div class="lnd-meta glass"><div class="lnd-row"><span class="lnd-ic">🗓</span><span>' + esc(dayShort(w) + " " + w.getDate() + "." + (w.getMonth() + 1)) + "</span></div>" +
       '<div class="lnd-row"><span class="lnd-ic">🕐</span><span><bdi dir="ltr">' + hhmm(w) + "</bdi>" + tz + "</span></div>" +
       '<div class="lnd-row"><span class="lnd-ic">📍</span><span>' + bdi(whereTxt(v)) + "</span></div>";
-    if (v.kind === "nf") h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>בנטפליקס</span>' + (RE_NF.test(v.link || "") ? '<a class="pty-open" href="' + esc(v.link) + '" target="_blank" rel="noopener">פתיחה</a>' : "") + "</div>";
-    else if (v.ch) h += '<div class="lnd-row"><span class="lnd-ic">📺</span><span>בערוץ ' + bdi(TVG.bidi(v.ch)) + "</span></div>";
+    if (hasWatch(v)) h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>בנטפליקס</span><a class="pty-open" href="' + esc(v.link) + '" target="_blank" rel="noopener">פתיחה</a></div>';
+    else if (v.kind === "tv" && v.ch) h += '<div class="lnd-row"><span class="lnd-ic">📺</span><span>בערוץ ' + bdi(TVG.bidi(v.ch)) + "</span></div>";
+    else h += '<div class="lnd-row"><span class="lnd-ic">🎬</span><span>צפייה</span></div>';
     h += "</div>";
-    // מי מגיע
-    h += '<div class="lnd-meta glass pty-who"><div class="pty-h">מי מגיע</div>' + whoHtml(v).replace('class="none"', 'class="none pty-none"') + "</div>";
-    if (!v.cancelled && !over) {
-      var a = GV.v.mine ? GV.v.mine.ans : "";
-      h += '<div class="lnd-meta glass pty-ask"><div class="pty-h">מגיע/ה?</div><div class="chips pty-chips" role="group" aria-label="התשובה שלך">' +
-        [["yes", "מגיע/ה 👍"], ["maybe", "אולי 🤔"], ["no", "לא הפעם"]].map(function (x) { return '<button type="button" class="chip pty-ans" data-ptyans="' + x[0] + '" aria-pressed="' + (a === x[0]) + '">' + x[1] + "</button>"; }).join("") +
-        '</div><label class="lbl" for="ptyGName">השם הפרטי שלך (יופיע ברשימה)</label><input id="ptyGName" class="pin" type="text" maxlength="24" autocomplete="given-name" placeholder="למשל: דנה" value="' + esc(GV.name) + '">' +
-        (a ? '<p class="credit">✓ התשובה נשמרה. אפשר לשנות אותה בכל רגע.</p>' : "") + "</div>";
-      if (a === "yes" || a === "maybe") h += '<p class="pty-note">' + (TVG.pushOn ? "🔔 נשלח לך התראה כשהמארח/ת מתחיל/ה <bdi dir=\"ltr\">3, 2, 1</bdi>." : "💡 כדי לקבל את ה-<bdi dir=\"ltr\">3, 2, 1</bdi> בטלפון צריך את האפליקציה במסך הבית עם התראות. בלי זה, משאירים את הדף הזה פתוח כשמתקרבים לשעה ונראה לכם אותו כאן.") + "</p>";
+    h += '<div class="lnd-meta glass pty-who"><div class="pty-h">מי בפנים</div>' + whoHtml(v) + "</div>";
+    if (!v.cancelled && !over && (a === "yes" || a === "maybe")) {
+      h += '<p class="pty-note">' + (mn && mn.push ? "🔔 תקבלו התראה כשמתחילים" : "💡 כדי לקבל את ה-<bdi dir=\"ltr\">3, 2, 1</bdi> בטלפון צריך את האפליקציה במסך הבית עם התראות. בלי זה, משאירים את הדף הזה פתוח כשמתקרבים לשעה והוא יציג את הספירה.") + "</p>";
     }
     return h;
   }
@@ -317,8 +363,8 @@
     var v = GV.v, guide = '<button type="button" class="lnd-link" data-ptyguide>לכל לוח השידורים</button>';
     if (!v || v.cancelled || Date.now() > v.at + GO_AFTER) return '<button type="button" class="btn" data-ptyguide>📺 לכל לוח השידורים</button>';
     var a = v.mine ? v.mine.ans : "";
-    if (!a) return '<p class="lnd-hint">בחרו תשובה כדי להוסיף ליומן</p>' + guide;
-    if (a === "no") return '<button type="button" class="btn" data-ptyclose>סגירה</button>';
+    if (!a) return guide;
+    if (a === "no") return '<button type="button" class="btn" data-ptyguide>📺 לכל לוח השידורים</button><button type="button" class="lnd-link" data-ptyclose>סגירה</button>';
     if (GV.safari) return '<div class="lnd-safari"><b>🧭 פתחו ב-Safari</b><span>הדפדפן הפנימי לא מוסיף ליומן. בתפריט ⋯ בוחרים פתיחה ב-Safari.</span></div><button type="button" class="btn" data-ptycopyl>📋 העתקת הקישור</button>' + guide;
     var rk = remKey(v), has = TVG.hasRem(rk);
     return '<button type="button" class="btn" data-ptycal>📅 הוספה ליומן</button>' +
@@ -339,16 +385,21 @@
     return apiGet(id).then(function (v) {
       if (GV !== gv) return null;
       gv.v = v; gv.err = 0; gv.off = v.now - Date.now(); if (v.mine && !gv.name) gv.name = v.mine.name;
-      paintLand(true); schedulePoll(); return v;
+      paintLand(true); schedulePoll(); syncPush(); return v;
     }).catch(function (e) { if (GV === gv) { gv.err = e.status || 1; paintLand(true); } return null; });
   }
+  // חלון הערב בשעון השרת: אותו חלון של השרת ל"פליי" (-60/+180 דקות). בתוכו סוקרים כל 2 שניות, מחוצה לו כל 30 שניות
+  function srvNow(gv) { return Date.now() + (gv.off || 0); }
+  function inSrvWindow(gv) { var n = srvNow(gv); return n >= gv.v.at - GO_BEFORE && n <= gv.v.at + GO_AFTER; }
   function schedulePoll() {
     clearInterval(poll); poll = 0;
     if (!GV || !GV.v) return;
+    var ticks = 0;
     poll = setInterval(function () {
-      if (!GV || $("#ptyL").hidden || document.hidden) return;
-      var near = Math.abs(Date.now() + (GV.off || 0) - GV.v.at) < 30 * 60000 + GO_AFTER * 0;
-      if (!near) return;
+      if (!GV || !GV.v || $("#ptyL").hidden || document.hidden) return;
+      syncPush();
+      ticks++;
+      if (!inSrvWindow(GV) && ticks % 15) return;
       var gv = GV, was = gv.v && gv.v.go || 0;
       apiGet(gv.id).then(function (v) {
         if (GV !== gv) return;
@@ -357,7 +408,15 @@
         var ae = document.activeElement; if (ae && ae.id === "ptyGName") return; // לא מפריעים באמצע הקלדה
         paintLand(true);
       }).catch(function () {});
-    }, 10000);
+    }, 2000);
+  }
+  // אורח שהפעיל התראות אחרי שענה: שולחים שוב את אותה תשובה עם הטוקן, בשקט, כדי שהשרת יוכל לשלוח לו פוש. "🔔 תקבלו התראה" מוצג רק כשהשרת אישר
+  function syncPush() {
+    var gv = GV; if (!gv || !gv.v || !gv.v.mine || gv.v.mine.push || !TVG.pushOn || gv.syncing || (gv.syncTry || 0) >= 3) return;
+    gv.syncing = true; gv.syncTry = (gv.syncTry || 0) + 1;
+    apiPost({ action: "rsvp", id: gv.id, gid: myGid(), name: gv.v.mine.name, ans: gv.v.mine.ans, t: TVG.myTok() }).then(function (v) {
+      gv.syncing = false; if (GV !== gv) return; gv.v = v; gv.off = v.now - Date.now(); paintLand(true);
+    }).catch(function () { gv.syncing = false; });
   }
   function closeGuest() {
     var e = $("#ptyL"); if (!e || e.hidden) return;
@@ -367,12 +426,15 @@
     if (!GV || !GV.v || GV.busy) return;
     var inp = $("#ptyGName"), name = cleanName(inp ? inp.value : GV.name);
     GV.name = name;
-    if (!name) { TVG.pill("כתבו קודם את השם הפרטי שלכם", 1800); if (inp) inp.focus(); return; }
-    var gv = GV; gv.busy = true;
-    apiPost({ action: "rsvp", id: gv.id, gid: myGid(), name: name, ans: ans, t: TVG.pushOn ? TVG.myTok() : undefined }).then(function (v) {
+    if (!name) { // זוכרים את הבחירה, ושולחים ברגע שהשם נכתב ואושר
+      GV.pending = ans; paintLand(true); inp = $("#ptyGName"); if (inp) inp.focus(); return;
+    }
+    var gv = GV; gv.busy = true; gv.pending = "";
+    apiPost({ action: "rsvp", id: gv.id, gid: myGid(), name: name, ans: ans, t: TVG.myTok() }).then(function (v) {
       gv.busy = false; if (GV !== gv) return;
       TVG.store("tvg.name", name); gv.v = v; gv.off = v.now - Date.now(); paintLand(true);
-      TVG.pill(ans === "yes" ? "👍 נרשמת: מגיע/ה" : ans === "maybe" ? "🤔 נרשמת: אולי" : "נרשם: לא הפעם", 2200);
+      TVG.pill(ans === "yes" ? "👍 נשמר: אני בפנים" : ans === "maybe" ? "🤔 נשמר: אולי" : "נשמר: לא הפעם", 2200);
+      syncPush();
     }).catch(function (e) { gv.busy = false; TVG.pill(errMsg(e), 2800); });
   }
   function remKey(v) { return "w|" + v.id + "|" + v.at; }
@@ -406,6 +468,7 @@
     if (!RE_ID.test(String(id || ""))) { TVG.pill("לא מצאנו את הערב הזה", 2200); return; }
     if (mine(id) && !go) { openHost(id); return; }
     var gv = openLandFor(id);
+    if (!mine(id)) listMine().then(function () { if (mine(id) && GV && GV.id === id && !go) { closeGuest(); openHost(id); } }); // מארח במכשיר חדש: פותח את תצוגת המארח
     if (go) gv.then(function (v) {
       if (v && v.go && v.go > v.now - 10 * 60000) startCountdown(v);
     });
@@ -440,7 +503,7 @@
     }
     var n = $("#ptyN"), t = $("#ptyT"); if (!n) return;
     var sec = Math.ceil(rem / 1000);
-    if (rem > 3000) { n.textContent = "…"; if (t) t.textContent = "מתכוננים… עוד רגע מתחילים ביחד"; }
+    if (rem > 3000) { n.textContent = "…"; if (t) t.textContent = "מתכוננים… מתחילים ביחד בעוד " + sec + " שניות"; }
     else { var s = String(sec); if (n.textContent !== s) { n.textContent = s; n.classList.remove("tick"); void n.offsetWidth; n.classList.add("tick"); } if (t) t.textContent = "בעוד " + sec + "…"; }
   }
   function stopCountdown(keepBox) {
@@ -486,6 +549,7 @@
         if (t.closest("[data-ptycancelno]")) { stop(e); HS.askCancel = false; paintHost(); return; }
         if (t.closest("[data-ptycancelyes]")) { stop(e); doCancel(); return; }
         if (t.closest("[data-ptyclosehost]")) { stop(e); closePty(); return; }
+        if ((b = t.closest("[data-ptyrm]"))) { stop(e); doRemove(b.getAttribute("data-ptyrm"), b.getAttribute("data-n") || ""); return; }
       }
       return;
     }
@@ -504,6 +568,9 @@
     else if (CR && t.hasAttribute("data-ptydt")) {
       var m = String(t.value).match(/^(\d+)-(\d+)-(\d+)T(\d+):(\d+)/);
       if (m) { CR.pickMs = TVG.ilTs(new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5])); var pv2 = $("#ptyPrev"); if (pv2) pv2.innerHTML = bubble(); }
-    } else if (GV && t.id === "ptyGName") GV.name = cleanName(t.value);
+    } else if (GV && t.id === "ptyGName") { GV.name = cleanName(t.value); var hn = $("#ptyHint"); if (hn) hn.hidden = !(GV.pending && !GV.name); }
   });
+  // אישור השם (Enter / סיום / עזיבת השדה): אם כבר בחרו תשובה, היא נשלחת עכשיו
+  document.addEventListener("change", function (e) { var t = e.target; if (GV && t && t.id === "ptyGName") { GV.name = cleanName(t.value); if (GV.pending && GV.name) answer(GV.pending); } });
+  document.addEventListener("keydown", function (e) { var t = e.target; if (e.key === "Enter" && t && t.id === "ptyGName") { e.preventDefault(); t.blur(); } });
 })(window.TVG);

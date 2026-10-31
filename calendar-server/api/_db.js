@@ -75,3 +75,12 @@ export async function listJson(col) {
   const rows = await (await be()).list(col);
   return rows.map((r) => { let value = null; try { value = JSON.parse(r.v); } catch (e) {} return { id: r.id, value }; });
 }
+
+// מסמכים שמזהה שלהם בטווח [lo, hi) (מיון לפי מזהה). לקריאה של "תת-אוסף" לפי קידומת, למשל prsvp/<partyId>__*: [{id, value}]
+export async function listRange(col, lo, hi) {
+  if (!/^[a-z][a-z0-9_]*$/.test(col)) throw new Error("bad collection");
+  const b = await be();
+  const rows = b.listRange ? await b.listRange(col, lo, hi) : (await b.list(col)).filter((r) => r.id >= lo && r.id < hi);
+  return rows.map((r) => { let value = null; try { value = JSON.parse(r.v); } catch (e) {} return { id: r.id, value }; });
+}
+export const listPrefix = (col, prefix) => listRange(col, prefix, prefix + String.fromCharCode(0xf8ff));

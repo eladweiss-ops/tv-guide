@@ -701,12 +701,12 @@ function nfFixtureData() {
       const NOWMS = Date.parse(FIXED_NOW), PID = "PartyIdAAAAAAAAAAAAAAA", AT_SUN = Date.parse("2026-11-01T21:00:00+02:00");
       let P = null;
       const ptyReset = (o) => { P = Object.assign({ at: AT_SUN, kind: "nf", title: "הסדרה הגדולה", ch: "נטפליקס", img: "https://image.tmdb.org/t/p/w342/fx_t88001.jpg", link: "https://www.netflix.com/search?q=Big", place: "home", host: "אלעד",
-        rs: [{ name: "דנה", ans: "yes" }, { name: "יוסי", ans: "yes" }, { name: "רון", ans: "maybe" }], mine: null, cancelled: false, go: 0, goOff: 1200, calls: [] }, o || {}); };
-      const ptyView = () => {
+        rs: [{ name: "דנה", ans: "yes" }, { name: "יוסי", ans: "yes" }, { name: "רון", ans: "maybe" }], mine: null, cancelled: false, go: 0, goOff: 1200, calls: [], subs: false, list: [], unknown: false }, o || {}); };
+      const ptyView = (host) => {
         const rs = P.rs.slice(); if (P.mine) rs.push({ name: P.mine.name, ans: P.mine.ans });
         const c = { yes: 0, maybe: 0, no: 0 }; rs.forEach((r) => { c[r.ans]++; });
-        const v = { id: PID, title: P.title, kind: P.kind, ref: "x", ch: P.ch, img: P.img, link: P.link, at: P.at, place: P.place, host: { name: P.host }, rsvps: rs, counts: c, now: NOWMS };
-        if (P.cancelled) v.cancelled = true; if (P.go) v.go = P.go; if (P.mine) v.mine = { ans: P.mine.ans, name: P.mine.name };
+        const v = { id: PID, title: P.title, kind: P.kind, ref: "x", ch: P.ch, img: P.img, link: P.link, at: P.at, place: P.place, host: { name: P.host }, rsvps: rs.map((r, i) => (host ? { name: r.name, ans: r.ans, rid: ("00000000000" + i).slice(-12) } : r)), counts: c, now: NOWMS };
+        if (P.cancelled) v.cancelled = true; if (P.go) v.go = P.go; if (P.mine) v.mine = { ans: P.mine.ans, name: P.mine.name, push: !!P.mine.push };
         return v;
       };
       ptyReset();
@@ -716,10 +716,14 @@ function nfFixtureData() {
         const rq = r.request(), ok = (o, st) => r.fulfill({ status: st || 200, contentType: "application/json", headers: CORS, body: JSON.stringify(o) });
         if (rq.method() === "GET") { const id = new URL(rq.url()).searchParams.get("id"); return id === PID ? ok(ptyView()) : ok({ error: "gone" }, 404); }
         const b = JSON.parse(rq.postData() || "{}"); P.calls.push(b);
+        if (b.action === "create" && P.unknown) return ok({ error: "unknown token" }, 403);
+        if (b.action === "list") return ok({ parties: P.list });
         if (b.action === "create") { P.at = b.at; P.title = b.title; P.kind = b.kind; P.place = b.place; P.host = b.name || ""; P.link = b.link || ""; P.ch = b.ch || ""; P.img = b.img || ""; P.rs = []; return ok(ptyView()); }
         if (b.id !== PID) return ok({ error: "gone" }, 404);
-        if (b.action === "rsvp") { P.mine = { ans: b.ans, name: b.name }; return ok(ptyView()); }
-        if (b.action === "view") return ok(Object.assign(ptyView(), { host: { name: P.host, me: true, push: false } }));
+        if (b.action === "get") return ok(ptyView());
+        if (b.action === "remove") { const i = +b.rid.slice(-2); if (b.undo) { if (P.removed) P.rs.splice(i, 0, P.removed); P.removed = null; } else { P.removed = P.rs.splice(i, 1)[0]; } return ok({ ok: true, removed: !b.undo }); }
+        if (b.action === "rsvp") { P.mine = { ans: b.ans, name: b.name, push: !!(b.t && P.subs) }; return ok(ptyView()); }
+        if (b.action === "view") return ok(Object.assign(ptyView(true), { host: { name: P.host, me: true, push: false } }));
         if (b.action === "cancel") { P.cancelled = !b.undo; return ok({ ok: true, cancelled: P.cancelled }); }
         if (b.action === "go") { P.go = NOWMS + P.goOff; return ok({ ok: true, go: P.go, now: NOWMS, pushed: 2 }); }
         return ok({ error: "bad action" }, 400);
@@ -766,13 +770,16 @@ function nfFixtureData() {
       await pt("guest-fresh", async () => {
         await fresh(); await clean(); await guestOpen();
         const t = await txt("#ptyL");
-        A(/אלעד מזמין\/ה אותך לערב צפייה/.test(t) && /הסדרה הגדולה/.test(t) && /אצל אלעד/.test(t) && /21:00/.test(t) && /בנטפליקס/.test(t) && /דנה/.test(t) && /יוסי/.test(t) && /אולי/.test(t), "guest landing content: " + t.slice(0, 300));
+        A(/הזמנה מאלעד לערב צפייה/.test(t) && /הסדרה הגדולה/.test(t) && /אצל אלעד/.test(t) && /21:00/.test(t) && /בנטפליקס/.test(t) && /דנה/.test(t) && /יוסי/.test(t) && /אולי/.test(t), "guest landing content: " + t.slice(0, 300));
         A(await page.evaluate(() => document.querySelectorAll("#ptyLBar .btn").length === 0), "before answering: no primary yet (calendar needs an answer)");
+        A(await page.evaluate(() => { const c = document.querySelector("[data-ptyans]").getBoundingClientRect(), bar = document.querySelector("#ptyLBar").getBoundingClientRect(); return c.bottom <= bar.top + 2 && c.top > 0; }), "answer chips visible without scrolling");
+        A(await page.evaluate(() => { const i = document.querySelector("#ptyGName").getBoundingClientRect(), c = document.querySelector("[data-ptyans]").getBoundingClientRect(); return i.bottom <= c.top; }), "name field comes before the answer chips");
         await snap("46_pty_guest_fresh");
         await page.evaluate(() => { document.querySelector("#ptyLBody").scrollTop = 9999; }); await page.waitForTimeout(300); await snap("46_pty_guest_fresh_bottom");
-        await page.click('[data-ptyans="yes"]'); await page.waitForTimeout(400); A(/כתבו קודם את השם/.test(await txt("#pill")), "name required"); A(!P.calls.some((c) => c.action === "rsvp"), "no rsvp without a name");
-        await page.fill("#ptyGName", "נועה"); await page.click('[data-ptyans="yes"]'); await page.waitForTimeout(700);
-        const rv = P.calls.filter((c) => c.action === "rsvp")[0]; A(rv && rv.ans === "yes" && rv.name === "נועה" && /^[A-Za-z0-9_-]{16,32}$/.test(rv.gid) && rv.id === PID && rv.t === undefined, "rsvp body " + JSON.stringify(rv));
+        await page.click('[data-ptyans="yes"]'); await page.waitForTimeout(400); A(/רק השם ונשלח/.test(await txt("#ptyL")), "empty name: inline hint"); A((await page.getAttribute('[data-ptyans="yes"]', "aria-pressed")) === "true", "choice remembered"); A(!P.calls.some((c) => c.action === "rsvp"), "no rsvp without a name");
+        A(await page.evaluate(() => document.activeElement && document.activeElement.id === "ptyGName"), "name field focused"); await snap("46_pty_guest_pending");
+        await page.fill("#ptyGName", "נועה"); await page.press("#ptyGName", "Enter"); await page.waitForTimeout(800);
+        const rv = P.calls.filter((c) => c.action === "rsvp")[0]; A(rv && rv.ans === "yes" && rv.name === "נועה" && /^[A-Za-z0-9_-]{16,32}$/.test(rv.gid) && rv.id === PID && typeof rv.t === "string", "rsvp body " + JSON.stringify(rv));
         A((await page.getAttribute('[data-ptyans="yes"]', "aria-pressed")) === "true", "yes pressed"); A(/הוספה ליומן/.test(await txt("#ptyLBar")), "calendar button after answering");
         A(await page.evaluate(() => document.querySelectorAll("#ptyLBar .btn").length === 1), "one primary"); A(/נועה/.test(await txt("#ptyL")), "my name in the list");
         await page.evaluate(() => { document.querySelector("#ptyLBody").scrollTop = 0; }); await page.waitForTimeout(200); await snap("47_pty_guest_yes");
@@ -785,7 +792,7 @@ function nfFixtureData() {
         A((await page.inputValue("#ptyGName")) === "נועה", "name prefilled");
         await page.click('[data-ptyans="maybe"]'); await page.waitForTimeout(600); A((await page.getAttribute('[data-ptyans="maybe"]', "aria-pressed")) === "true", "maybe pressed"); A(/הוספה ליומן/.test(await txt("#ptyLBar")), "maybe also gets the calendar");
         await snap("48_pty_guest_maybe");
-        await page.click('[data-ptyans="no"]'); await page.waitForTimeout(600); A((await page.getAttribute('[data-ptyans="no"]', "aria-pressed")) === "true", "no pressed"); A(!/הוספה ליומן/.test(await txt("#ptyLBar")) && /סגירה/.test(await txt("#ptyLBar")), "no: just close");
+        await page.click('[data-ptyans="no"]'); await page.waitForTimeout(600); A((await page.getAttribute('[data-ptyans="no"]', "aria-pressed")) === "true", "no pressed"); A(!/הוספה ליומן/.test(await txt("#ptyLBar")) && /לכל לוח השידורים/.test(await txt("#ptyLBar")) && /סגירה/.test(await txt("#ptyLBar")) && (await page.evaluate(() => document.querySelectorAll("#ptyLBar .btn").length === 1)), "no: orange = to the guide, close is quiet");
         await snap("49_pty_guest_no");
         await page.click('[data-ptyans="yes"]'); await page.waitForTimeout(500); A((await page.getAttribute('[data-ptyans="yes"]', "aria-pressed")) === "true", "answer can change later");
         A(P.calls.filter((c) => c.action === "rsvp").length === 3 && new Set(P.calls.filter((c) => c.action === "rsvp").map((c) => c.gid)).size === 1, "same gid for every change");
@@ -802,6 +809,15 @@ function nfFixtureData() {
           await page.evaluate(() => { TVG.pushOn = false; TVG.REMS = []; TVG.saveRems(); });
         }
       });
+      await pt("guest-push-sync", async () => { // התראות הופעלו אחרי התשובה: נשלחת שוב אותה תשובה עם הטוקן, והאישור "🔔" מופיע רק אחרי שהשרת אישר
+        await ls({ "tvg.name": "נועה" }); await guestOpen({ mine: { ans: "yes", name: "נועה", push: false }, subs: true });
+        A(/💡/.test(await txt("#ptyL")) && !/🔔 תקבלו התראה/.test(await txt("#ptyL")), "no bell before the server has the push");
+        const n0 = P.calls.filter((c) => c.action === "rsvp").length;
+        await page.evaluate(() => { TVG.pushOn = true; }); await page.waitForTimeout(3500);
+        const rc = P.calls.filter((c) => c.action === "rsvp"); A(rc.length === n0 + 1 && rc[rc.length - 1].ans === "yes" && typeof rc[rc.length - 1].t === "string", "silent re-send of the same answer with the token");
+        A(/🔔 תקבלו התראה כשמתחילים/.test(await txt("#ptyL")), "bell shown after the server confirmed"); await page.evaluate(() => { TVG.pushOn = false; });
+        await page.evaluate(() => { document.querySelector("#ptyLBody").scrollTop = 9999; }); await page.waitForTimeout(300); await snap("49_pty_guest_push_ok");
+      });
       await pt("guest-inapp", async () => {
         if (d.name.indexOf("iphone") !== 0) return;
         await ls({ "tvg.name": "נועה" }); await guestOpen({ mine: { ans: "yes", name: "נועה" } });
@@ -815,14 +831,17 @@ function nfFixtureData() {
         for (let i = errs.length - 1; i >= 0; i--) if (/api\/party/.test(errs[i]) && /404/.test(errs[i])) errs.splice(i, 1); // 404 צפוי לערב לא קיים
         await guestOpen({ at: NOWMS - 5 * 3600000 }); A(/כבר עבר/.test(await txt("#ptyL")), "past party");
         await guestOpen({ kind: "tv", ch: "קשת 12", link: "", img: "" }); A(/בערוץ/.test(await txt("#ptyL")), "tv party shows the channel"); await snap("52_pty_guest_tv");
+        await guestOpen({ kind: "nf", link: "", ch: "" }); A(/צפייה/.test(await txt("#ptyL")) && !/בנטפליקס/.test(await txt("#ptyL")) && !(await page.$(".pty-open")), "nf without a link: plain 'watch', no button");
       });
       await pt("host-row-sheet", async () => {
         ptyReset({ at: NOWMS + 3 * 3600000 }); await fresh(); await ls({ "tvg.parties": HOSTLS(), "tvg.gid": null }); await fresh(); await page.click('[data-tab="rems"]'); await page.waitForTimeout(1200);
-        const row = await txt('[data-party]'); A(/הסדרה הגדולה/.test(row) && /ערב צפייה/.test(row) && /2 מגיעים/.test(row) && /1 אולי/.test(row), "host row: " + row);
+        const row = await txt('[data-party]'); A(/הסדרה הגדולה/.test(row) && /ערב צפייה/.test(row) && /👍 2 · 🤔 1/.test(row), "host row: " + row);
         await snap("53_pty_host_row");
         await page.click("[data-party]"); await page.waitForTimeout(800); A(await shown("#party"), "host sheet");
         const h = await txt("#party"); A(/דנה/.test(h) && /יוסי/.test(h) && /רון/.test(h) && /שליחה שוב בוואטסאפ/.test(h) && /ביטול הערב/.test(h), "host sheet content"); A(!(await page.$("[data-ptygo]")), "no 3-2-1 button more than an hour before");
         await snap("54_pty_host_sheet");
+        await page.click("[data-ptyrm]"); await page.waitForTimeout(700); A(/הוסרה התשובה/.test(await txt("#pill")) && !/דנה/.test(await txt("#party")), "guest removed (with undo toast)"); await snap("54_pty_host_removed");
+        await page.click("#pill .pillact"); await page.waitForTimeout(700); A(/דנה/.test(await txt("#party")), "remove undone");
         await stubWa(); await page.click("[data-ptyresend]"); /* window.open -> wa.me (נחסם בנתב) */ await page.waitForTimeout(500);
         await page.click("[data-party]"); await page.waitForTimeout(600);
         await page.click("[data-ptycancel]"); await page.waitForTimeout(300); A(/לבטל את הערב/.test(await txt("#party")), "confirm before cancelling"); await snap("55_pty_host_cancel_confirm");
@@ -849,6 +868,23 @@ function nfFixtureData() {
         A(await shown("#ptyGo") && /עברו לערוץ/.test(await txt("#ptyGo")), "tv: switch-channel text"); await snap("59_pty_go_final_tv");
         await page.click("[data-ptygoclose]"); await page.waitForTimeout(300);
         ptyReset({ go: NOWMS + 4500 }); await fresh("?w=" + PID + "&go=1"); await page.waitForTimeout(1000); A(/מתכוננים/.test(await txt("#ptyGo")), "get ready (more than 3s)"); await snap("58_pty_go_ready");
+      });
+      await pt("host-newdevice", async () => { // מארח במכשיר חדש: הרשימה מהשרת, וקישור/הודעה פותחים את תצוגת המארח ולא את דף האורח
+        ptyReset({ at: NOWMS + 3 * 3600000 }); P.list = [{ id: PID, title: P.title, kind: "nf", ref: "t1", ch: "נטפליקס", img: "", link: P.link, at: P.at, place: "home", name: "אלעד", counts: { yes: 2, maybe: 1, no: 0 } }];
+        await fresh(); await ls({ "tvg.parties": null }); await fresh(); await page.click('[data-tab="rems"]'); await page.waitForTimeout(1500);
+        A(!!(await page.$("[data-party]")), "host list restored from the server");
+        await ls({ "tvg.parties": null }); await fresh("?w=" + PID); await page.waitForTimeout(1800);
+        A(await shown("#party") && !(await shown("#ptyL")), "host opens the host view from a link on a new device");
+      });
+      await pt("create-unknown", async () => {
+        ptyReset({ unknown: true }); nfFixture = true; await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(700); await page.click(".nfhero"); await page.waitForTimeout(700); await page.click("[data-ptynf]"); await page.waitForTimeout(400);
+        await page.click("[data-ptysend]"); await page.waitForTimeout(700); A(/מכינים את החשבון/.test(await txt("#pill")) && (await shown("#party")), "unknown token: friendly message, sheet stays"); nfFixture = false;
+        for (let i = errs.length - 1; i >= 0; i--) if (errs[i].indexOf("api/party") >= 0 && /403/.test(errs[i])) errs.splice(i, 1); // 403 צפוי
+      });
+      await pt("dst", async () => { // שעון קיץ: 26.3.2027. השעה מחושבת לפי הקיזוז במועד האירוע, לא לפי עכשיו
+        await fresh();
+        const r = await page.evaluate(() => [["2027-03-25T21:00:00+02:00"], ["2027-03-26T21:00:00+03:00"], ["2027-03-28T21:00:00+03:00"], ["2026-10-24T21:00:00+03:00"], ["2026-10-25T21:00:00+02:00"]].map((x) => { const w = TVG.partyWall(Date.parse(x[0])); return w.getHours() + ":" + w.getMinutes() + "|" + w.getDate(); }));
+        A(JSON.stringify(r) === JSON.stringify(["21:0|25", "21:0|26", "21:0|28", "21:0|24", "21:0|25"]), "wall time at the event offset: " + r.join());
       });
       await pt("dark", async () => {
         await ls({ "tvg.name": "נועה", "tvg.parties": null }); await guestOpen({ mine: { ans: "yes", name: "נועה" } }); await page.evaluate(() => TVG.setTheme("dark")); await page.waitForTimeout(400);

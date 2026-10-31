@@ -45,3 +45,20 @@
 }
 @keyframes ptyTick { from { transform: scale(1.45); opacity: .2; } to { transform: scale(1); opacity: 1; } }
 @keyframes ptyPop { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8px) rotate(6deg); } }
+
+/* ----- עדכון: דף אורח קומפקטי (התשובה על המסך בלי גלילה), רשימת מארח עם הסרה ----- */
+.pty-hero { flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; min-height: 0; padding: 16px 18px; }
+.pty-hero .lnd-em { font-size: 72px; }
+.pty-pos { width: 56px; flex: none; align-self: center; border-radius: 12px; }
+.pty-ht { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pty-hero .lnd-ttl { font-size: 1.55rem; line-height: 1.15; }
+.pty-inv { font-size: .98rem; }
+label.pty-h { display: block; }
+.pty-hint { margin: -4px 2px 0; color: var(--accent); font-weight: 700; font-size: .95rem; }
+.pty-hint[hidden] { display: none; }
+.pty-cnt { font-weight: 800; font-size: 1.05rem; }
+.pty-rr { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; border-bottom: 1px solid var(--line); }
+.pty-rn { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.pty-rr .ghost.sm { flex: none; }
+#ptyL .lnd-scroll > * { flex-shrink: 0; }
+#ptyL .lnd-bar { position: sticky; bottom: 0; } /* שכבה נפרדת מהתוכן שנגלל מתחתיה (כמו .nfs-bar) */

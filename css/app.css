@@ -558,3 +558,4 @@
   #qx { z-index: 0; isolation: isolate; }
   .tmdbmark { position: relative; } .tmdbmark::after { content: ""; position: absolute; inset: -12px -8px; } /* אזור לחיצה 44px, התג עצמו נשאר קטן */
   details.calopt summary { display: flex; align-items: center; min-height: 44px; }
+  .srow.sgrow { flex-wrap: nowrap; } .srow.sgrow > .go { flex: 1 1 auto; } .srow.sgrow > .go + * { margin-inline-start: 0; } /* הצעה: הכוכב באותה שורה עם השם, בלי שורה ריקה */

@@ -156,7 +156,7 @@
       var sg = suggestions(term);
       if (sg.length) h += '<h2 class="sech">הצעות</h2>' + sg.map(function (x) {
         if (TVG.favPick) return '<div class="srow"><button type="button" class="go sg" data-favpick="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + '</span></span></button><button type="button" class="btn sm" data-favpick="' + esc(x.t) + '">' + (FAV.has(x.t) ? "★ כבר שם" : "☆ הוסף") + "</button></div>";
-        return '<div class="srow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
+        return '<div class="srow sgrow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
       }).join("");
     }
     if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';

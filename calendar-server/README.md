@@ -1,6 +1,6 @@
 # שרת היומן "לוח שידורים"
 
-שרת קטן ב-Vercel (פרויקט `tv-guide-cal`, כתובת https://tv-guide-cal.vercel.app) ששומר את רשימת התזכורות של כל משתמש ב-Vercel Blob ומגיש אותה כיומן מנוי.
+שרת קטן ב-Vercel (פרויקט `tv-guide-cal`, כתובת https://tv-guide-cal.vercel.app) ששומר את רשימת התזכורות של כל משתמש ב-Google Cloud Firestore (ראו "אחסון: Firestore") ומגיש אותה כיומן מנוי.
 
 - `POST /api/rems` עם `{t, rems}` – שמירת הרשימה (האפליקציה קוראת לזה בכל הוספה/ביטול)
 - `GET /api/rems?t=…` – קריאת הרשימה (שחזור אחרי התקנה מחדש)
@@ -44,7 +44,7 @@
 | `POST /api/snooze` | 20 לטוקן (אחרי אימות), 60 ל-IP | 4KB |
 
 חריגה = `429 {"error":"rate"}` עם `Retry-After: 60`. המונים הם **בזיכרון של כל instance** (best-effort; Vercel יכול להריץ כמה instances), בלי שירות בתשלום.
-ההגנה המתמשכת היא על תזמון QStash (הדבר היחיד שעולה כסף), והיא נשמרת ב-blob הקיים `sched/<t>.json` תחת המפתח `__q`:
+ההגנה המתמשכת היא על תזמון QStash (הדבר היחיד שעולה כסף), והיא נשמרת במסמך הקיים `sched/<t>` (Firestore) תחת המפתח `__q`:
 
 - **תקרת תזמון:** עד **60** תזכורות עתידיות מתוזמנות לכל טוקן (הקרובות ביותר). השאר **נשמרות** (ביומן המנוי ובשרת) אך לא מתוזמנות ב-QStash; כשהזמן עובר והן נכנסות לתוך ה-60 הן מתוזמנות בשמירה הבאה. התשובה כוללת `sch.capped`.
 - **תקציב פרסום:** עד **300** פרסומים ל-QStash ליום (UTC) לטוקן; מעבר לזה `sch.limited:"daily"`, והתזמון ממשיך למחרת.
@@ -73,9 +73,24 @@
 ### iCalendar
 `DESCRIPTION`/`SUMMARY` עוברים escape לפי RFC 5545 (`\\`, `\;`, `\,`, `\n`) ותווי בקרה (כולל `\r`) מוסרים, כך שאי אפשר להזריק שורות לקובץ ה-ICS. כותרות `Referrer-Policy: no-referrer` ו-`X-Content-Type-Options: nosniff` מוגדרות ב-`vercel.json` ל-`/api/*` ול-`/cal/*`.
 
-### תוכנית: Blob פרטי (לא בוצע)
-`@vercel/blob@1.1.1` (האחרון ב-1.x) תומך רק ב-`access:"public"`; גישה פרטית קיימת ב-2.x. תוכנית: לעבור ל-2.x, ליצור store פרטי, לכתוב `push/` ו-`sched/` לשם עם קריאה כפולה (פרטי ואז ציבורי) בתקופת מעבר, ואז למחוק את הציבוריים. `rems/` ו-`backup/` נשארים ציבוריים עד שהיומן המנוי עובר רק דרך `/api/cal`.
-`npm audit`: 3 פגיעויות (undici / @fastify/busboy דרך `@vercel/blob` <=2.0.0), לא נפתרות ב-1.x (1.1.1 הוא האחרון); נדרש 2.x.
+### אחסון: Firestore (מחליף את Vercel Blob)
+ה-Blob הושעה (מכסה), והאחסון עבר ל-Google Cloud Firestore: פרויקט `tv-guide-8f736`, מסד `(default)`, אזור europe-west3, חוקים `deny all` (רק השרת ניגש, דרך Admin SDK). כל הגישה עוברת דרך `api/_db.js` (`readJson` / `writeJson` / `delJson` / `listJson`), באותו ממשק נתיבים כמו קודם.
+
+- **משתנה סביבה:** `FIREBASE_SERVICE_ACCOUNT` = מחרוזת ה-JSON המלאה של חשבון השירות. בלעדיו כל קריאה לאחסון נכשלת (500 גנרי) ובלוג: `missing FIREBASE_SERVICE_ACCOUNT`. `BLOB_READ_WRITE_TOKEN` כבר לא בשימוש בשרת (רק בסקריפט ההעברה).
+- **מיפוי:** קידומת = אוסף, שאר הנתיב = מזהה המסמך (`/` מוחלף ב-`__`). מסמך = `{v: מחרוזת JSON, at: זמן כתיבה}`.
+
+| נתיב ב-Blob | אוסף / מסמך |
+|---|---|
+| `rems/<t>.json` | `rems/<t>` |
+| `push/<t>.json` | `push/<t>` |
+| `backup/<t>.json` | `backup/<t>` |
+| `sched/<t>.json` | `sched/<t>` |
+| `snz/<t>/<hash>.json` | `snz/<t>__<hash>` |
+
+- **כתיבות חסכוניות:** `writeJson` קורא את המסמך ולא כותב אם התוכן זהה; `backup` לא כותב גיבוי זהה. מכסת Spark: 50K קריאות ו-20K כתיבות ליום.
+- **ביצועים:** אתחול עצלן, אפליקציה אחת לכל instance, `preferRest: true` (בלי gRPC).
+- **העברת נתונים מהבלוב:** `node tools/migrate-blob-to-firestore.mjs --dry-run` (ואז בלי הדגל), כשה-Blob קריא שוב. אידמפוטנטי, לא דורס מסמך קיים (אלא עם `--overwrite`).
+- **בדיקות:** `test/helpers/fakedb.mjs` (אחסון בזיכרון) ו-`test/db.test.mjs` (חוזה זהה לדמה ול-`firestoreBackend`, חוסר אישורים).
 
 ### ביטול נודניק ותזכורת כפולה
 - `POST /api/snooze` עם `{k, t, m:0, cancel:1}` (טוקן אישי בלבד): מוחק את הנודניק המתוזמן ל-`k` (`{ok:true, cancelled:bool}`). `m:0` נשלח בכוונה: שרת ישן ידחה אותו ב-400 במקום לתזמן נודניק חדש.

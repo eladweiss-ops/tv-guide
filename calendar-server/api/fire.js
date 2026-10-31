@@ -19,14 +19,14 @@ export async function handleFire(b, d, now = Date.now()) {
   if (b.st) { // התראה שנייה ברגע ההתחלה ("וגם בתחילת השידור"): רק אם dbl עדיין קיים והזמן לא השתנה
     if (!r.dbl || !(r.lead > 0) || Math.abs(r.ts - b.at) > 120000) return { status: 200, json: { skipped: "changed" } };
     const o2 = await d.sendTo(b.t, remPayload(r, { t: b.t, at: now }));
-    await d.dropSched(b.t, b.k + START_SUFFIX);
+    try { await d.dropSched(b.t, b.k + START_SUFFIX); } catch (e) { console.error("dropSched failed (push already sent, not retrying)", e && e.message); }
     try { o2.sch = await d.reschedule(b.t, rems.filter((x) => x.k !== b.k)); } catch (e) { console.error("fire reschedule", e && e.message); }
     return { status: 200, json: o2 };
   }
   const at = r.ts - (r.lead || 0) * 60000;
   if (Math.abs(Math.max(at, 0) - b.at) > 120000 && at > now + 60000) return { status: 200, json: { skipped: "changed" } };
   const out = await d.sendTo(b.t, remPayload(r, { t: b.t, at: now }));
-  await d.dropSched(b.t, b.k);
+  try { await d.dropSched(b.t, b.k); } catch (e) { console.error("dropSched failed (push already sent, not retrying)", e && e.message); }
   // תזמון המשך: תזכורות מעבר לתקרה (61+) או שנדחו בגלל תקציב יומי שאופס. כישלון כאן לא מפיל את ההודעה (QStash ינסה שוב וישלח פוש כפול)
   // תזכורת כפולה שעוד לא התחילה: נשארת ברשימה רק עם stOnly, כדי ש-reschedule לא ימחק את הודעת k#s ולא יתזמן שוב את ההתראה שנשלחה עכשיו
   const rest = rems.filter((x) => x.k !== b.k);

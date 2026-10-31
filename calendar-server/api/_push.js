@@ -1,20 +1,12 @@
 // התראות פוש: מנויים לכל משתמש, שליחה, ותזמון מדויק דרך Upstash QStash (אם הוגדר QSTASH_TOKEN)
 import webpush from "web-push";
-import { put, list } from "@vercel/blob";
+import { readJson, writeJson } from "./_db.js";
 import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
 import { wantedSchedule, START_SUFFIX } from "./_rems.js";
 export { remPayload };
 
-export async function readJson(p, dflt) {
-  const { blobs } = await list({ prefix: p, limit: 1 });
-  if (!blobs.length) return dflt;
-  const r = await fetch(blobs[0].url + "?v=" + Date.now(), { cache: "no-store" });
-  return r.ok ? await r.json().catch(() => dflt) : dflt;
-}
-export async function writeJson(p, o) {
-  await put(p, JSON.stringify(o), { access: "public", addRandomSuffix: false, allowOverwrite: true, contentType: "application/json", cacheControlMaxAge: 60 });
-}
+export { readJson, writeJson }; // נשארים מיוצאים מכאן (snooze.js, בדיקות); המימוש ב-_db.js
 export const getSubs = (t) => readJson(`push/${t}.json`, []);
 export const setSubs = (t, s) => writeJson(`push/${t}.json`, s);
 
@@ -29,7 +21,7 @@ export async function sendTo(t, payload, d = {}) {
     try { await send(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); }
     catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) keep.push(s); else console.log("subscription gone", e.statusCode); }
   }
-  if (keep.length !== subs.length) await (d.setSubs || setSubs)(t, keep);
+  if (keep.length !== subs.length) { try { await (d.setSubs || setSubs)(t, keep); } catch (e) { console.error("setSubs failed (push already sent)", e && e.message); } }
   return { ok, total: subs.length };
 }
 

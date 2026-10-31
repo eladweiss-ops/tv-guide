@@ -7,11 +7,14 @@ import { readFileSync } from "node:fs";
 process.env.FIRE_SECRET = "test-secret-not-real";
 process.env.QSTASH_TOKEN = "qs-test";
 process.env.QSTASH_URL = "https://qstash.example";
-delete process.env.BLOB_READ_WRITE_TOKEN;
+delete process.env.FIREBASE_SERVICE_ACCOUNT;
 console.error = () => {}; // השרת רושם שגיאות ללוג; בבדיקות שקט
 delete process.env.QSTASH_CURRENT_SIGNING_KEY;
 delete process.env.QSTASH_NEXT_SIGNING_KEY;
 
+import { memBackend, failingBackend } from "./helpers/fakedb.mjs";
+const { _setBackend } = await import("../api/_db.js");
+_setBackend(memBackend()); // אחסון בזיכרון במקום Firestore
 const snz = await import("../api/_snz.js");
 const { encToken, decToken, signSnz, signSnzLegacy, verifySnz, SNZ_TTL } = snz;
 const { allow, _resetLimits, readBody } = await import("../api/_guard.js");
@@ -333,14 +336,17 @@ test("selftest הוסר מ-rems.js", async () => {
   assert.ok(!/selftest/.test(file("../api/rems.js")));
   _resetLimits();
   const r = mockRes();
+  _setBackend(failingBackend());
   await remsH({ method: "GET", headers: {}, query: { t: "selftest0123456789abcdefg", selftest: "1" } }, r);
-  assert.equal(r.code, 500); // נכשל בקריאה מהלוב (אין טוקן) ולא בכתיבה; אין מסלול כתיבה
+  _setBackend(memBackend());
+  assert.equal(r.code, 500); // נכשל בקריאה מהאחסון ולא בכתיבה; אין מסלול כתיבה
   assert.deepEqual(r.body, { error: "server error" });
 });
 
 test("500: גוף גנרי בלי e.message, בכל ה-handlers", async () => {
   _resetLimits();
   const logs = []; const orig = console.error; console.error = (...a) => logs.push(a.join(" "));
+  _setBackend(failingBackend());
   try {
     const cases = [
       [remsH, { body: { t: TOK, rems: [] } }],
@@ -355,7 +361,7 @@ test("500: גוף גנרי בלי e.message, בכל ה-handlers", async () => {
       assert.ok(!JSON.stringify(r.body).includes("token"), "ללא פרטי שגיאה");
     }
     assert.ok(logs.length >= 3, "הפרטים נרשמו בלוג בשרת");
-  } finally { console.error = orig; }
+  } finally { console.error = orig; _setBackend(memBackend()); }
 });
 
 test("snooze: מגבלת קצב לטוקן אחרי אימות (429)", async () => {

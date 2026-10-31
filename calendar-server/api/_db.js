@@ -13,13 +13,19 @@ export function mapPath(p) {
 
 // ---- backend: ארבע פעולות גולמיות על מסמך. get -> מחרוזת או null ----
 // client = מופע Firestore (או דמה עם אותו ממשק: collection(c).doc(id).get()/set()/delete(), collection(c).get())
-export function firestoreBackend(client) {
-  return {
+// FieldPath (מ-firebase-admin/firestore): כשקיים, listRange היא שאילתת טווח אמיתית על מזהה המסמך (בלי לקרוא את כל האוסף)
+export function firestoreBackend(client, FieldPath) {
+  const b = {
     async get(col, id) { const s = await client.collection(col).doc(id).get(); return s.exists ? (s.data() || {}).v ?? null : null; },
     async set(col, id, v) { await client.collection(col).doc(id).set({ v, at: new Date() }); },
     async del(col, id) { await client.collection(col).doc(id).delete(); },
     async list(col) { const s = await client.collection(col).get(); return s.docs.map((d) => ({ id: d.id, v: (d.data() || {}).v ?? null })); },
   };
+  if (FieldPath) b.listRange = async (col, lo, hi) => {
+    const s = await client.collection(col).where(FieldPath.documentId(), ">=", lo).where(FieldPath.documentId(), "<", hi).limit(500).get();
+    return s.docs.map((d) => ({ id: d.id, v: (d.data() || {}).v ?? null }));
+  };
+  return b;
 }
 
 let backend = null, pending = null;
@@ -33,11 +39,11 @@ async function initBackend() {
   try { sa = JSON.parse(raw); } catch (e) { console.error("bad FIREBASE_SERVICE_ACCOUNT (not JSON)"); throw new Error("bad FIREBASE_SERVICE_ACCOUNT"); }
   if (typeof sa.private_key === "string") sa.private_key = sa.private_key.replace(/\\n/g, "\n");
   const { initializeApp, getApps, cert } = await import("firebase-admin/app");
-  const { initializeFirestore, getFirestore } = await import("firebase-admin/firestore");
+  const { initializeFirestore, getFirestore, FieldPath } = await import("firebase-admin/firestore");
   const app = getApps()[0] || initializeApp({ credential: cert(sa), projectId: sa.project_id || "tv-guide-8f736" });
   let fs;
   try { fs = initializeFirestore(app, { preferRest: true }); } catch (e) { fs = getFirestore(app); } // כבר אותחל ב-instance הזה
-  return firestoreBackend(fs);
+  return firestoreBackend(fs, FieldPath);
 }
 
 // מאתחל פעם אחת לכל instance; כישלון לא נשמר (ניסיון חוזר בבקשה הבאה)

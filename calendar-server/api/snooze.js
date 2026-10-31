@@ -2,7 +2,7 @@
 //   מ-Service Worker: o (טוקן מוצפן), a (זמן שליחת הפוש), s (חתימת HMAC) – כמו שהגיעו בשדה snz של הפוש
 //   מהאפליקציה:       t (הטוקן האישי)
 // תשובה: {ok:true, at:<ms>, m, dup?}   שגיאות: 400 קלט שגוי · 403 חתימה לא תקפה · 404 אין תזכורת כזו · 413 גדול מדי · 429 קצב · 502/503 תזמון נכשל
-import { okToken, load } from "./_store.js";
+import { okToken, loadAll as load } from "./_store.js";
 import { readJson, writeJson } from "./_push.js";
 import { handleSnooze } from "./_snz.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";

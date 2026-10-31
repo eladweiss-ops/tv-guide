@@ -4,6 +4,9 @@ import { safeEq } from "./_sig.js";
 import { readJson, writeJson, getSubs, sendTo } from "./_push.js";
 import { listJson, delJson } from "./_db.js";
 import { runCheck } from "./_wcheck.js";
+import { runFollowCheck } from "./_fcheck.js";
+import { load } from "./_store.js";
+import { reschedule } from "./_push.js";
 import { SEARCH_TTL } from "./_nfs.js";
 import { fail } from "./_guard.js";
 
@@ -28,6 +31,12 @@ export async function cleanNfCache(now = Date.now(), list = listJson, del = delJ
   return n;
 }
 
+// כל המשתמשים עם מעקב אחרי סדרות: אוסף fol (מזהה המסמך = הטוקן)
+export async function listFol(list = listJson) {
+  const rows = await list("fol");
+  return rows.filter((r) => /^[a-z0-9]{24,48}$/.test(r.id) && r.value && typeof r.value === "object").slice(0, 5000).map((r) => ({ t: r.id, doc: r.value }));
+}
+
 // 200 מותר · 401 סוד שגוי/חסר · 503 CRON_SECRET לא מוגדר (הנקודה סגורה)
 export function cronAuth(req, secret = process.env.CRON_SECRET) {
   if (!secret) return 503;
@@ -41,7 +50,14 @@ export default async function handler(req, res, d = {}) {
   const au = cronAuth(req);
   if (au !== 200) return res.status(au).json({ error: au === 503 ? "not configured" : "unauthorized" });
   try {
-    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: Date.now() + 60000, ...d });
+    // אותו cron, שני שלבים: קודם רענון מעקב הסדרות (תזכורות, חשוב יותר וקל יותר) עם חצי מהזמן, אחר כך בדיקת רשימות המעקב של נטפליקס
+    const t0 = Date.now();
+    let fo;
+    try {
+      fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems) => reschedule(t, rems), deadline: t0 + 40000, ...d, ...(d.follow || {}) });
+    } catch (e) { console.error("follow-check", e && e.message); fo = { error: true }; }
+    const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 60000, ...d });
+    r.follow = fo;
     console.log("watch-check", JSON.stringify(r));
     res.setHeader("cache-control", "no-store");
     return res.status(200).json(r);

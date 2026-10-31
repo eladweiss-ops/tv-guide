@@ -46,6 +46,7 @@
         return TVG.syncRems().then(function () {
           TVG.closeRem();
           if (TVG.wlSync) TVG.wlSync(); // רשימת "🔔 תודיע לי" שנשמרה בזמן שההתראות היו כבויות עולה עכשיו לשרת
+          if (TVG.folSync) TVG.folSync().then(function (r) { if (r && r.ok && TVG.FOL && TVG.FOL.some(function (x) { return !x.x; })) TVG.pill("📺 המעקב אחרי הסדרות פעיל. נזכיר לך על כל פרק חדש", 3500); }); // מעקב אחרי סדרות שנשמר בזמן שההתראות היו כבויות
           if (pendRec) {
             var pr = pendRec; pendRec = null; TVG.REMS.push(pr); TVG.saveRems(); TVG.syncRems(); TVG.render();
             // עם ביטול (גם לתזכורת צפייה מדף נטפליקס, שנשארת פתוח ומתעדכנת)

@@ -42,7 +42,7 @@
   function openSnooze(k) {
     k = String(k || "");
     stopTimer();
-    var x = TVG.hasRem(k), pr = TVG.G ? TVG.findProg(k) : null;
+    var x = TVG.hasRem(k) || (k.indexOf("f|") === 0 && TVG.G && TVG.folRem ? TVG.folRem(k) : null), pr = TVG.G ? TVG.findProg(k) : null; // f|: תזכורת שנגזרה ממעקב אחרי סדרה (series.js), לא נשמרת ב-REMS
     TVG.rem = null; TVG.LP = null;
     SZ = { k: k, pick: 5, timer: 0, busy: false };
     if (!x) { // תזכורת לא קיימת / פגה: הודעה ידידותית

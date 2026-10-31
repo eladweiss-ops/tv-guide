@@ -140,14 +140,16 @@
     // אותו שידור בשני ערוצים תאומים (SD/HD, או כאן וערוץ 1) - מציגים פעם אחת
     var twin = {}; hits = hits.filter(function (x) { var k = x.p.s.getTime() + "|" + String(x.p.title).replace(/[^\p{L}]/gu, "").slice(0, 8); if (twin[k]) return false; twin[k] = 1; return true; });
     var series = TVG.qExact || isTopic(TVG.q.trim());
+    // 📺 מעקב אחרי סדרה: כותרת מדויקת (נבחרה מההצעות, או הוקלדה במלואה) של סדרה עם 2+ שידורים קרובים. מחליף את "תזכיר לי לכל השידורים" ואת "נושא למעקב" לאותה כותרת
+    var exT = TVG.qExact || ((titleIndex().filter(function (e) { return e.tl === term; })[0] || {}).t), fi = exT && TVG.folInfo ? TVG.folInfo(exT) : null, serFollow = !!(fi && fi.n >= 2);
     markReruns(hits);
     if (series) { var nNew = hits.filter(function (x) { return !x.rr; }).length, nRr = hits.length - nNew; if (TVG.sKind === "new") hits = hits.filter(function (x) { return !x.rr; }); else if (TVG.sKind === "rerun") hits = hits.filter(function (x) { return x.rr; }); }
     var h = favBanner() + '<div class="chips" role="group" aria-label="היקף חיפוש"><button type="button" class="chip" data-scope="all" aria-pressed="' + (TVG.scope === "all") + '">כל הלוח</button><button type="button" class="chip" data-scope="mine" aria-pressed="' + (TVG.scope === "mine") + '">הערוצים שלי</button>' +
       (TVG.qExact ? '<button type="button" class="chip xchip" data-clearx="1" aria-label="ביטול הבחירה">' + esc(TVG.qExact) + " ✕</button>" : "") + "</div>" +
       '<div class="chips" role="group" aria-label="מתי">' + [["all", "הכל"], ["live", "● משודר עכשיו"], ["today", "הערב"], ["week", "השבוע"]].map(function (w) { return '<button type="button" class="chip" data-when="' + w[0] + '" aria-pressed="' + (TVG.sWhen === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
-    if (!TVG.qExact && term.length >= 2 && !TVG.favPick) {
+    if (!TVG.qExact && term.length >= 2 && !TVG.favPick && !serFollow) {
       var tt = TVG.q.trim(), fol = isTopic(tt);
-      h += '<div class="remall follow"><span>' + (fol ? "✓ אתה עוקב אחרי \"" + esc(tt) + "\"" : "⭐ לעקוב אחרי \"" + esc(tt) + "\"? כל שידור שמזכיר את זה, בשם או בתקציר") + "</span>" +
+      h += '<div class="remall follow"><span>' + (fol ? "✓ אתה עוקב אחרי הנושא \"" + esc(tt) + "\"" : "⭐ לעקוב אחרי הנושא \"" + esc(tt) + "\"? כל שידור שמזכיר את זה, בשם או בתקציר") + "</span>" +
         '<button type="button" class="' + (fol ? "ghost" : "btn") + ' sm" data-follow="' + esc(tt) + '">' + (fol ? "הפסק לעקוב" : "לעקוב") + "</button></div>";
     }
     if (!TVG.qExact) {
@@ -161,7 +163,11 @@
     }
     if (!hits.length) return h + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
     if (series) h += '<div class="chips seg3" role="group" aria-label="סוג שידור">' + [["all", "הכל"], ["new", "✨ פרקים חדשים (" + nNew + ")"], ["rerun", "🔁 שידורים חוזרים (" + nRr + ")"]].map(function (w) { return '<button type="button" class="chip" data-kind="' + w[0] + '" aria-pressed="' + (TVG.sKind === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
-    if (series) {
+    if (serFollow && !TVG.favPick) {
+      var fk = TVG.folKey(exT), fl = TVG.folFind(fk);
+      h += '<div class="remall follow serfol"><span>' + (fl ? "✓ אתה עוקב אחרי הסדרה" : "נזכיר לך על כל פרק חדש") + "</span>" +
+        (fl ? '<button type="button" class="ghost sm" data-folopen="' + esc(fk) + '">ניהול</button>' : '<button type="button" class="btn sm" data-folnew="' + esc(exT) + '" data-folch0="' + esc(hits[0] ? hits[0].c.id : "") + '">📺 לעקוב אחרי הסדרה</button>') + "</div>";
+    } else if (series) {
       var todo = hits.filter(function (x) { return !TVG.hasRem(TVG.remKey(x.c.id, x.p.s)); }).length;
       var what = TVG.sKind === "new" ? "הפרקים החדשים" : TVG.sKind === "rerun" ? "השידורים החוזרים" : "השידורים";
       h += '<div class="remall"><span>' + (todo ? "⏰ להזכיר לך לפני " + (todo === 1 ? "השידור" : "כל " + todo + " " + what) + "?" : "✓ יש תזכורת לכל " + what) + "</span>" +

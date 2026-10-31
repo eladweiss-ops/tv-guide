@@ -351,7 +351,7 @@
   .syn { margin: -6px 0 12px; padding: 12px 16px; border-radius: 0 0 20px 20px; background: var(--soft); line-height: 1.5; font-size: .98rem; }
   .synb { border: 0; border-radius: 999px; background: var(--soft); color: var(--ink); font-weight: 700; padding: 0 12px; min-height: 40px; font-size: .9rem; }
   .synb[aria-expanded="true"] { background: var(--ink); color: var(--bg); }
-  .gsearch { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .gsearch { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; min-height: 44px; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
   /* אי דינמי: ספירה לאחור לתזכורת הבאה */
   .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; } .acts .btn.rem { flex: 1; min-width: 0; }
   .island { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px auto 8px; width: min(100%, 300px); height: 40px; padding: 0 16px; box-sizing: border-box; border-radius: 20px; background: #000; color: #fff; font-weight: 700; font-size: .9rem; border: 0; }
@@ -617,3 +617,11 @@
   details.calopt summary { display: flex; align-items: center; min-height: 44px; }
   .srow.sgrow { flex-wrap: nowrap; } .srow.sgrow > .go { flex: 1 1 auto; } .srow.sgrow > .go + * { margin-inline-start: 0; } /* הצעה: הכוכב באותה שורה עם השם, בלי שורה ריקה */
   .nfvia { margin: 4px 0 12px; color: var(--muted); font-size: .95rem; }
+  /* ===== 📺 מעקב אחרי סדרה (js/series.js) ===== */
+  .folnext { list-style: none; margin: 4px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .folnext li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 8px 16px; min-height: 44px; border-radius: 16px; background: var(--soft); }
+  .folnext .fw { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .folnext .fc { color: var(--muted); font-size: .92rem; overflow-wrap: anywhere; }
+  .folnext .ft { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+  .remall.serfol .btn, .remall.serfol .ghost { flex: none; }
+  .folrow .go .time { color: inherit; font-size: 1.25rem; text-align: center; }

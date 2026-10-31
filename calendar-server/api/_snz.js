@@ -73,6 +73,11 @@ export function remPayload(r, o = {}) {
     const z = snzField(o.t, r.k, o.at || now); if (z) q.snz = z;
     return q;
   }
+  if (String(r.k).startsWith("f|")) { // תזכורת שנגזרה ממעקב אחרי סדרה: 📺 במקום ⏰
+    const q = { title: "📺 " + r.title, body: (o.snooze ? "💤 " : "") + when + (r.ch ? " · " + r.ch : ""), tag: r.k, url: "./?rem=" + encodeURIComponent(r.k) };
+    const z = snzField(o.t, r.k, o.at || now); if (z) q.snz = z;
+    return q;
+  }
   const p = { title: "⏰ " + r.title, body: (o.snooze ? "💤 " : "") + (r.ch ? r.ch + " · " : "") + when, tag: r.k, url: "./?rem=" + encodeURIComponent(r.k) };
   const snz = snzField(o.t, r.k, o.at || now);
   if (snz) p.snz = snz;

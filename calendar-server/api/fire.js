@@ -1,6 +1,6 @@
 // נקרא על ידי QStash בדיוק בזמן ההתראה. שולח פוש אם התזכורת עדיין קיימת ולא שונתה.
 // אימות: ?s=FIRE_SECRET (הודעות שכבר תוזמנו) או חתימת QStash (Upstash-Signature) כשהוגדרו מפתחות החתימה
-import { load, okToken } from "./_store.js";
+import { loadAll, okToken } from "./_store.js";
 import { sendTo, remPayload, dropSched, reschedule } from "./_push.js";
 import { fireAuth, rawBodyOf } from "./_sig.js";
 import { fail } from "./_guard.js";
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     let b;
     try { b = JSON.parse(raw || "{}"); } catch (e) { return res.status(400).json({ error: "bad request" }); }
     if (!b || !okToken(b.t) || typeof b.k !== "string") return res.status(400).json({ error: "bad request" });
-    const r = await handleFire(b, { load, sendTo, dropSched, reschedule });
+    const r = await handleFire(b, { load: loadAll, sendTo, dropSched, reschedule });
     return res.status(r.status).json(r.json);
   } catch (e) {
     return fail(res, e, "fire");

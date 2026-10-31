@@ -21,7 +21,7 @@ const { audit: runAudit } = require("./audit.cjs");
 
 const OUT = path.resolve(process.argv[2] || "shots");
 const REPO = path.resolve(__dirname, "..", "..");
-const FIXED_NOW = process.env.TVG_NOW || "2026-10-30T20:15:00+02:00"; // inside the range guide.json covers
+const FIXED_NOW = process.env.TVG_NOW || "2026-11-01T20:15:00+02:00"; // inside the range guide.json covers
 const SEL = ["208", "199", "3787", "3819", "3547", "334", "3588", "301", "255", "315", "559", "223"]; // seeded tvg.sel
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -109,11 +109,21 @@ function nfFixtureData() {
       if (r.request().method() === "POST") wlPosts.push(JSON.parse(r.request().postData() || "{}"));
       return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"ok":true,"n":1}' });
     });
+    // 📺 מעקב אחרי סדרה (/api/follow): תמיד מדומה. folPosts = גופי ה-POST; folStatus = קוד התשובה (403 = אין מנוי פוש בשרת)
+    const folPosts = []; let folStatus = 200;
+    await ctx.route(/\/api\/follow/, (r) => {
+      if (r.request().method() === "POST") {
+        const b = JSON.parse(r.request().postData() || "{}"); folPosts.push(b);
+        if (folStatus !== 200) return r.fulfill({ status: folStatus, contentType: "application/json", headers: CORS, body: '{"error":"no push"}' });
+        return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: JSON.stringify({ ok: true, n: (b.follows || []).filter((x) => !x.x).length, follows: b.follows || [], next: 2 }) });
+      }
+      return r.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: '{"follows":[]}' });
+    });
     let page = null;
     const errs = [], auditRaw = [];
     const audit = (name) => runAudit(page, name, auditRaw);
     const hookPage = () => { page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
-    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => { crashed = true; console.log("  !! renderer crashed", d.name, String(phase)); }); };
+    page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/backup/.test(u) && /404/.test(m.text())) || ((/api\/snooze$/.test(u) || /api\/nf-search/.test(u)) && /502/.test(m.text())) || (/api\/follow/.test(u) && /403/.test(m.text()))) return; /* follow 403 is injected by the no-push-on-server scenario */ /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); }); page.on("crash", () => { crashed = true; console.log("  !! renderer crashed", d.name, String(phase)); }); };
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
     const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await audit(n); };
     let stepIdx = 0;
@@ -182,7 +192,7 @@ function nfFixtureData() {
       nfQueries.length = 0; await nfSearch("הנוקמים");
       const txt = await page.textContent("#main");
       for (const s of ["סדרת סרטים", "הנוקמים - אוסף", "סרטים וסדרות", "אנשים", "▶בנטפליקס", "לא זמין כרגע", "משודר בערוץ", "קשת"]) A(txt.indexOf(s) >= 0, "missing text: " + s);
-      A(/היום 22:50/.test(txt), "airing today badge: " + txt.slice(0, 400)); A(/יום א׳ 19:15/.test(txt), "airing Sunday badge");
+      A(/משודר בערוץ קשת[^·]*· [^\d]*\d{1,2}:\d{2}/.test(txt), "airing badge (Keshet): " + txt.slice(0, 400)); A(/משודר בערוץ כאן 11 · [^\d]*\d{1,2}:\d{2}/.test(txt), "airing badge (Kan)"); /* שעות התוכניות משתנות עם הלוח: בודקים רק את הצורה */
       A(nfQueries.length === 1 && nfQueries[0] === "הנוקמים", "one debounced query: " + JSON.stringify(nfQueries));
       A(await page.evaluate(() => [].map.call(document.querySelectorAll(".nfxn"), (e) => e.textContent).join() === "1,2,3,4"), "collection numbered in order");
       await snap("20_nfs_avengers");
@@ -339,8 +349,12 @@ function nfFixtureData() {
     // ---- נודניק, ניווט שכבות, פרמטרים בכתובת, תזכורת כפולה ----
     const TOK = "qa0123456789abcdefghijklmn";
     const mkRem = (title, startIso, endIso, lead) => ({ k: "208|" + new Date(startIso).getTime(), id: "208", ts: new Date(startIso).getTime(), end: new Date(endIso).getTime(), title, ch: "ערוץ ויוה", desc: "", lead, at: 1 });
-    const REM_NEXT = mkRem("להיוולד מחדש - פרק 74", "2026-10-30T20:27:00+02:00", "2026-10-30T21:16:00+02:00", 10);
-    const REM_STARTED = mkRem("להיוולד מחדש - פרק 73", "2026-10-30T19:37:00+02:00", "2026-10-30T20:40:00+02:00", 10);
+    // תזכורות לדוגמה על תוכניות אמיתיות בערוץ 208 סביב FIXED_NOW (הלוח גולל קדימה: אין תאריכים קבועים)
+    const p208 = JSON.parse(fs.readFileSync(path.join(REPO, "guide.json"), "utf8")).programs.filter((p) => p.ch === "208").sort((x, y) => (x.start < y.start ? -1 : 1)), msOf = (s) => new Date(s + ":00+02:00").getTime(), nowMs = new Date(FIXED_NOW).getTime();
+    const iNext = p208.findIndex((p) => msOf(p.start) > nowMs + 10 * 60000), iStarted = p208.findIndex((p) => msOf(p.start) > nowMs) - 1;
+    const asRem = (i, lead) => mkRem(p208[i].title, new Date(msOf(p208[i].start)).toISOString(), new Date(msOf(p208[i + 1].start)).toISOString(), lead);
+    const REM_NEXT = asRem(iNext, 10);
+    const REM_STARTED = asRem(iStarted, 10);
     const seedRems = async (list) => { await page.evaluate(([l, tok]) => { localStorage.setItem("tvg.rem", JSON.stringify(l)); localStorage.setItem("tvg.calTok", tok); localStorage.setItem("tvg.push", "1"); localStorage.setItem("tvg.calmode", "sub"); }, [list, TOK]); };
     const assert = (cond, msg) => { if (!cond) throw new Error("assert: " + msg); };
     const vis = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && !e.hidden; }, sel);
@@ -444,6 +458,84 @@ function nfFixtureData() {
       await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(500);
       assert(await vis("[data-dbl]"), "dbl chip shown"); await page.click("[data-dbl]"); await page.waitForTimeout(250);
       assert((await page.getAttribute("[data-dbl]", "aria-pressed")) === "true", "dbl pressed"); await snap("12_rem_double");
+    });
+    // ---- 📺 מעקב אחרי סדרה (js/series.js). ההתראות מאושרות בהקשר (pushOn אמיתי), /api/follow מדומה, ו-/api/rems נחסם ב-TVG_NO_WRITES ----
+    const FOL_TITLE = "הזמר במסכה";
+    const folSeed = async (push) => { await page.evaluate(([tok, p]) => { localStorage.removeItem("tvg.fol"); localStorage.removeItem("tvg.folDirty"); localStorage.setItem("tvg.calTok", tok); if (p) localStorage.setItem("tvg.push", "1"); else localStorage.removeItem("tvg.push"); localStorage.setItem("tvg.calmode", "sub"); }, [TOK, push]); };
+    const pushNow = () => page.evaluate(() => { TVG.pushOn = true; });
+    const folKeep = (title) => page.evaluate(([t, tok]) => { localStorage.setItem("tvg.fol", JSON.stringify([{ title: t, mode: "new", lead: 10, ch: "", chn: "", u: Date.now() }])); localStorage.setItem("tvg.calTok", tok); }, [title, TOK]);
+    const folOpenSearch = async () => { await page.evaluate((t) => { TVG.tab = "dial"; TVG.startSearch(t, true); }, FOL_TITLE); await page.waitForTimeout(700); };
+    for (const theme of ["light", "dark"]) {
+      const F = (theme === "dark" ? "A_dark_" : "") + "21_fol_";
+      await step("fol-search-" + theme, async () => {
+        folPosts.length = 0; folStatus = 200;
+        await fresh(); await folSeed(true); await fresh(); await pushNow(); await page.evaluate((t) => TVG.setTheme(t), theme); await folOpenSearch();
+        assert(await vis(".serfol [data-folnew]"), "follow row in search"); assert(!(await vis("[data-remlist]")), "old batch row replaced");
+        assert((await page.textContent(".serfol .btn")).indexOf("לעקוב אחרי הסדרה") >= 0, "primary label");
+        await snap(F + "01_search");
+        // (אותו צעד: חיפוש -> חלון -> עוקבים. חלוקה לקבוצות לא תפריד ביניהם)
+        await page.click(".serfol [data-folnew]"); await page.waitForTimeout(500);
+        assert(await vis("#rem"), "sheet open"); assert(await vis("[data-folgo]"), "go button"); assert((await page.getAttribute('[data-folmode="new"]', "aria-pressed")) === "true", "default = new only");
+        assert((await page.evaluate(() => [].filter.call(document.querySelectorAll("#rem .btn"), (b) => b.offsetParent).length)) === 1, "one primary button");
+        await snap(F + "02_sheet_new");
+        await page.click('[data-folmode="all"]'); await page.waitForTimeout(300);
+        assert((await page.getAttribute('[data-folmode="all"]', "aria-pressed")) === "true", "rerun chip pressed"); await snap(F + "03_sheet_all");
+        await page.click('[data-folmode="new"]'); await page.waitForTimeout(200);
+        await page.click("[data-folgo]"); await page.waitForTimeout(900);
+        assert(!(await vis("#rem")), "sheet closed after follow");
+        const st = await page.evaluate(() => TVG.FOL.filter((x) => !x.x).map((x) => x.title + "|" + x.mode + "|" + x.lead)); assert(st.length === 1 && /הזמר במסכה\|new\|/.test(st[0]), "follow saved: " + JSON.stringify(st));
+        assert(folPosts.length >= 1 && folPosts[folPosts.length - 1].follows.some((x) => x.title === FOL_TITLE && x.mode === "new"), "POST /api/follow sent");
+        const pt = await page.textContent("#pill"); assert(/נזכיר לך על כל פרק חדש/.test(pt), "toast: " + pt); await snap(F + "04_toast");
+        assert(await vis(".serfol .ghost"), "search row now shows manage");
+      });
+      await step("fol-rems-row-" + theme, async () => {
+        await fresh(); await folKeep(FOL_TITLE); await fresh(); await pushNow(); await page.evaluate((t) => TVG.setTheme(t), theme);
+        await page.evaluate(() => { TVG.setSearch(false); TVG.tab = "rems"; TVG.render(); }); await page.waitForTimeout(600);
+        const n = await page.evaluate(() => document.querySelectorAll(".folrow").length); assert(n === 1, "one row per series: " + n);
+        const tx = await page.textContent(".folrow"); assert(/הפרק הבא/.test(tx) && tx.indexOf("📺") >= 0, "row text: " + tx);
+        assert((await page.evaluate(() => TVG.REMS.filter((x) => x.k.indexOf("f|") === 0).length)) === 0, "follow did not write into REMS");
+        await snap(F + "05_rems_row");
+      });
+      await step("fol-manage-stop-undo-" + theme, async () => {
+        await fresh(); await folKeep(FOL_TITLE); await fresh(); await pushNow(); await page.evaluate((t) => { TVG.setTheme(t); TVG.tab = "rems"; TVG.render(); }, theme); await page.waitForTimeout(500);
+        await page.click(".folrow .go"); await page.waitForTimeout(500);
+        assert(await vis("[data-folstop]"), "stop button"); assert(!(await vis("[data-folgo]")), "no go in manage"); await snap(F + "06_sheet_manage");
+        await page.click('[data-folead="30"]'); await page.waitForTimeout(250);
+        assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x)[0].lead)) === 30, "lead changed live");
+        await page.click("[data-folstop]"); await page.waitForTimeout(500);
+        assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x).length)) === 0, "stopped"); assert((await page.evaluate(() => document.querySelectorAll(".folrow").length)) === 0, "row gone");
+        const pt = await page.textContent("#pill"); assert(/הפסקת לעקוב/.test(pt) && /החזר/.test(pt), "undo toast: " + pt); await snap(F + "07_stopped_toast");
+        assert(folPosts[folPosts.length - 1].follows.some((x) => x.x === 1), "tombstone sent");
+        await page.click("[data-pillact]"); await page.waitForTimeout(500);
+        assert((await page.evaluate(() => TVG.FOL.filter((x) => !x.x).length)) === 1, "restored by undo"); assert((await page.evaluate(() => document.querySelectorAll(".folrow").length)) === 1, "row back");
+      });
+    }
+    await step("fol-from-remsheet", async () => {
+      await folSeed(true); await fresh(); await pushNow(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(500);
+      const ok = await page.evaluate((t) => { for (const c of TVG.G.channels) { const p = (TVG.by.get(c.id) || []).filter((x) => x.s > new Date() && TVG.folKey(x.title) === TVG.folKey(t))[0]; if (p) { TVG.openRem({ id: c.id, p: p }); return true; } } return false; }, FOL_TITLE);
+      assert(ok, "found a program of the series"); await page.waitForTimeout(400);
+      assert(await vis('#rem [data-folnew]'), "secondary option in the reminder sheet"); assert((await page.evaluate(() => [].filter.call(document.querySelectorAll("#rem .btn"), (b) => b.offsetParent).length)) === 1, "still one primary"); await snap("21_fol_remsheet_option");
+      await page.click('#rem [data-folnew]'); await page.waitForTimeout(400); assert(await vis("[data-folgo]"), "follow sheet from reminder sheet"); await snap("21_fol_remsheet_to_follow");
+    });
+    await step("fol-no-push", async () => {
+      await folSeed(false); folPosts.length = 0;
+      await fresh(); await folOpenSearch(); await page.click(".serfol [data-folnew]"); await page.waitForTimeout(500);
+      const note = await page.textContent("#remBody"); assert(/התראות/.test(note), "honest push note in sheet"); await snap("21_fol_nopush_sheet");
+      await page.click("[data-folgo]"); await page.waitForTimeout(700);
+      const pt = await page.textContent("#pill"); assert(/נשמר/.test(pt) && /(התראות|לא נוכל|אי אפשר)/.test(pt) && !/נזכיר לך על כל/.test(pt), "honest toast: " + pt); await snap("21_fol_nopush_toast");
+      assert(folPosts.length === 0, "no POST without push"); assert((await page.evaluate(() => localStorage.getItem("tvg.folDirty"))) === "1", "kept dirty for later sync");
+    });
+    await step("fol-server-403", async () => {
+      await folSeed(true); folStatus = 403;
+      await fresh(); await pushNow(); await folOpenSearch(); await page.click(".serfol [data-folnew]"); await page.waitForTimeout(400); await page.click("[data-folgo]"); await page.waitForTimeout(900);
+      const pt = await page.textContent("#pill"); assert(/ההתראות לא פעילות/.test(pt) && !/נזכיר לך על כל/.test(pt), "403 message: " + pt); await snap("21_fol_403_toast"); folStatus = 200;
+    });
+    await step("fol-snooze-derived-key", async () => {
+      await folSeed(true); await fresh();
+      const k = await page.evaluate((t) => { for (const c of TVG.G.channels) { const p = (TVG.by.get(c.id) || []).filter((x) => x.s > new Date() && TVG.folKey(x.title) === TVG.folKey(t))[0]; if (p) return "f|" + TVG.folKey(t) + "|" + c.id + "|" + TVG.ilTs(p.s); } return ""; }, FOL_TITLE);
+      assert(k, "derived key"); await fresh("?rem=" + encodeURIComponent(k));
+      assert(await vis("#snzRoot"), "tap on a derived reminder opens the snooze sheet"); assert(hasNoSnoozeParams(), "url cleaned"); await snap("21_fol_snooze_derived");
+      await page.evaluate(() => { localStorage.removeItem("tvg.fol"); localStorage.removeItem("tvg.push"); localStorage.removeItem("tvg.calmode"); });
     });
     await page.evaluate(() => { try { localStorage.removeItem("tvg.tab"); localStorage.removeItem("tvg.calmode"); localStorage.removeItem("tvg.push"); } catch (e) {} });
 

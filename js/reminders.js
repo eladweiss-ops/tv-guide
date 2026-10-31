@@ -92,6 +92,7 @@
   function icsT(d) { return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""); }
   function icsW(d) { return icsT(new Date(TVG.ilTs(d))); } // d = שעון קיר ישראלי (ראו core.js)
   function findProg(v) {
+    if (v.indexOf("f|") === 0) { var fr = TVG.folRem && TVG.folRem(v), fp = fr && (TVG.by.get(fr.id) || []).filter(function (x) { return TVG.ilTs(x.s) === fr.ts; })[0]; return fp ? { id: fr.id, p: fp } : null; } // תזכורת שנגזרה ממעקב אחרי סדרה (f|סדרה|ערוץ|ts)
     var k = v.lastIndexOf("|"), id = v.slice(0, k), ts = +v.slice(k + 1);
     var p = (TVG.by.get(id) || []).filter(function (x) { return x.s.getTime() === ts; })[0];
     return p ? { id: id, p: p } : null;

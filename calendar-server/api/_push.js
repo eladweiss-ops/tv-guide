@@ -4,6 +4,7 @@ import { readJson, writeJson } from "./_db.js";
 import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
 import { wantedSchedule, START_SUFFIX } from "./_rems.js";
+import { withDerived, isDerKey, folPath } from "./_fol.js";
 export { remPayload };
 
 export { readJson, writeJson }; // נשארים מיוצאים מכאן (snooze.js, בדיקות); המימוש ב-_db.js
@@ -28,6 +29,7 @@ export async function sendTo(t, payload, d = {}) {
 // תקרות תזמון לכל משתמש
 export const MAX_SCHED = 60;        // כמה תזכורות עתידיות מתוזמנות במקביל; הקרובות ביותר מתוזמנות, השאר נשמרות (ביומן) אך בלי פוש מדויק
 export const MAX_PUBLISH_DAY = 300; // תקציב פרסומים ל-QStash לכל טוקן ליום (נשמר ב-sched/<t>.json תחת __q)
+export const DER_RESERVE = 40;      // מתוך התקציב היומי: תזכורות שנגזרו ממעקב סדרות לא נוגעות ב-40 האחרונות (שמורות לתזכורות של המשתמש)
 
 // מסנכרן את התזמונים מול רשימת התזכורות: מוסיף חדשות, מבטל שבוטלו או ששונו. תזכורות שלא השתנו (אותו זמן ±דקה) לא נוגעים בהן.
 // d (לבדיקות): {getSubs, readJson, writeJson, fetch, now}
@@ -44,17 +46,20 @@ export async function reschedule(t, rems, d = {}) {
   const fired = sched.__f || {}; delete sched.__f;
   for (const k of Object.keys(fired)) if (now - fired[k].w > FIRED_MS) delete fired[k];
   if (!q || q.d !== day) q = { d: day, n: 0 };
+  // תזכורות שנגזרו ממעקב אחרי סדרות (fol/<t>) מצטרפות לאותו תקציב (60 מתוזמנות, 300 פרסומים ביום); של המשתמש קודמות
+  let fol = null; if (subs.length) { try { fol = await rj(folPath(t), null); } catch (e) { console.error("reschedule fol", e && e.message); } }
+  if (fol && Array.isArray(fol.derived) && fol.derived.length) rems = withDerived(rems, fol.derived, now);
   let want = subs.length ? wantedSchedule(rems, now) : {}; // כולל הודעות k#s (תחילת שידור)
   const noNew = new Set(rems.filter((r) => r.stOnly).map((r) => r.k + START_SUFFIX)); // stOnly: רק משאירים k#s קיימת, לא מפרסמים
   for (const k of Object.keys(want)) if (fired[k] && Math.abs(fired[k].at - want[k]) < 60000) delete want[k];
   // תקרה: רק ה-MAX_SCHED הקרובות ביותר (כל הודעה מתוזמנת נספרת, כולל k#s)
   let capped = 0;
-  const ks = Object.keys(want);
+  const ks = Object.keys(want).filter((k) => !isDerKey(k)).concat(Object.keys(want).filter(isDerKey)); // של המשתמש קודם, אחר כך הנגזרות
   if (ks.length > MAX_SCHED) {
-    ks.sort((x, y) => want[x] - want[y]);
-    const keep = {}; for (const k of ks.slice(0, MAX_SCHED)) keep[k] = want[k];
+    const mine = ks.filter((k) => !isDerKey(k)).sort((x, y) => want[x] - want[y]), der = ks.filter(isDerKey).sort((x, y) => want[x] - want[y]);
+    const keep = {}; for (const k of mine.concat(der).slice(0, MAX_SCHED)) keep[k] = want[k];
     capped = ks.length - MAX_SCHED; want = keep;
-  }
+  } else { const o = {}; for (const k of ks) o[k] = want[k]; want = o; }
   let added = 0, removed = 0, limited = false;
   for (const k of Object.keys(sched)) {
     if (want[k] && Math.abs(sched[k].at - want[k]) < 60000) { delete want[k]; continue; }
@@ -64,6 +69,7 @@ export async function reschedule(t, rems, d = {}) {
   for (const [k, at] of Object.entries(want)) {
     if (noNew.has(k)) continue;
     if (q.n >= MAX_PUBLISH_DAY) { limited = true; break; }
+    if (isDerKey(k) && q.n >= MAX_PUBLISH_DAY - DER_RESERVE) { limited = true; continue; }
     q.n++;
     const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
       method: "POST",

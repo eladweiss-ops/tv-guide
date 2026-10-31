@@ -7,6 +7,8 @@
  * Without baseUrl it serves the repo root on a random local port.
  * Takes screenshots of every tab and sheet at 375 + 393 (iPhone UA) and 360 + 412 (Android Chrome UA),
  * freezes the clock so before/after runs are comparable, and fails (exit 1) on any console error / pageerror.
+ * After EVERY snap a layout audit runs (tools/qa/audit.cjs): touching/overlapping/tiny controls, clipped text, horizontal overflow.
+ * It writes <outDir>/qa-audit-<device>.json and prints "audit <device> issues: N"; TVG_AUDIT_STRICT=1 makes issues fail the run (exit 1).
  * Compare two runs with:  node tools/qa/diff.cjs <dirA> <dirB>
  *
  * Needs installed Chrome (channel "chrome") and:  cd tools/qa && npm install
@@ -15,6 +17,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { chromium } = require("playwright-core");
+const { audit: runAudit } = require("./audit.cjs");
 
 const OUT = path.resolve(process.argv[2] || "shots");
 const REPO = path.resolve(__dirname, "..", "..");
@@ -60,18 +63,19 @@ function nfFixtureData() {
   if (!base) { const s = await serve(); srv = s.srv; base = s.url; }
   if (!base.endsWith("/")) base += "/";
   const browser = await chromium.launch({ channel: "chrome", headless: true });
-  let total = 0, failed = 0; const allErrors = [];
+  let total = 0, failed = 0, auditTotal = 0; const allErrors = [];
   for (const d of DEVICES.filter((x) => !process.env.TVG_ONLY || process.env.TVG_ONLY.split(",").some((o) => x.name.indexOf(o) === 0))) { // TVG_ONLY=iphone|android|iphone_375,... מצמצם
     const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem" });
     await ctx.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
     // TVG_NO_WRITES=1 (הניטור מול האתר החי): חוסם כל בקשה שאינה GET לשרת התזכורות, כדי שהבדיקה לא תכתוב גיבויים/תזכורות
     if (process.env.TVG_NO_WRITES) await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
     const page = await ctx.newPage();
-    const errs = [];
+    const errs = [], auditRaw = [];
+    const audit = (name) => runAudit(page, name, auditRaw);
     page.on("pageerror", (e) => errs.push("pageerror: " + String(e)));
     page.on("console", (m) => { if (m.type() !== "error") return; const u = (m.location() || {}).url || ""; if (/netflix\.json/.test(u) || (/api\/snooze$/.test(u) && /502/.test(m.text()))) return; /* snooze 502 is injected by the failure scenario */ /* netflix.json is optional (404 is expected) */ errs.push("console: " + m.text() + " " + u); });
     const fresh = async (q) => { await page.goto(base + "index.html" + (q || ""), { waitUntil: "networkidle" }); await page.waitForTimeout(1200); };
-    const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); };
+    const snap = async (n) => { total++; await page.screenshot({ path: path.join(OUT, d.name + "_" + n + ".png") }); await audit(n); };
     const step = async (name, fn) => { try { await fn(); } catch (e) { failed++; errs.push("step " + name + ": " + e.message.split("\n")[0]); } };
     await page.clock.setFixedTime(new Date(FIXED_NOW));
     // netflix.json: ברירת מחדל = הקובץ האמיתי; במצב fixture = עותק עם ציונים וקצוות (בלי לגעת בקובץ במאגר)
@@ -436,6 +440,58 @@ function nfFixtureData() {
       await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap("15_dark_share_card");
       await page.evaluate(() => { TVG.setTheme("light"); });
     });
+    // ---- ביקורת פריסה: המצבים שמסתירים באגים (תקציר ארוך פתוח, כל החלונות, הודעות עם כפתור, בהיר + כהה) ----
+    // snap() מריץ את הביקורת גם בכל הצעדים שלמעלה; כאן מוסיפים את מה שאין בהם. אין צורך בצילומים נוספים לבדיקה - snap שומר אותם בשם "A_<theme>_*".
+    const LONG_DESC = "בפרק הערב מתמודדים המשתתפים עם אתגר חדש ובלתי צפוי, בזמן שבבית מתגלים סודות ישנים שמטלטלים את כל המשפחה. אחרי שבועות של מתח, הכול מתפוצץ בסצנה אחת דרמטית שבה כל אחד נאלץ לבחור צד. אורחי הערב מגיעים עם הפתעות, והסיפור מקבל תפנית שאיש לא ציפה לה.";
+    const injectLong = () => page.evaluate((txt) => { TVG.by.forEach((a) => a.forEach((p) => { p.desc = txt; })); TVG.render(); }, LONG_DESC);
+    for (const theme of ["light", "dark"]) {
+      const A = "A_" + theme + "_";
+      await step("audit-" + theme + "-guide", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await injectLong(); await page.waitForTimeout(400);
+        await snap(A + "01_dial_longdesc");
+        const mb = await page.$("#dCard [data-more]"); if (mb) { await mb.click(); await page.waitForTimeout(300); await snap(A + "02_dial_longdesc_open"); }
+        await page.click('[data-tab="now"]'); await page.waitForTimeout(600);
+        await page.click("[data-opentog]"); await page.waitForTimeout(500); await snap(A + "03_now_synopsis_open");
+        const mb2 = await page.$(".card.open [data-more]"); if (mb2) { await mb2.click(); await page.waitForTimeout(300); await snap(A + "04_now_synopsis_more"); }
+        await page.evaluate(() => { const c = document.querySelector('.card[data-toggle]:not(.open)'); if (c) { c.classList.add("open"); const o = c.querySelector("[data-more]"); if (o) o.click(); } }); await page.waitForTimeout(300); await snap(A + "05_now_all_open");
+        await page.click('[data-tab="grid"]'); await page.waitForTimeout(600);
+        await page.evaluate(() => { const r = document.querySelector('.row[data-toggle][data-pts]:not(.past):not(.now)'); if (r) { r.scrollIntoView({ block: "center" }); r.classList.add("open"); const o = r.querySelector("[data-more]"); if (o) o.click(); } }); await page.waitForTimeout(300); await snap(A + "06_grid_row_open");
+        await page.click('[data-tab="rems"]'); await page.waitForTimeout(500); await snap(A + "07_rems");
+        await page.click("#sBtn"); await page.fill("#q", "חדשות"); await page.waitForTimeout(900);
+        await page.evaluate(() => { const r = document.querySelector("#results [data-toggle], #results .row"); if (r) r.click(); }); await page.waitForTimeout(400); await snap(A + "08_search_open_result");
+      });
+      await step("audit-" + theme + "-sheets", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await injectLong(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(500);
+        await page.evaluate(() => document.querySelector("[data-rem]").click()); await page.waitForTimeout(600); await snap(A + "10_remsheet");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#setBtn"); await page.waitForTimeout(500); await snap(A + "11_settings_top");
+        await page.evaluate(() => { const s = document.querySelector("#setsheet"); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300); await snap(A + "11_settings_bottom");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#chBtn"); await page.waitForTimeout(500); await snap(A + "12_channels"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.click("#fvBtn"); await page.waitForTimeout(500); await snap(A + "13_favs"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+        await page.evaluate(() => { TVG.tab = "dial"; TVG.scrub = null; TVG.render(); }); await page.waitForTimeout(400);
+        await page.evaluate(() => { const b = document.querySelector("#dCard [data-share]"); if (b) b.click(); }); await page.waitForTimeout(600); await snap(A + "14_share_text");
+        await page.click('[data-shmode="card"]'); await page.waitForTimeout(2200); await snap(A + "15_share_card");
+      });
+      await step("audit-" + theme + "-landing-nf", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); const pk = await pickLink("up"); await landOpen(pk.v); await snap(A + "20_landing_up");
+        await page.click("[data-landinst]"); await page.waitForTimeout(300); await snap(A + "21_landing_install"); await page.click("[data-landinstx]"); await page.waitForTimeout(200);
+        const pl = await pickLink("live"); if (pl) { await landOpen(pl.v); await snap(A + "22_landing_live"); }
+        const pe = await pickLink("ended"); if (pe) { await landOpen(pe.v); await snap(A + "23_landing_ended"); }
+        nfFixture = true; await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme); await page.click('[data-tab="nf"]'); await page.waitForTimeout(1500); await snap(A + "30_nf_top");
+        await page.click(".nfhero"); await page.waitForTimeout(900); await snap(A + "31_nf_page");
+        await page.keyboard.press("Escape"); await page.waitForTimeout(400);
+        await page.evaluate(() => document.querySelector('[data-nfopen="x_edge"]').click()); await page.waitForTimeout(900); await snap(A + "32_nf_page_edge"); nfFixture = false;
+      });
+      await step("audit-" + theme + "-toasts", async () => {
+        await fresh(); await page.evaluate((t) => TVG.setTheme(t), theme);
+        await page.evaluate(() => TVG.pill("★ נוסף למועדפים", 30000, "ביטול", function () {}, "החזר", function () {})); await page.waitForTimeout(400); await snap(A + "40_toast_two_actions");
+        await page.evaluate(() => TVG.pill("נזכיר לך ב-20:25 לפני הפרק המיוחד של התוכנית הארוכה ביותר בעולם", 30000, "ביטול", function () {})); await page.waitForTimeout(400); await snap(A + "41_toast_long_action");
+        await page.evaluate(() => TVG.pill("עודכנת לגרסה", 30000)); await page.waitForTimeout(300); await snap(A + "42_toast_plain");
+        await page.evaluate(() => TVG.setTheme("light"));
+      });
+    }
+
     if (d.name === "iphone_375") await step("card-png", async () => {
       await fresh();
       const out = await page.evaluate(async () => {
@@ -459,9 +515,18 @@ function nfFixtureData() {
     const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     console.log(d.name, "scrollWidth/clientWidth", overflow.sw + "/" + overflow.cw, "errors:", errs.length);
     errs.forEach((e) => { console.log("   ", e); allErrors.push(d.name + " " + e); });
+    // ---- דו"ח ביקורת הפריסה: אותה בעיה (סוג + אלמנט[ים]) שחוזרת בכמה שלבים נספרת פעם אחת ----
+    const uniq = new Map(), sg = (s) => String(s || "").replace(/ ".*$/, "");
+    auditRaw.forEach((i) => { const k = i.type + "|" + sg(i.el) + "|" + sg(i.el2); const u = uniq.get(k); if (u) u.steps.push(i.step); else uniq.set(k, { type: i.type, el: i.el, el2: i.el2, msg: i.msg, steps: [i.step] }); });
+    const issues = Array.from(uniq.values()), byType = {}; issues.forEach((i) => { byType[i.type] = (byType[i.type] || 0) + 1; });
+    fs.writeFileSync(path.join(OUT, "qa-audit-" + d.name + ".json"), JSON.stringify({ device: d.name, count: issues.length, byType, issues }, null, 1));
+    console.log("audit " + d.name + " issues: " + issues.length + " " + JSON.stringify(byType));
+    issues.slice(0, 5).forEach((i) => console.log("    audit: [" + i.type + "] " + i.el + (i.el2 ? " <> " + i.el2 : "") + " - " + i.msg + " @" + i.steps[0]));
+    auditTotal += issues.length;
     await ctx.close();
   }
   await browser.close(); if (srv) srv.close();
   console.log("\nscreenshots:", total, "-> " + OUT, "| step failures:", failed, "| console/page errors:", allErrors.length);
-  process.exit(allErrors.length ? 1 : 0);
+  console.log("layout audit issues:", auditTotal, process.env.TVG_AUDIT_STRICT ? "(strict)" : "(report only; TVG_AUDIT_STRICT=1 to fail)");
+  process.exit(allErrors.length || (process.env.TVG_AUDIT_STRICT && auditTotal) ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

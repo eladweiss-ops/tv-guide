@@ -26,10 +26,15 @@ const line = (s) => RLM + s;
 
 // ───────── ניתוח פלט shoot.cjs ─────────
 export function parseUx(text) {
-  const out = { devices: [], overflow: [], errors: [], stepFailures: [], ran: !!text };
+  const out = { devices: [], overflow: [], errors: [], stepFailures: [], ran: !!text, audit: { devices: {}, total: 0, samples: {} } };
   if (!text) return out;
   let dev = null;
   for (const raw of String(text).split(/\r?\n/)) {
+    // ביקורת פריסה (tools/qa/audit.cjs): "audit <device> issues: N {...}" ואחריה עד 5 שורות דוגמה "    audit: [type] el <> el - msg @step"
+    const am = raw.match(/^audit\s+(\S+)\s+issues:\s*(\d+)/);
+    if (am) { dev = am[1]; out.audit.devices[am[1]] = +am[2]; out.audit.total += +am[2]; continue; }
+    const as = raw.match(/^\s{2,}audit:\s+(.+)$/);
+    if (as) { const d = dev || "?"; (out.audit.samples[d] = out.audit.samples[d] || []).push(as[1].trim()); continue; }
     const m = raw.match(/^(\S+)\s+scrollWidth\/clientWidth\s+(\d+)\/(\d+)\s+errors:\s*(\d+)/);
     if (m) { dev = m[1]; out.devices.push({ name: m[1], sw: +m[2], cw: +m[3], errors: +m[4] }); if (+m[2] > +m[3]) out.overflow.push(m[1] + " (" + m[2] + ">" + m[3] + ")"); continue; }
     const e = raw.match(/^\s{2,}(step .+|console: .+|pageerror: .+)$/);
@@ -45,6 +50,11 @@ export const uxProblems = (ux) => {
   ux.errors.slice(0, 6).forEach((s) => p.push("UX שגיאת קונסולה – " + s));
   if (ux.errors.length > 6) p.push("UX ועוד שגיאות קונסולה");
   ux.overflow.forEach((s) => p.push("UX גלילה אופקית ב-" + s));
+  // ביקורת פריסה: כפתורים צמודים/חופפים, יעד מגע קטן מ-44px, טקסט חתוך. תקלה אדומה לכל מכשיר עם בעיות (רק בריצת הבוקר – שם רץ ה-UX).
+  for (const [dev, n] of Object.entries((ux.audit && ux.audit.devices) || {})) if (n > 0) {
+    const ex = ((ux.audit.samples || {})[dev] || [])[0];
+    p.push("UX ביקורת פריסה ב-" + dev + ": " + n + " בעיות" + (ex ? " (למשל " + ex.replace(/\s*@\S+$/, "").slice(0, 110) + ")" : ""));
+  }
   return p;
 };
 
@@ -119,7 +129,7 @@ function statusBlock(all, health, ux) {
   const out = [];
   if (!all.length) {
     out.push(line("✅ " + escapeHtml(summaryLine(health))));
-    out.push(line(ux.ran && ux.devices.length ? "✅ UX תקין · " + ux.devices.length + " מכשירים, בלי שגיאות וגלילה אופקית" : "UX: לא נבדק"));
+    out.push(line(ux.ran && ux.devices.length ? "✅ UX תקין · " + ux.devices.length + " מכשירים, בלי שגיאות וגלילה אופקית" + (ux.audit && Object.keys(ux.audit.devices).length ? " · ביקורת פריסה: 0 בעיות" : "") : "UX: לא נבדק"));
   } else {
     out.push(line("🔴 <b>" + all.length + " תקלות פתוחות</b>"), ...bullets(all));
     if (!health.problems.length && !(ux.ran && uxProblems(ux).length)) out.push(line("UX: לא נבדק"));

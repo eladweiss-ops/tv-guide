@@ -518,7 +518,7 @@
   .lnd-empty p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 1.05rem; }
   .lnd-empty p b { color: var(--ink); }
   .lnd-empty .lnd-sm { font-size: .95rem; }
-  .lnd-big { font-size: 64px; line-height: 1; }
+  .lnd-big { font-size: 64px; line-height: 1.25; }
   .lnd-bar { flex: none; position: relative; display: flex; flex-direction: column; gap: 8px; padding: 12px 18px calc(16px + env(safe-area-inset-bottom, 0px)); }
   .lnd-bar::before { content: ""; position: absolute; inset: -26px 0 auto 0; height: 26px; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0), var(--sheet)); }
   .lnd-bar .btn, .lnd-bar .ghost { width: 100%; min-height: 52px; }
@@ -536,3 +536,25 @@
   .lnd-safari { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 22px; background: var(--soft); line-height: 1.4; }
   .lnd-safari span { color: var(--muted); font-size: .92rem; }
   html.android .sheet.land { max-height: none; }
+  /* ===== ביקורת פריסה (tools/qa/audit.cjs): יעד מגע 44px לפחות ורווח 8px בין שני פקדים. סקאלה: 8/12/16/24 ===== */
+  .chip, .chips.lp .chip, .synb, .btn.sm, .ghost.sm, .ghost[data-grp], .lnd-link, .lnd-inst, .island, .lpsel select, .pill .pillact { min-height: 44px; }
+  .lpsel select { height: 44px; }
+  .sheet .chips, .chips.lp, .seg, .rbts, .lnd-bs, .hb { gap: 8px; }
+  .chips.lp { row-gap: 8px; }
+  .srow { row-gap: 8px; }
+  .island { height: 44px; }
+  .moreb { display: flex; align-items: center; justify-content: flex-start; flex: 0 0 100%; width: 100%; min-height: 44px; padding: 0; margin: 0 0 8px; } /* שורה משלו: לא יושב ליד כפתורי הפעולה (באג v1.39) */
+  .chip { min-width: 44px; }
+  .rsyn .moreb { margin: 0; }
+  .pill { display: flex; align-items: center; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); white-space: normal; text-align: center; box-sizing: border-box; border-radius: 24px; }
+  .pill[hidden] { display: none; }
+  .pill .pillact { margin-inline-start: 0; flex: none; }
+  .open > .more { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } /* תקציר פתוח: טקסט, "עוד…" וכפתורי הפעולה בשורות נפרדות עם רווח 8 (לא צמודים) */
+  .more > p, .more > .moreb { flex: 1 1 100%; }
+  .more > .ghost { flex: 1 1 auto; margin: 0; }
+  .pill .pillact { padding: 0 10px; }
+  #qx { width: 44px; height: 44px; inset-inline-end: 0; background: none; }
+  #qx::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: rgba(118,118,128,.28); z-index: -1; }
+  #qx { z-index: 0; isolation: isolate; }
+  .tmdbmark { position: relative; } .tmdbmark::after { content: ""; position: absolute; inset: -12px -8px; } /* אזור לחיצה 44px, התג עצמו נשאר קטן */
+  details.calopt summary { display: flex; align-items: center; min-height: 44px; }

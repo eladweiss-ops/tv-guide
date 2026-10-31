@@ -424,6 +424,13 @@ async function buildService(svc, ctx) {
   const { tmdb, omdbKey, dir } = ctx;
   const pid = await resolveProvider(tmdb, svc);
   const d = discFor(pid);
+  // אבחון (בלי מפתחות): איזה מזהה ספק נמצא, וכמה תוצאות מחזירה שאילתת בדיקה – עם ובלי סינון flatrate
+  if (process.env.GITHUB_ACTIONS === "true") try { // רק בהרצה ב-GitHub (לא בבדיקות)
+    const t1 = await tmdb("/discover/movie", Object.assign({}, d, { page: 1 }));
+    const d2 = Object.assign({}, d); delete d2.with_watch_monetization_types;
+    const t2 = await tmdb("/discover/movie", Object.assign({}, d2, { page: 1 }));
+    console.log(`${svc.id}: provider=${pid} total(flatrate)=${t1 && t1.total_results} total(any)=${t2 && t2.total_results}`);
+  } catch (e) { console.log(`${svc.id}: provider=${pid} diag failed ${e.message}`); }
   const from = day(-60), to = day(0);
   const byPop = (a, b) => b.pop - a.pop;
   const specs = [

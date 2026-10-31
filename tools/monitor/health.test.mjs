@@ -65,7 +65,7 @@ test("ערוץ חסר בלוח", () => {
 });
 
 test("נטפליקס", () => {
-  const items = Object.fromEntries(Array.from({ length: 50 }, (_, i) => ["t" + i, i < 5 ? { ratings: { imdb: 7 }, vote: 7 } : { vote: 7 }]));
+  const items = Object.fromEntries(Array.from({ length: 150 }, (_, i) => ["t" + i, i < 5 ? { ratings: { imdb: 7 }, vote: 7 } : { vote: 7 }]));
   const ok = evaluateNetflix({ v: 2, updated: "2026-10-30T08:00:00Z", items }, NOW);
   assert.deepEqual(ok.problems, []); assert.equal(ok.info.rated, 5);
   assert.ok(evaluateNetflix({ v: 1, updated: "2026-10-30T08:00:00Z", items }, NOW).problems.length);
@@ -94,7 +94,7 @@ test("parseSiteFiles", () => {
 test("runHealth עם fetch מזויף: הכול תקין, ורק GET", async () => {
   const guide = fakeGuide(), calls = [];
   const idx = 'var BUILD = "B1"; TVG.list = ["core","boot"];';
-  const nf = { v: 2, updated: "2026-10-30T09:00:00Z", items: Object.fromEntries(Array.from({ length: 50 }, (_, i) => ["t" + i, {}])) };
+  const nf = { v: 2, updated: "2026-10-30T09:00:00Z", items: Object.fromEntries(Array.from({ length: 150 }, (_, i) => ["t" + i, {}])) };
   const fetchFn = async (url, opts = {}) => {
     calls.push({ url, method: opts.method || "GET" });
     const u = url.replace(/\?.*/, "");

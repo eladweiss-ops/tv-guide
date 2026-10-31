@@ -17,8 +17,11 @@
 //   "rows": {                             // שורות, כל אחת רשימת מפתחות לפי הסדר (רק פריטים עם poster)
 //     "popular": ["m603", "t1396"],       // הכי נצפים
 //     "recent":  [...],                   // יצא לאחרונה (60 הימים האחרונים), לפי date יורד. לא "חדש בנטפליקס"
-//     "top":     [...]                    // הכי מדורגים (עם מינימום הצבעות)
+//     "top":     [...],                   // הכי מדורגים (עם מינימום הצבעות)
+//     // שורות נוספות (עד 24 פריטים כל אחת, פריט מופיע בעד 2 שורות; שורה עם פחות מ-4 לא נכתבת):
+//     "israeli", "week", "series", "movies", "comedy", "crime", "docu", "family"
 //   },
+//   "rowMeta": { "israeli": { "title": "🇮🇱 ישראלי בנטפליקס" }, ... },  // כותרות השורות; הלקוח מצייר לפיהן. לקוח ישן מתעלם משורות לא מוכרות
 //   "items": {                            // מפתח = "m"|"t" + מזהה TMDB; כל פריט פעם אחת
 //     "m603": {
 //       "id": 603, "type": "movie",       // movie | tv
@@ -47,6 +50,10 @@ import { fileURLToPath } from "node:url";
 export const SCHEMA = 2;
 export const NETFLIX = "8"; // מזהה נטפליקס ב-TMDB
 export const ROW_LIMIT = 20;
+export const NEW_LIMIT = 24;   // פריטים בשורה חדשה
+export const NEW_PAGES = 2;    // עמודי discover (20 בכל אחד) לכל שאילתה
+export const MAX_ROWS_PER_ITEM = 2;
+export const MIN_ROW = 4;      // שורה חדשה עם פחות פריטים לא נכתבת
 export const OMDB_CAP = 300;
 export const CACHE_DAYS = 7;
 export const POOL = 8;
@@ -115,24 +122,98 @@ const disc = {
 const day = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
 const key = (type, id) => (type === "movie" ? "m" : "t") + id;
 
-async function list(tmdb, type, extra) {
-  try {
-    const j = await tmdb("/discover/" + type, { ...disc, ...extra });
-    return (j.results || []).slice(0, ROW_LIMIT).map((r) => ({ type, id: r.id, pop: r.popularity || 0 }));
-  } catch (e) {
-    console.error("discover " + type + ": " + e.message);
-    return [];
+// pages: כמה עמודי discover לשלוף (20 תוצאות בכל אחד). עמוד שנכשל לא מפיל את השאר
+async function list(tmdb, type, extra, { pages = 1, limit = ROW_LIMIT } = {}) {
+  const got = await Promise.all(
+    Array.from({ length: pages }, async (_, i) => {
+      try {
+        const j = await tmdb("/discover/" + type, { ...disc, ...extra, ...(i ? { page: String(i + 1) } : {}) });
+        return j.results || [];
+      } catch (e) {
+        console.error("discover " + type + (i ? " עמוד " + (i + 1) : "") + ": " + e.message);
+        return [];
+      }
+    })
+  );
+  const out = [], seen = new Set();
+  for (const r of got.flat()) {
+    if (!r || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push({ type, id: r.id, pop: r.popularity || 0, date: r.release_date || r.first_air_date || "" });
   }
+  return out.slice(0, limit);
+}
+
+// ---------- שורות חדשות ----------
+// כותרות השורות (הלקוח מצייר לפיהן, לכן כאן המקום היחיד לשנות ניסוח)
+export const ROW_META = {
+  popular: { title: "הכי נצפים" },
+  recent: { title: "יצא לאחרונה" },
+  top: { title: "הכי מדורגים" },
+  israeli: { title: "🇮🇱 ישראלי בנטפליקס" },
+  week: { title: "🆕 יצא החודש" }, // TMDB לא יודע מתי עלה לנטפליקס ישראל; מקרבים לפי תאריך יציאה ב-30 הימים האחרונים
+  series: { title: "📺 סדרות" },
+  movies: { title: "🎬 סרטים" },
+  comedy: { title: "😂 קומדיה" },
+  crime: { title: "🔪 מתח ופשע" },
+  docu: { title: "🎙 דוקו" },
+  family: { title: "👨‍👩‍👧 לכל המשפחה" },
+};
+export const NEW_ORDER = ["israeli", "week", "series", "movies", "comedy", "crime", "docu", "family"];
+
+// הגדרות השאילתות: לכל שורה רשימת [סוג, פרמטרים]. שאילתות מאותו סוג מאוחדות (או).
+// ב-TMDB פסיק = וגם, קו אנכי = או. בז'אנרים משתמשים ב-או (מתח או פשע), אחרת מקבלים רק את החיתוך הצר.
+const popSort = { sort_by: "popularity.desc" };
+export function newRowSpecs(now = Date.now()) {
+  const d30 = new Date(now - 30 * 86400000).toISOString().slice(0, 10), d0 = new Date(now).toISOString().slice(0, 10);
+  const genre = (m, t) => [["movie", { ...popSort, with_genres: m }], ["tv", { ...popSort, with_genres: t }]];
+  return {
+    israeli: [
+      ["movie", { ...popSort, with_original_language: "he" }], ["movie", { ...popSort, with_origin_country: "IL" }],
+      ["tv", { ...popSort, with_original_language: "he" }], ["tv", { ...popSort, with_origin_country: "IL" }],
+    ],
+    week: [
+      ["movie", { ...popSort, "primary_release_date.gte": d30, "primary_release_date.lte": d0 }],
+      ["tv", { ...popSort, "first_air_date.gte": d30, "first_air_date.lte": d0 }],
+    ],
+    series: [["tv", popSort]],
+    movies: [["movie", popSort]],
+    comedy: genre("35", "35"),
+    crime: genre("80|53", "80|9648"),
+    docu: genre("99", "99"),
+    family: genre("10751|16", "10751|10762"),
+  };
+}
+
+// מציב מועמדים בשורה לפי הסדר, בלי לעבור MAX_ROWS_PER_ITEM שורות לפריט. counts משתנה במקום
+export function place(cands, limit, counts) {
+  const out = [];
+  for (const r of cands) {
+    if (out.length >= limit) break;
+    const k = key(r.type, r.id);
+    if ((counts.get(k) || 0) >= MAX_ROWS_PER_ITEM) continue;
+    counts.set(k, (counts.get(k) || 0) + 1);
+    out.push(r);
+  }
+  return out;
+}
+
+// מועמדים לשורה חדשה: איחוד שאילתות לפי סוג, ואז סרטים וסדרות לסירוגין (או סוג אחד)
+async function newRowCands(tmdb, queries) {
+  const by = { movie: new Map(), tv: new Map() };
+  const lists = await pool(queries.map(([t, e]) => () => list(tmdb, t, e, { pages: NEW_PAGES, limit: NEW_PAGES * 20 })));
+  queries.forEach(([t], i) => { for (const r of lists[i]) if (!by[t].has(r.id)) by[t].set(r.id, r); });
+  return mergeRow([...by.movie.values()], [...by.tv.values()], (a, b) => b.pop - a.pop, NEW_PAGES * 40);
 }
 
 // ---------- מיזוג ושליפת פרטים ----------
 // סרטים וסדרות לסירוגין, כל אחד לפי הסדר שלו. ציוני הפופולריות של TMDB לא בני השוואה בין הסוגים
 // (סדרות תמיד גבוהות יותר), ומיון משותף השאיר שורה של סדרות בלבד.
-export function mergeRow(a, b, sorter) {
+export function mergeRow(a, b, sorter, limit = ROW_LIMIT) {
   const x = [...a].sort(sorter), y = [...b].sort(sorter), out = [];
-  for (let i = 0; out.length < ROW_LIMIT && (i < x.length || i < y.length); i++) {
+  for (let i = 0; out.length < limit && (i < x.length || i < y.length); i++) {
     if (i < x.length) out.push(x[i]);
-    if (i < y.length && out.length < ROW_LIMIT) out.push(y[i]);
+    if (i < y.length && out.length < limit) out.push(y[i]);
   }
   return out;
 }
@@ -222,7 +303,9 @@ export const isFresh = (e, now = Date.now()) => !!e && typeof e === "object" && 
 // cache: אובייקט שמשתנה במקום. מחזיר מספר בקשות שנעשו.
 export async function fillRatings(ids, cache, omdbKey, { cap = OMDB_CAP, now = Date.now() } = {}) {
   let used = 0;
-  const todo = [...new Set(ids)].filter((id) => id && !isFresh(cache[id], now));
+  // חסרים לגמרי קודם (לפי סדר הקדימות שנמסר), ורק אחר כך מי שפג תוקפו: התקרה לא מרעיבה פריטים חדשים
+  const need = [...new Set(ids)].filter((id) => id && !isFresh(cache[id], now));
+  const todo = [...need.filter((id) => !cache[id]), ...need.filter((id) => cache[id])];
   for (const id of todo) {
     if (used >= cap) break;
     used++;
@@ -302,6 +385,13 @@ export async function run(opts = {}) {
     recent: mergeRow(nm, nt, byPop),
     top: [...tm, ...tt],
   };
+  // שורות חדשות: מועמדים לכל שורה, ואז הצבה לפי סדר קבוע עם מגבלת "עד 2 שורות לפריט".
+  // 'הכי מדורגים' עוד לא סופי (ממתין לציוני OMDb), לכן אכיפה סופית נעשית בסוף (enforceMax)
+  const specsNew = newRowSpecs();
+  const cands = await pool(NEW_ORDER.map((name) => () => newRowCands(tmdb, specsNew[name]).catch((e) => { console.error("שורה " + name + ": " + e.message); return []; })));
+  const counts = new Map();
+  for (const r of [...refs.popular, ...refs.recent]) counts.set(key(r.type, r.id), 1);
+  NEW_ORDER.forEach((name, i) => { refs[name] = place(cands[i], NEW_LIMIT, counts); });
   const uniq = new Map();
   for (const r of Object.values(refs).flat()) uniq.set(key(r.type, r.id), r);
 
@@ -319,7 +409,9 @@ export async function run(opts = {}) {
 
   const rows = {};
   for (const [name, arr] of Object.entries(refs)) rows[name] = arr.map((r) => key(r.type, r.id)).filter((k) => items[k]);
-  rows.recent.sort((a, b) => (items[b].date || "").localeCompare(items[a].date || ""));
+  const byDate = (a, b) => (items[b].date || "").localeCompare(items[a].date || "");
+  rows.recent.sort(byDate);
+  rows.week.sort(byDate);
 
   const types = new Set(rows.popular.map((k) => items[k].type));
   if (rows.popular.length < MIN_POPULAR || !types.has("movie") || !types.has("tv")) {
@@ -332,7 +424,9 @@ export async function run(opts = {}) {
       const cachePath = dir + "/ratings-cache.json";
       const cache = await readCache(cachePath);
       const now = opts.now ?? Date.now();
-      const used = await fillRatings(Object.values(items).map((i) => i.imdb_id), cache, omdbKey, { now });
+      // סדר קדימות לתקרת הבקשות: הכי נצפים (משם נבחר הכרטיס הראשי), מדורגים, ישראלי, יצא לאחרונה, ואז כל השאר
+      const order = [...rows.popular, ...rows.top, ...rows.israeli, ...rows.recent, ...Object.keys(rows).flatMap((n) => rows[n]), ...Object.keys(items)];
+      const used = await fillRatings(order.map((k) => items[k] && items[k].imdb_id), cache, omdbKey, { now, cap: opts.omdbCap ?? OMDB_CAP });
       for (const id of Object.keys(cache)) if (!cache[id] || now - (cache[id].t || 0) > CACHE_DAYS * 2 * 86400000) delete cache[id];
       await writeFile(cachePath, JSON.stringify(cache));
       console.log(`OMDb: ${used} בקשות`);
@@ -351,10 +445,43 @@ export async function run(opts = {}) {
   const score = (it) => (it.ratings && it.ratings.imdb != null ? it.ratings.imdb : it.vote || 0); // IMDb קודם, TMDB כגיבוי
   rows.top.sort((a, b) => score(items[b]) - score(items[a]));
   rows.top = rows.top.slice(0, ROW_LIMIT);
-  const out = { v: SCHEMA, updated: new Date().toISOString(), hero: pickHero(rows.popular, items), rows, items };
+  const hero = pickHero(rows.popular, items);
+  const { rows: outRows, items: outItems, rowMeta } = finalize(rows, items);
+  const out = { v: SCHEMA, updated: new Date().toISOString(), hero, rows: outRows, rowMeta, items: outItems };
   await writeFile(dir + "/netflix.json", JSON.stringify(out));
-  console.log(`netflix.json: ${rows.popular.length} popular, ${rows.recent.length} recent, ${rows.top.length} top`);
+  console.log(`netflix.json: ${Object.keys(outItems).length} פריטים; ` + Object.keys(outRows).map((n) => `${n}=${outRows[n].length}`).join(" "));
   return out;
+}
+
+// אכיפה סופית: פריט בעד MAX_ROWS_PER_ITEM שורות (עודף יורד מהשורות החדשות האחרונות), שורה חדשה קטנה מדי נושרת,
+// פריטים שאף שורה לא מפנה אליהם נושרים, ושדות מיותרים (ריקים, ו-vote/imdb_id שהלקוח לא קורא) נגרעים מהקובץ
+export function finalize(rowsIn, itemsIn) {
+  const rows = {}, base = ["popular", "recent", "top"];
+  for (const n of base) rows[n] = [...(rowsIn[n] || [])];
+  for (const n of NEW_ORDER) rows[n] = [...(rowsIn[n] || [])];
+  const counts = new Map();
+  for (const n of [...base, ...NEW_ORDER]) {
+    rows[n] = rows[n].filter((k) => {
+      const c = counts.get(k) || 0;
+      if (c >= MAX_ROWS_PER_ITEM && !base.includes(n)) return false;
+      counts.set(k, c + 1);
+      return true;
+    });
+  }
+  const outRows = {}, rowMeta = {};
+  for (const n of [...base, ...NEW_ORDER]) {
+    if (!base.includes(n) && rows[n].length < MIN_ROW) continue;
+    outRows[n] = rows[n]; rowMeta[n] = ROW_META[n];
+  }
+  const used = new Set(Object.values(outRows).flat());
+  const items = {};
+  for (const k of used) {
+    const it = { ...itemsIn[k] };
+    for (const f of ["vote", "vote_count", "imdb_id"]) delete it[f];
+    for (const f of Object.keys(it)) if (it[f] === "" || it[f] == null || (Array.isArray(it[f]) && !it[f].length)) delete it[f];
+    items[k] = it;
+  }
+  return { rows: outRows, items, rowMeta };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

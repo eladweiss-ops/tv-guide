@@ -81,6 +81,7 @@
   navLayer("#favs", function () { TVG.closeFavs(); });
   navLayer("#land", function () { if (TVG.closeLand) TVG.closeLand(); }); // דף נחיתה לתוכנית ששיתפו (landing.js). לפני #rem: תזכורת נפתחת מעליו
   navLayer("#rem", function () { TVG.closeRem(); });
+  navLayer("#nflist", function () { if (TVG.closeNfList) TVG.closeNfList(); }); // רשימה מלאה של שורה בנטפליקס ('עוד ›', netflix.js). נפתחת לפני דף התוכן ומתחתיו
   navLayer("#nfsheet", function () { if (TVG.closeNf) TVG.closeNf(); }); // דף תוכן נטפליקס (netflix.js)
   navLayer("#qwrap", function () { TVG.setSearch(false); });
 

@@ -34,6 +34,7 @@
       var el = document.querySelector(".row.now"); if (el) el.scrollIntoView({ block: "center" });
     }
     TVG.scrollNext = false;
+    if (nf && !searching && TVG.nfAfterRender) TVG.nfAfterRender(); // שורות נטפליקס מתחת לקפל נבנות בגלילה (netflix.js)
     if (TVG.D && TVG.tab === "dial" && !nf && !picking && !searching && !srchOpen && $("#dial")) TVG.updateDial(TVG.dialT());
     var dsel = document.querySelector('.days .day[aria-pressed="true"]'); if (dsel && dsel.scrollIntoView) dsel.scrollIntoView({ block: "nearest", inline: "center" });
   }

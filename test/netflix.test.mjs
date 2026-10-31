@@ -236,3 +236,104 @@ test("mergeRow: סרטים וסדרות לסירוגין גם כשלסדרות �
   assert.equal(r.filter((x) => x.type === "movie").length, 10);
   assert.equal(r[0].type, "movie"); assert.equal(r[1].type, "tv");
 });
+
+// ---------- שורות חדשות ----------
+import { newRowSpecs, place, finalize, ROW_META, NEW_ORDER } from "../netflix.mjs";
+
+// mock עשיר: מזהים שונים לפי שאילתה (כך שורות לא חופפות), ורושם כל קריאת discover
+function richMock(log) {
+  const base = tmdbMock();
+  return async (u, i) => {
+    const url = new URL(String(u));
+    const d = url.pathname.match(/^\/3\/discover\/(movie|tv)$/);
+    if (!d) return base(u, i);
+    const q = Object.fromEntries(url.searchParams);
+    log.push({ type: d[1], q });
+    const { page, ...rest } = q;
+    const seed = [...JSON.stringify(rest)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 50000, 7);
+    const pg = Number(page || 1);
+    return json({ results: Array.from({ length: 20 }, (_, n) => ({ id: seed * 100 + (pg - 1) * 20 + n + (d[1] === "tv" ? 50000000 : 0), popularity: 100 - n, release_date: "2026-10-0" + (1 + (n % 9)) })) });
+  };
+}
+
+test("שאילתות discover של השורות החדשות: שפה/מדינה/ז'אנרים/תאריכים", () => {
+  const s = newRowSpecs(Date.UTC(2026, 9, 31));
+  assert.deepEqual(Object.keys(s), NEW_ORDER);
+  const has = (row, type, k, v) => s[row].some(([t, e]) => t === type && e[k] === v);
+  for (const t of ["movie", "tv"]) assert.ok(has("israeli", t, "with_original_language", "he") && has("israeli", t, "with_origin_country", "IL"));
+  assert.equal(s.series.length, 1); assert.equal(s.series[0][0], "tv");
+  assert.equal(s.movies[0][0], "movie");
+  assert.ok(has("comedy", "movie", "with_genres", "35") && has("comedy", "tv", "with_genres", "35"));
+  assert.ok(has("crime", "movie", "with_genres", "80|53") && has("crime", "tv", "with_genres", "80|9648"));
+  assert.ok(has("docu", "movie", "with_genres", "99") && has("docu", "tv", "with_genres", "99"));
+  assert.ok(has("family", "movie", "with_genres", "10751|16") && has("family", "tv", "with_genres", "10751|10762"));
+  assert.ok(has("week", "movie", "primary_release_date.gte", "2026-10-01") && has("week", "tv", "first_air_date.lte", "2026-10-31"));
+});
+
+test("run: שורות חדשות נשלפות עם פרמטרי נטפליקס ישראל, rowMeta, ובלי שדות מיותרים", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "nf-"));
+  const log = [];
+  globalThis.fetch = richMock(log);
+  const out = await run({ tmdbKey: "k", omdbKey: "", dir });
+  assert.equal(log.length, 6 + 2 * (4 + 2 + 1 + 1 + 8));
+  for (const c of log) {
+    assert.equal(c.q.watch_region, "IL"); assert.equal(c.q.with_watch_providers, "8");
+    assert.equal(c.q.language, "he-IL"); assert.equal(c.q.include_adult, "false");
+  }
+  assert.ok(log.some((c) => c.q.page === "2"), "עמוד שני");
+  for (const n of NEW_ORDER) {
+    assert.ok(out.rows[n] && out.rows[n].length >= 4 && out.rows[n].length <= 24, n + ": " + (out.rows[n] || []).length);
+    assert.ok(out.rowMeta[n].title);
+  }
+  assert.ok(out.rows.series.every((k) => k[0] === "t") && out.rows.movies.every((k) => k[0] === "m"));
+  const wk = out.rows.week.map((k) => out.items[k].date);
+  assert.deepEqual(wk, [...wk].sort().reverse());
+  const cnt = {}; for (const r of Object.values(out.rows)) for (const k of r) cnt[k] = (cnt[k] || 0) + 1;
+  assert.ok(Math.max(...Object.values(cnt)) <= 2, "כל פריט בעד 2 שורות");
+  assert.deepEqual(new Set(Object.keys(out.items)), new Set(Object.keys(cnt)), "אין פריטים יתומים");
+  const it = Object.values(out.items)[0];
+  assert.ok(!("vote" in it) && !("imdb_id" in it) && !("vote_count" in it));
+  assert.ok(!Object.values(it).some((v) => v === ""));
+  assert.ok(JSON.stringify(out).length < 1.5e6);
+  JSON.parse(await readFile(join(dir, "netflix.json"), "utf8"));
+});
+
+test("place ו-finalize: עד 2 שורות לפריט, שורה קטנה מדי נושרת, שדות ריקים נגרעים", () => {
+  const c = Array.from({ length: 6 }, (_, i) => ({ type: "movie", id: i }));
+  const counts = new Map([["m0", 2], ["m1", 1]]);
+  assert.deepEqual(place(c, 3, counts).map((r) => r.id), [1, 2, 3]);
+  assert.equal(counts.get("m1"), 2);
+  const items = Object.fromEntries(["m1", "m2", "m3", "m4", "m5", "m6"].map((k) => [k, { id: 1, title: "x", poster: "p", vote: 5, imdb_id: "tt", orig: "", genres: [] }]));
+  const f = finalize({ popular: ["m1", "m2"], recent: ["m1", "m2"], top: ["m1"], israeli: ["m1", "m3", "m4", "m5", "m6"], week: ["m3", "m4"], series: ["m3"] }, items);
+  assert.ok(!f.rows.israeli.includes("m1"), "m1 כבר בשלוש שורות קיימות: נשאר שם (שורות קיימות לא משתנות) ויורד מהחדשה");
+  assert.ok(!f.rows.week && !f.rowMeta.week, "שורה עם פחות מ-4 לא נכתבת");
+  assert.deepEqual(Object.keys(f.rowMeta).sort(), Object.keys(f.rows).sort());
+  assert.ok(f.items.m3 && !("vote" in f.items.m3) && !("orig" in f.items.m3) && !("genres" in f.items.m3));
+  assert.ok(ROW_META.israeli.title.includes("ישראלי"));
+});
+
+test("OMDb: חסרים לגמרי קודם לפג-תוקף, גם בתקרה", async () => {
+  const now = 1e12, day = 86400000, calls = [];
+  globalThis.fetch = async (u) => { calls.push(new URL(String(u)).searchParams.get("i")); return json({ imdbRating: "7.0", imdbVotes: "5,000", Ratings: [] }); };
+  await fillRatings(["ttOld", "ttNew1", "ttNew2"], { ttOld: { t: now - 20 * day, r: {} } }, "K", { cap: 2, now });
+  assert.deepEqual(calls, ["ttNew1", "ttNew2"]);
+});
+
+test("run: תקרת OMDb ברמת הריצה (omdbCap), ובלי מפתחות לא נכשל", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "nf-"));
+  const log = [], inner = richMock([]);
+  globalThis.fetch = async (u, i) => { if (new URL(String(u)).hostname === "www.omdbapi.com") log.push(String(u)); return inner(u, i); };
+  await run({ tmdbKey: "k", omdbKey: "o", dir, omdbCap: 5 });
+  assert.equal(log.length, 5);
+  const out = await run({ tmdbKey: "k", omdbKey: "", dir: await mkdtemp(join(tmpdir(), "nf-")) });
+  assert.ok(out && out.rows.israeli);
+});
+
+test("run: שאילתת שורה חדשה שנכשלת לא מפילה את השאר", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "nf-"));
+  const inner = richMock([]);
+  globalThis.fetch = async (u, i) => (decodeURIComponent(String(u)).includes("with_genres=99") ? json({}, 500, { "retry-after": "0" }) : inner(u, i));
+  console.error = () => {};
+  const out = await run({ tmdbKey: "k", dir });
+  assert.ok(out && !out.rows.docu && out.rows.comedy);
+});

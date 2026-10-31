@@ -525,6 +525,13 @@
   .lnd-link { align-self: center; border: 0; background: transparent; color: var(--muted); font-weight: 600; min-height: 40px; padding: 0 16px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .shnote { margin: -4px 0 0; font-size: .85rem; color: var(--muted); text-align: center; }
   .lnd-tz { font-weight: 500; color: var(--muted); font-size: .85rem; }
+  .lnd-inst { align-self: center; border: 0; background: transparent; color: var(--muted); font-weight: 600; font-size: .92rem; min-height: 36px; padding: 0 14px; cursor: pointer; }
+  .lnd-isheet { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-end; background: rgba(0,0,0,.35); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .lnd-isheet[hidden] { display: none; }
+  .lnd-ib { width: 100%; box-sizing: border-box; padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px)); border-radius: 28px 28px 0 0; background: var(--sheet); box-shadow: 0 -10px 40px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 12px; text-align: center; }
+  .lnd-ib h3 { margin: 0; font-size: 1.15rem; }
+  .lnd-ib p { margin: 0; line-height: 1.6; }
+  .lnd-ib .shg { display: inline-block; vertical-align: -5px; width: 22px; height: 22px; margin: 0 2px; color: #0a84ff; }
   .lnd-hint { margin: 2px 0 0; text-align: center; font-size: .9rem; color: var(--muted); }
   .lnd-safari { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 22px; background: var(--soft); line-height: 1.4; }
   .lnd-safari span { color: var(--muted); font-size: .92rem; }

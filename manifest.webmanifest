@@ -9,6 +9,7 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
   "theme_color": "#0E0F14",
   "background_color": "#0E0F14",
   "icons": [

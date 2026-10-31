@@ -43,7 +43,7 @@
       title: String(p.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: "יום " + TVG.DAYS[d.getDay()] + " " + d.getDate() + "." + (d.getMonth() + 1),
       time: hhmm(d),
-      chRaw: TVG.chNice(TVG.chName(r.id)),
+      chRaw: TVG.bidiText(TVG.chName(r.id)), // LRM סביב רצפים לטיניים, לטקסט שנשלח
       ch: TVG.bidi(TVG.chName(r.id)), // עם בידוד LTR: לתצוגה בלבד (HTML/קנבס), לא לטקסט שנשלח
       live: p.lv === 1,
       link: linkOf(r.id, p),
@@ -51,7 +51,7 @@
       kind: TVG.kindOf(r.id, p.title)
     };
   }
-  var RLM = "\u200F", CTA = "📅 להוספה ליומן ותזכורת:";
+  var RLM = "\u200F", CTA = "👇 לשמירה ביומן לחצו כאן:";
   function textOf(x, cardOnly) { // במצב כרטיס: רק הקריאה לפעולה והקישור (הפרטים כבר בתמונה)
     // RLM רק בתחילת שורה שמתחילה באימוג'י (לא צמוד ל-_ או *, שוואטסאפ לא מזהה כעיצוב אחרת); שורות שמתחילות בעברית כבר RTL
     if (cardOnly) return [RLM + CTA, x.link].join("\n");
@@ -62,7 +62,7 @@
   }
   function bubbleHtml(x, mode, imgUrl) {
     // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה (במצב טקסט) כרטיס תצוגה מקדימה מתגיות og של האתר
-    var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>פרטי התוכנית ותזכורת בלחיצה</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
+    var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>לחצו לשמירה ביומן ולתזכורת</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
     var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
     if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
     return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +

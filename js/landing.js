@@ -101,21 +101,35 @@
   function barHtml() {
     var guide = '<button type="button" class="lnd-link" data-landguide>לכל לוח השידורים</button>';
     var gbtn = '<button type="button" class="btn" data-landguide>📺 לכל לוח השידורים</button>';
-    if (L.kind === "missing" || L.kind === "ended") return gbtn;
+    if (L.kind === "missing" || L.kind === "ended") return gbtn + instRow();
     var r = L.r, st = status(r.p);
-    if (st === "live") return gbtn;
+    if (st === "live") return gbtn + instRow();
     if (L.safari) return '<div class="lnd-safari"><b>🧭 פתחו ב-Safari</b><span>הדפדפן הפנימי לא יודע להוסיף ליומן. בתפריט ⋯ (או סמל הדפדפן) בוחרים פתיחה ב-Safari, ושם מוסיפים ליומן.</span></div>' +
-      '<button type="button" class="btn" data-landcopy>📋 העתקת הקישור</button>' + guide;
+      '<button type="button" class="btn" data-landcopy>📋 העתקת הקישור</button>' + guide + instRow();
     var h = '<button type="button" class="btn" data-landcal>📅 הוספה ליומן</button>';
     if (L.kind !== "stub") {
       if (canRem()) h += '<button type="button" class="ghost" data-landrem>' + (TVG.hasRem(TVG.remKey(r.id, r.p.s)) ? "✓ יש תזכורת · שינוי" : "⏰ תזכורת עם התראה") + "</button>";
-      else if (TVG.isIOS) h += '<p class="lnd-hint">לקבלת התראות לטלפון: הוספה למסך הבית</p>';
     }
-    return h + guide;
+    return h + guide + instRow();
   }
+  // שורה משנית "להתקנת האפליקציה": רק במובייל, ורק למי שלא באפליקציה המותקנת. לא מתחרה בכפתור הכתום
+  function instRow() {
+    if (TVG.isStandalone || TVG.installed || !(TVG.isIOS || TVG.isAndroid)) return "";
+    return '<button type="button" class="lnd-inst" data-landinst>📲 להתקנת האפליקציה</button>';
+  }
+  var SHARE_SVG = '<svg class="shg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="סמל השיתוף" role="img"><path d="M12 3v12M8 7l4-4 4 4M7 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></svg>';
+  function openInst() {
+    var b = $("#lndInst"); if (!b) return;
+    var h = '<div class="lnd-ib" role="dialog" aria-label="התקנת האפליקציה"><h3>📲 התקנת האפליקציה</h3>';
+    if (TVG.isIOS) h += (inApp() ? "<p>קודם פותחים את הקישור ב-Safari.</p>" : "") + "<p>בספארי: שיתוף " + SHARE_SVG + " ← הוספה למסך הבית</p>";
+    else if (TVG.dip) h += "<p>האפליקציה תופיע במסך הבית ותיפתח במסך מלא.</p>" + '<button type="button" class="btn" data-landinstgo>התקנה</button>';
+    else h += "<p>בתפריט Chrome ⋮ ← ״התקנת האפליקציה״</p>";
+    b.innerHTML = h + '<button type="button" class="ghost" data-landinstx>סגירה</button></div>'; b.hidden = false;
+  }
+  function closeInst() { var b = $("#lndInst"); if (b) b.hidden = true; }
   function paint() {
     var el = $("#land"); if (!el || !L) return;
-    $("#landBody").innerHTML = bodyHtml(); $("#landBar").innerHTML = barHtml();
+    closeInst(); $("#landBody").innerHTML = bodyHtml(); $("#landBar").innerHTML = barHtml();
     $("#landBody").scrollTop = 0;
     TVG.landCh = L.r && L.kind !== "stub" ? L.r.id : null;
   }
@@ -179,6 +193,9 @@
   }
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t.closest || !L || $("#land").hidden || !t.closest("#land")) return;
+    if (t.closest("[data-landinst]")) { e.stopPropagation(); openInst(); return; }
+    if (t.closest("[data-landinstgo]")) { e.stopPropagation(); closeInst(); TVG.install(); return; }
+    if (t.closest("[data-landinstx]") || t.id === "lndInst") { e.stopPropagation(); closeInst(); return; }
     if (t.closest("[data-landguide]")) { e.stopPropagation(); closeLand(true); return; }
     if (t.closest("[data-landclose]")) { e.stopPropagation(); closeLand(); return; }
     if (t.closest("[data-landcal]")) { e.stopPropagation(); addCal(); return; }

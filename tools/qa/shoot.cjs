@@ -265,8 +265,15 @@ function nfFixtureData() {
     await step("share-texts", async () => { // הטקסט המדויק שנשלח בכל מצב (נשמר לקובץ לעיון)
       await fresh();
       const o = await page.evaluate(() => { const now = Date.now(); const out = []; for (const id of Array.from(TVG.sel)) { const a = (TVG.by.get(id) || []).filter(p => p.s.getTime() > now + 3600000 && p.desc && p.desc.length > 20); if (a.length) { const r = { id, p: a[0] }; out.push(TVG.shareText(r, false), TVG.shareText(r, true)); break; } } const lv = (TVG.by.get("3787") || []).filter(p => p.lv === 1)[0]; if (lv) out.push(TVG.shareText({ id: "3787", p: lv }, false)); return out; });
-      assert(o.length >= 2, "texts"); assert(/\n\n.*📅 להוספה ליומן ותזכורת:\n.*\?p=/.test(o[0]), "text mode format: " + o[0]); assert(!/[\u2066\u2069]/.test(o.join("")), "no isolates in sent text"); assert(!/\u200F[_*]/.test(o.join("")), "no RLM adjacent to markup"); assert(o[1].split("\n").length === 2 && /^‏📅 להוספה ליומן ותזכורת:\nhttps/.test(o[1]), "card text only cta+link: " + o[1]);
+      assert(o.length >= 2, "texts"); assert(/\n\n\u200F👇 לשמירה ביומן לחצו כאן:\nhttps:\/\/\S*\?p=\S+$/.test(o[0]), "text mode format: " + o[0]); assert(!/ליומן ותזכורת:/.test(o.join("")), "old CTA gone"); assert(!/[\u2066\u2069]/.test(o.join("")), "no isolates in sent text"); assert(!/\u200F[_*]/.test(o.join("")), "no RLM adjacent to markup"); assert(o[1].split("\n").length === 2 && /^\u200F👇 לשמירה ביומן לחצו כאן:\nhttps/.test(o[1]), "card text only cta+link: " + o[1]);
       fs.appendFileSync(path.join(OUT, "share_texts_" + d.name + ".txt"), o.map((t, i) => "--- " + i + " ---\n" + t).join("\n\n") + "\n");
+    });
+    await step("share-bidi", async () => { // שמות ערוצים לטיניים בטקסט שנשלח / ICS / גוגל קלנדר: LRM סביב הרצף הלטיני, בלי תווי בידוד
+      const o = await page.evaluate(() => ({ a: TVG.bidiText("5 LIVE"), b: TVG.bidiText("ספורט 5 LIVE"), c: TVG.bidiText("!E ערוץ הבידור"), d: TVG.bidiText("i24NEWS"), e: TVG.bidiText("רשת 13") }));
+      assert(o.a === "‎5 LIVE‎", "5 LIVE: " + JSON.stringify(o.a)); assert(o.b === "ספורט ‎5 LIVE‎", "ספורט 5 LIVE"); assert(o.c === "‎E!‎ ערוץ הבידור", "E!"); assert(o.d === "‎i24NEWS‎", "i24NEWS"); assert(o.e === "רשת ‎13‎", "רשת 13");
+      const t = await page.evaluate(() => { const id = Array.from(TVG.sel)[0]; const p = (TVG.by.get(id) || [])[0]; const r = { id, p, lead: 15 }; return { ics: TVG.icsText(r), g: decodeURIComponent(TVG.gcalUrl(r)), sh: TVG.shareText(r, false), ch: TVG.chName(id) }; });
+      assert(!/[⁦⁧⁨⁩]/.test(t.ics + t.g + t.sh), "no isolates in ics/gcal/share");
+      if (/[A-Za-z0-9]/.test(t.ch)) assert(/SUMMARY:[^\r\n]*‎/.test(t.ics) && /text=[^&]*‎/.test(t.g) && /‎/.test(t.sh), "LRM in all plain-text channel names");
     });
     // ---- דף נחיתה ----
     const pickLink = (kind) => page.evaluate((kind) => {
@@ -290,7 +297,12 @@ function nfFixtureData() {
         await landOpen(pk.v);
         assert(await vis("#land"), "landing visible"); assert(!(await vis("#sheet")), "no channel picker"); assert(!/[?&]p=/.test(page.url()), "url cleaned " + page.url());
         const txt = await page.textContent("#land");
-        if (kind === "up") { assert(txt.indexOf(pk.t) >= 0, "title"); assert(/מתחיל בעוד/.test(txt), "countdown: " + txt.slice(0, 200)); assert(await vis("[data-landcal]"), "cal button"); if (d.name.indexOf("iphone") === 0) assert(/הוספה למסך הבית/.test(txt) && !(await vis("[data-landrem]")), "iOS not installed: no reminder button, home-screen hint"); else assert(await vis("[data-landrem]"), "android reminder button"); }
+        if (kind === "up") { assert(txt.indexOf(pk.t) >= 0, "title"); assert(/מתחיל בעוד/.test(txt), "countdown: " + txt.slice(0, 200)); assert(await vis("[data-landcal]"), "cal button"); if (d.name.indexOf("iphone") === 0) assert(!(await vis("[data-landrem]")), "iOS not installed: no reminder button"); else assert(await vis("[data-landrem]"), "android reminder button");
+          assert(await vis("[data-landinst]") && /להתקנת האפליקציה/.test(txt), "install row visible when not standalone");
+          const ib = await page.evaluate(() => { const a = document.querySelector("[data-landinst]").getBoundingClientRect(), b = document.querySelector("[data-landcal]").getBoundingClientRect(); return { ih: a.height, ch: b.height, below: a.top > b.bottom }; }); assert(ib.below && ib.ih < ib.ch, "install row is secondary (below + smaller): " + JSON.stringify(ib));
+          await page.click("[data-landinst]"); await page.waitForTimeout(300); const it = await page.textContent("#lndInst"); assert(await vis("#lndInst"), "install sheet opens");
+          if (d.name.indexOf("iphone") === 0) assert(/בספארי: שיתוף/.test(it) && /הוספה למסך הבית/.test(it) && (await page.evaluate(() => !!document.querySelector("#lndInst svg.shg"))), "ios install text+glyph: " + it); else assert(/התקנת האפליקציה/.test(it) && (/Chrome ⋮/.test(it) || (await vis("[data-landinstgo]"))), "android install text: " + it);
+          await snap("14_landing_install"); await page.click("[data-landinstx]"); await page.waitForTimeout(200); assert(!(await vis("#lndInst")), "install sheet closes"); }
         if (kind === "live") { assert(/משודר עכשיו/.test(txt), "live text"); }
         if (kind === "rerun") { assert(/כבר שודרה/.test(txt) && /מתחיל בעוד|משודר עכשיו/.test(txt), "rerun: " + txt.slice(0, 200)); }
         if (kind === "ended") { assert(/התוכנית כבר שודרה/.test(txt) && /אין לה שידור נוסף/.test(txt), "ended: " + txt.slice(0, 200)); }
@@ -298,6 +310,12 @@ function nfFixtureData() {
         await snap("14_landing_" + kind);
       });
     }
+    await step("landing-standalone", async () => { // באפליקציה המותקנת שורת ההתקנה מוסתרת
+      const pg2 = await ctx.newPage(); await pg2.addInitScript(() => { try { Object.defineProperty(navigator, "standalone", { get: () => true }); } catch (e) {} });
+      await pg2.clock.setFixedTime(new Date(FIXED_NOW)); const pk = await pickLink("up"); await pg2.goto(base + "index.html?p=" + pk.v, { waitUntil: "networkidle" }); await pg2.waitForTimeout(1300);
+      assert(await pg2.evaluate(() => !document.querySelector("#land").hidden && TVG.isStandalone === true), "landing open in standalone"); assert(await pg2.evaluate(() => !document.querySelector("[data-landinst]")), "install row hidden when standalone"); assert(await pg2.evaluate(() => !!document.querySelector("[data-landcal]")), "primary button still there");
+      await pg2.close();
+    });
     await step("landing-long", async () => { // כותרת וסינופסיס ארוכים
       await fresh(); const pk = await pickLink("up"); await landOpen(pk.v);
       await page.evaluate(() => { const p = TVG.landTest && 0; document.querySelector(".lnd-ttl").textContent = "מכבי תל אביב נגד הפועל באר שבע בגמר גביע המדינה בכדורסל – משחק שלישי בסדרה"; document.querySelector(".lnd-syn") && (document.querySelector(".lnd-syn").textContent = document.querySelector(".lnd-syn").textContent.repeat(4)); });

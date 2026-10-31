@@ -62,7 +62,7 @@
   }
   function bubbleHtml(x, mode, imgUrl) {
     // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה (במצב טקסט) כרטיס תצוגה מקדימה מתגיות og של האתר
-    var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>לוח שידורים 📺</b><span>לחצו לשמירה ביומן ולתזכורת</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
+    var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>זפזופ 📺</b><span>לחצו לשמירה ביומן ולתזכורת</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
     var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
     if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
     return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +
@@ -118,7 +118,7 @@
       ctx.direction = "ltr"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.globalAlpha = 0.22; ctx.font = "400 330px " + F; ctx.fillStyle = "#fff"; ctx.fillText(x.emoji, 18, 330); ctx.globalAlpha = 1;
       ctx.direction = "rtl"; ctx.textAlign = "right"; ctx.fillStyle = "#fff";
       // שורה עליונה: סימן האפליקציה (ימין) ושידור ישיר (שמאל)
-      ctx.font = "700 36px " + F; ctx.globalAlpha = 0.92; ctx.fillText("📺 לוח שידורים", R, 100); ctx.globalAlpha = 1;
+      ctx.font = "700 36px " + F; ctx.globalAlpha = 0.92; ctx.fillText("📺 זפזופ", R, 100); ctx.globalAlpha = 1;
       if (x.live) {
         ctx.font = "800 32px " + F; var lw = Math.ceil(ctx.measureText("● שידור ישיר").width) + 48;
         ctx.fillStyle = "#fff"; rr(ctx, PAD, 56, lw, 60, 30); ctx.fill(); ctx.fillStyle = "#D70015"; ctx.textAlign = "center"; ctx.fillText("● שידור ישיר", PAD + lw / 2, 98); ctx.textAlign = "right"; ctx.fillStyle = "#fff";

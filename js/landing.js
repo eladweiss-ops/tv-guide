@@ -79,7 +79,7 @@
       '<h1 class="lnd-ttl"><bdi dir="auto">' + (stub ? "תוכנית ב" + chB(r.id) : esc(p.title)) + "</bdi></h1>" + (b ? '<div class="lnd-bs">' + b + "</div>" : "") + "</div>";
   }
   function bodyHtml() {
-    var h = '<div class="lnd-top"><span class="lnd-brand">📺 לוח שידורים</span><button type="button" class="glass round lnd-x" data-landclose aria-label="סגירה">✕</button></div>';
+    var h = '<div class="lnd-top"><span class="lnd-brand">📺 זפזופ</span><button type="button" class="glass round lnd-x" data-landclose aria-label="סגירה">✕</button></div>';
     if (L.kind === "missing") {
       var pr = L.pr, has = pr && TVG.chName(pr.id), d = pr && new Date(pr.ts);
       return h + '<div class="lnd-empty"><div class="lnd-big">🔎</div><h1>לא מצאנו את התוכנית</h1>' +

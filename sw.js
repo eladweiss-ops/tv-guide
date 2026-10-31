@@ -7,7 +7,7 @@ const hhmm = (ts) => new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusale
 
 self.addEventListener("push", (e) => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: "לוח שידורים", body: e.data && e.data.text() }; }
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: "זפזופ", body: e.data && e.data.text() }; }
   const tag = d.tag || "tvg";
   const o = {
     body: rtl(d.body), dir: "rtl", lang: "he", tag, renotify: !!d.tag, icon: "icon-192.png", badge: "badge-96.png",
@@ -15,7 +15,7 @@ self.addEventListener("push", (e) => {
   };
   // כפתורים: אנדרואיד/כרום בלבד. באייפון מתעלמים מהם (והנודניק שם דרך פתיחת האפליקציה)
   if (d.snz) o.actions = [{ action: "snz", title: "💤 עוד 5 דק׳" }, { action: "open", title: "פתיחה בלוח" }];
-  e.waitUntil(self.registration.showNotification(rtl(d.title || "לוח שידורים"), o));
+  e.waitUntil(self.registration.showNotification(rtl(d.title || "זפזופ"), o));
 });
 
 async function snooze(n) {

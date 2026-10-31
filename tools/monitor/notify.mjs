@@ -120,7 +120,7 @@ export function decide({ prev, problems, mode, health, ux, now = new Date() }) {
 // ───────── נוסחי הודעות ─────────
 const bullets = (a) => a.map((p) => line("• " + escapeHtml(p)));
 function buildAlert(fresh, still) {
-  const out = [line("🔴 <b>תקלה בלוח שידורים</b>"), ...bullets(fresh)];
+  const out = [line("🔴 <b>תקלה בזפזופ</b>"), ...bullets(fresh)];
   if (still.length) out.push(line("עדיין פתוחות:"), ...bullets(still));
   return out.join("\n");
 }
@@ -138,7 +138,7 @@ function statusBlock(all, health, ux) {
 }
 function buildDaily(st, all, health, ux, now) {
   const since = now.getTime() - DAY;
-  const out = [line("☀️ <b>סיכום יומי · לוח שידורים</b>"), ...statusBlock(all, health, ux)];
+  const out = [line("☀️ <b>סיכום יומי · זפזופ</b>"), ...statusBlock(all, health, ux)];
   const fixed = st.incidents.filter((i) => i.closed && Date.parse(i.closed) >= since);
   const opened = st.incidents.filter((i) => Date.parse(i.opened) >= since);
   if (fixed.length) out.push(line("✔ תוקן מאז אתמול: " + escapeHtml(fixed.map((i) => i.text.replace(/:.*$/, "")).join(", "))));
@@ -164,7 +164,7 @@ export function buildPeriod(st, all, health, ux, now, days) {
   const cmpBase = weekly ? st.history.filter((h) => Date.parse(h.t) <= start && Date.parse(h.t) > start - 7 * DAY) : inW.filter((h) => Date.parse(h.t) <= start + 7 * DAY);
   const baseName = weekly ? "לעומת השבוע הקודם" : "לעומת תחילת החודש";
   const num = (a, k) => avg(a.map((h) => h[k]));
-  const out = [line(weekly ? "📅 <b>סיכום שבועי · לוח שידורים</b>" : "🗓 <b>סיכום חודשי · לוח שידורים</b>")];
+  const out = [line(weekly ? "📅 <b>סיכום שבועי · זפזופ</b>" : "🗓 <b>סיכום חודשי · זפזופ</b>")];
   out.push(...statusBlock(all, health, ux));
   const okN = inW.filter((h) => h.ok).length;
   out.push(line("<b>זמינות</b>: " + (inW.length ? f1((okN / inW.length) * 100) + "% (" + okN + " מתוך " + inW.length + " בדיקות)" : "אין נתונים")));

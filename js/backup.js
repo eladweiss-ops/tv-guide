@@ -104,8 +104,8 @@
   }
   $("#bkShare").addEventListener("click", function () {
     var link = myLink(); bkPush();
-    var txt = "הקישור האישי שלי ללוח השידורים (לשחזור במכשיר חדש):";
-    if (navigator.share) navigator.share({ title: "לוח שידורים - קישור אישי", text: txt, url: link }).catch(function () {});
+    var txt = "הקישור האישי שלי לזפזופ (לשחזור במכשיר חדש):";
+    if (navigator.share) navigator.share({ title: "זפזופ - קישור אישי", text: txt, url: link }).catch(function () {});
     else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { TVG.pill("הקישור הועתק", 1600); }, function () { $("#bkCode").value = link; });
     else $("#bkCode").value = link;
   });

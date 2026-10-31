@@ -25,7 +25,7 @@
 
   // ---- שיתוף האפליקציה עם חברים: קישור ההזמנה join/ (תמונה ותיאור משלו בוואטסאפ) ----
   var JOIN = "https://eladweiss-ops.github.io/tv-guide/join/";
-  var APPTXT = "היי! 👋 מצאתי אפליקציה ללוח שידורים: כל הערוצים במקום אחד, תזכורת לפני שהתוכנית מתחילה, מעקב אחרי סדרות ומה חדש בנטפליקס.\nחינם ובלי הרשמה. באייפון: פותחים בספארי ← שיתוף ← \"הוסף למסך הבית\".\n👇\n" + JOIN;
+  var APPTXT = "היי! 👋 תכירו את זפזופ 📺 לוח שידורים חכם: כל הערוצים במקום אחד, תזכורת לפני שהתוכנית מתחילה, מעקב אחרי סדרות ומה חדש בנטפליקס.\nחינם ובלי הרשמה. באייפון: פותחים בספארי ← שיתוף ← \"הוסף למסך הבית\".\n👇\n" + JOIN;
   function appWa() {
     var u = "https://wa.me/?text=" + encodeURIComponent(APPTXT), w = null;
     try { w = window.open(u, "_blank"); } catch (e) {}
@@ -33,7 +33,7 @@
     TVG.pill("📤 נשלח לוואטסאפ", 1800);
   }
   function appShare() {
-    if (navigator.share) { navigator.share({ title: "לוח שידורים", text: APPTXT.replace(JOIN, "").trim(), url: JOIN }).catch(function () {}); return; }
+    if (navigator.share) { navigator.share({ title: "זפזופ", text: APPTXT.replace(JOIN, "").trim(), url: JOIN }).catch(function () {}); return; }
     var ok = function () { TVG.pill("🔗 הקישור הועתק", 1800); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(APPTXT).then(ok, function () { TVG.pill(JOIN, 4000); });
     else TVG.pill(JOIN, 4000);

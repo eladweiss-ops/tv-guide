@@ -12,13 +12,13 @@ const icon = "data:image/png;base64," + fs.readFileSync(path.join(REPO, "icon-19
 
 const JOIN = process.argv[2] === "join";
 const bodyShare = `
-  <div class="brand"><img src="${icon}" alt=""><span>לוח שידורים</span></div>
+  <div class="brand"><img src="${icon}" alt=""><span>זפזופ</span></div>
   <div class="btn"><div class="big"><i>📅</i>לחצו לשמירה ביומן</div><div class="sub">פרטי התוכנית, תזכורת והוספה ליומן</div></div>
   <div class="hand">👆</div>`;
 const bodyJoin = `
   <div class="jwrap">
     <img class="jicon" src="${icon}" alt="">
-    <div class="jtxt"><div class="jname">לוח שידורים</div><div class="jline">כל הערוצים. מסך אחד.</div></div>
+    <div class="jtxt"><div class="jname">זפזופ</div><div class="jline">לוח שידורים חכם · כל הערוצים</div></div>
   </div>
   <div class="jchips"><span>⏰ תזכורת לפני השידור</span><span>📺 מעקב אחרי סדרות</span><span>🍿 נטפליקס וערב צפייה</span></div>
   <div class="jcta">חינם · בלי הרשמה · לחצו להתחלה 👆</div>`;

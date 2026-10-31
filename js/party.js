@@ -321,7 +321,7 @@
   var GV = null; // {id, v, ans, busy, safari, tick, name}
   var poll = 0;
   function whereTxt(v) { return v.place === "home" ? (v.host.name ? "אצל " + v.host.name : "אצל המארח") : "כל אחד מהבית"; }
-  function topBar() { return '<div class="lnd-top"><span class="lnd-brand">📺 לוח שידורים</span><button type="button" class="glass round lnd-x" data-ptyclose aria-label="סגירה">✕</button></div>'; }
+  function topBar() { return '<div class="lnd-top"><span class="lnd-brand">📺 זפזופ</span><button type="button" class="glass round lnd-x" data-ptyclose aria-label="סגירה">✕</button></div>'; }
   function hasWatch(v) { return v.kind === "nf" && RE_NF.test(v.link || ""); }
   function landBody() {
     var v = GV.v, h = topBar();

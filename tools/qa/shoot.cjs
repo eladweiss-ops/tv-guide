@@ -234,6 +234,9 @@ function dsFixtureData() {
         const st = () => page.evaluate(() => { const b = document.getElementById("toNow"), nd = document.querySelector(".nextday"); return { day: TVG.day, now: !!document.querySelector("#main .row.now"), lbl: !!document.querySelector(".pastlbl"), nd: nd ? nd.textContent : "", show: b.classList.contains("show"), txt: b.textContent }; });
         let s = await st(); T(s.day === "2026-11-01" && s.now && !s.lbl && /^היום, יום שני 2\.11/.test(s.nd), "opens on yesterday with now-row: " + JSON.stringify(s));
         await snap("02f_grid_midnight");
+        await page.click('.day[data-day="2026-11-02"]'); await page.waitForTimeout(500);
+        s = await st(); T(s.day === "2026-11-02", "tapping today after midnight stays on today (no bounce back): " + JSON.stringify(s));
+        await page.click('.day[data-day="2026-11-01"]'); await page.waitForTimeout(500);
         await page.click(".nextday"); await page.waitForTimeout(500);
         s = await st(); T(s.day === "2026-11-02" && s.show && s.txt === "→עכשיו", "today shows '→עכשיו': " + JSON.stringify(s));
         await page.click("#toNow"); await page.waitForTimeout(600);
@@ -778,9 +781,9 @@ function dsFixtureData() {
     });
     await step("fluid-day-swipe-edge", async () => { // יום אחרון: גומי וחוזר; כיוון RTL נשמר (dx>0 = היום הבא)
       const cdp = await ctx.newCDPSession(page); await fresh(); await page.click('[data-tab="grid"]'); await page.waitForTimeout(700);
-      const days = await page.evaluate(() => TVG.allDays()), y = d.h * 0.55;
+      const days = await page.evaluate(() => TVG.allDays()), y = d.h * 0.55, d0 = await page.evaluate(() => TVG.day); /* יש גם ימים שעברו בתחילת הרשימה */
       await touch.drag(cdp, [[d.w * 0.25, y], [d.w * 0.7, y]], 120); await page.waitForTimeout(800);
-      if ((await page.evaluate(() => TVG.day)) !== days[1]) throw new Error("assert: dx>0 should go to the next day");
+      if ((await page.evaluate(() => TVG.day)) !== days[days.indexOf(d0) + 1]) throw new Error("assert: dx>0 should go to the next day");
       await page.evaluate((l) => { TVG.day = l; TVG.render(); }, days[days.length - 1]); await page.waitForTimeout(500);
       await touch.drag(cdp, [[d.w * 0.25, y], [d.w * 0.85, y]], 250); await page.waitForTimeout(800);
       const r = await page.evaluate(() => ({ day: TVG.day, tr: document.querySelector(".list").style.transform }));

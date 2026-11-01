@@ -22,7 +22,7 @@
     TVG.G = r.g; TVG.isSample = r.s; TVG.classify(); TVG.index();
     try { var saved = JSON.parse(TVG.store("tvg.sel") || "null"); if (Array.isArray(saved)) saved.forEach(function (id) { id = TVG.IDMAP[id] || id; if (TVG.by.has(id)) sel.add(id); }); if (sel.size !== saved.length && !TVG.isSample && TVG.G.channels.length > 50) TVG.saveSel(); } catch (e) {}
     var st0 = TVG.store("tvg.tab"); TVG.tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
-    TVG.scrollNext = TVG.tab === "grid";
+    TVG.scrollNext = TVG.enterGrid = TVG.tab === "grid";
     TVG.render();
     TVG.loadPastIndex(); // ימים שעברו (past/) לפס הימים בלוח
     if (TVG.afterBoot) TVG.afterBoot(); // nav.js: מקום אחד לפרמטרים בכתובת, קדימות rem > p > q > tab

@@ -101,7 +101,7 @@
       var nt = tb.getAttribute("data-tab");
       if (!$("#qwrap").hidden) { TVG.setSearch(false); if (nt === TVG.tab) { window.scrollTo(0, SCR[TVG.tab] || 0); return; } } // לשונית סוגרת את החיפוש
       if (nt === TVG.tab) { if (TVG.prevTab && TVG.prevTab !== TVG.tab) nt = TVG.prevTab; else { window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); return; } } // לחיצה שנייה: חזרה למסך הקודם
-      TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.tab === "grid"; TVG.render();
+      TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.enterGrid = TVG.tab === "grid"; TVG.render();
       if (!(TVG.tab === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, SCR[TVG.tab] || 0); return; // לוח: תמיד ממורכז על מה שמשודר עכשיו (מיקום ישן כבר לא רלוונטי)
     }
     if (t.closest("[data-tonow]") && TVG.day !== TVG.nowDay()) { TVG.day = TVG.nowDay(); TVG.scrub = null; TVG.scrollNext = true; TVG.render(); return; } // יום אחר: חזרה ליום של מה שמשודר עכשיו, ממורכז עליו

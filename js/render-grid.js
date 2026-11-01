@@ -10,7 +10,8 @@
 
   function vGrid() {
     var now = new Date(), td = dstr(now); TVG.pickers(now); // קובע ערוץ ויום ברירת מחדל
-    if (TVG.scrollNext && TVG.day === td) TVG.day = nowDay(); // אחרי חצות: מה שמשודר עכשיו התחיל אתמול - נכנסים ליום שלו
+    if (TVG.enterGrid && TVG.day === td) TVG.day = nowDay(); // כניסה ללוח אחרי חצות: מה שמשודר עכשיו התחיל אתמול - נכנסים ליום שלו (לא במעבר יום ביד)
+    TVG.enterGrid = false;
     var h = TVG.pickers(now), isPast = TVG.day < td;
     var rows = (TVG.by.get(TVG.chId) || []).filter(function (p) { return dstr(p.s) === TVG.day; });
     var st = isPast && TVG.PAST.indexOf(TVG.day) >= 0 ? TVG.pastState[TVG.day] : "ok"; // אתמול שעוד לא בארכיון - כבר בלוח

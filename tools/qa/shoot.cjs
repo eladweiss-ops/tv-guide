@@ -211,7 +211,20 @@ function dsFixtureData() {
       if (s.show) { await page.click("#toNow"); await page.waitForTimeout(900); s = await st(); T(!s.show, "toNow hides after tap"); }
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(300);
       await page.click(".nextday"); await page.waitForTimeout(500);
-      s = await st(); T(s.day === "2026-11-02" && s.y === 0 && !s.show, "nextday → 2.11 at top: " + JSON.stringify(s)); await snap("02d_grid_nextday");
+      s = await st(); T(s.day === "2026-11-02" && s.y === 0 && s.show && s.txt === "חזרה להיום→", "nextday → 2.11 at top, back-to-today shown: " + JSON.stringify(s)); await snap("02d_grid_nextday");
+    });
+    await step("grid_past", async () => { // לוח: ימים שעברו (past/) בפס הימים, טעינה, כותרת "שודר", חזרה להיום
+      const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
+      await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(900);
+      const days = await page.$$eval(".days .day", (a) => a.map((b) => b.getAttribute("data-day") + (b.classList.contains("pastd") ? "p" : "")));
+      T(days.indexOf("2026-10-31p") >= 0 && days.indexOf("2026-11-01") === days.indexOf("2026-10-31p") + 1, "past days before today: " + days.join(","));
+      await page.click('.day[data-day="2026-10-31"]'); await page.waitForSelector(".pastlbl"); await page.waitForTimeout(1200);
+      const s = await page.evaluate(() => ({ lbl: document.querySelector(".pastlbl").textContent, rows: document.querySelectorAll("#main .list .row[data-pts]").length, dim: document.querySelectorAll("#main .row.past").length, btn: document.getElementById("toNow").textContent, show: document.getElementById("toNow").classList.contains("show") }));
+      T(s.lbl === "שודר ביום שבת 31.10" && s.rows > 5 && s.dim === 0 && s.show && s.btn === "חזרה להיום←", "past day view: " + JSON.stringify(s));
+      await snap("02e_grid_past");
+      await page.click("#toNow"); await page.waitForTimeout(600);
+      const b = await page.evaluate(() => ({ day: TVG.day, now: !!document.querySelector("#main .row.now"), show: document.getElementById("toNow").classList.contains("show") }));
+      T(b.day === "2026-11-01" && b.now && !b.show, "back to today: " + JSON.stringify(b));
     });
     await step("synopsis", async () => {
       await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(600);

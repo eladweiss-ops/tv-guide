@@ -190,7 +190,41 @@
   function allDays() {
     var s = new Set(); TVG.by.forEach(function (a) { a.forEach(function (p) { s.add(dstr(p.s)); }); });
     var all = Array.from(s).sort(), td = dstr(new Date()), fut = all.filter(function (d) { return d >= td; });
-    return (fut.length ? fut : all).slice(0, 8); // כל מה שיש בלוח (בדרך כלל שבוע)
+    if (!fut.length) return all.slice(0, 8);
+    return TVG.PAST.filter(function (d) { return d < td; }).concat(fut.slice(0, 8)); // ימים שעברו (מהארכיון) + כל מה שיש בלוח (בדרך כלל שבוע)
+  }
+
+  // ===== "שודר": ימים שעברו, מהארכיון past/ (archive_past.mjs). יום יורד רק כשבוחרים בו =====
+  TVG.PAST = []; TVG.pastState = {}; // יום → "loading" | "ok" | "fail"
+  TVG.loadPastIndex = function () {
+    if (TVG.isSample) return;
+    fetch("past/index.json?v=" + TVG.BUILD, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var td = dstr(new Date());
+      TVG.PAST = (j && j.days || []).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d) && d < td; }).sort();
+      if (TVG.PAST.length && TVG.tab === "grid") TVG.render();
+    }).catch(function () {});
+  };
+  TVG.loadPast = function (d) {
+    if (TVG.pastState[d] === "loading" || TVG.pastState[d] === "ok") return;
+    TVG.pastState[d] = "loading";
+    fetch("past/" + d + ".json").then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) {
+      mergePast(j.programs || []); TVG.pastState[d] = "ok";
+    }).catch(function () { TVG.pastState[d] = "fail"; }).then(function () { if (TVG.tab === "grid" && TVG.day === d) TVG.render(); });
+  };
+  // מוסיף תוכניות של יום שעבר ללוח (אותו איחוד ערוצים כמו index), בלי כפילויות, ומחשב מחדש שעות סיום
+  function mergePast(progs) {
+    var touched = {}, seen = {};
+    progs.forEach(function (p) {
+      var lid = TVG.IDMAP[p.ch] || p.ch, a = TVG.by.get(lid); if (!a || !p.start || !p.title) return;
+      if (!seen[lid]) { seen[lid] = {}; a.forEach(function (o) { seen[lid][o.s.getTime()] = 1; }); }
+      var o = { title: unent(p.title), desc: p.desc || "", s: TVG.parse(p.start), rr: p.rr ? 1 : 0, lv: p.lv === 1 ? 1 : p.lv === 0 ? 0 : -1 };
+      if (isNaN(o.s) || seen[lid][o.s.getTime()]) return;
+      seen[lid][o.s.getTime()] = 1; a.push(o); touched[lid] = a;
+    });
+    Object.keys(touched).forEach(function (k) {
+      var a = touched[k]; a.sort(function (x, y) { return x.s - y.s; });
+      a.forEach(function (p, i) { p.e = a[i + 1] ? a[i + 1].s : new Date(p.s.getTime() + 3600000); });
+    });
   }
   function dObj(ds) { var p = ds.split("-"); return new Date(+p[0], p[1] - 1, +p[2]); }
   function dayLabel(ds) { var d = dObj(ds); return (ds === dstr(new Date()) ? "היום" : DAYS[d.getDay()]) + " " + d.getDate() + "." + (d.getMonth() + 1); }

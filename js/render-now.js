@@ -75,7 +75,7 @@
     }).join("") + "</select></label>";
     h += '<div class="days" role="group" aria-label="יום">' + days.map(function (d) {
       var dt = TVG.dObj(d);
-      return '<button type="button" class="day" data-day="' + d + '" aria-pressed="' + (d === TVG.day) + '"><span>' + (d === dstr(now) ? "היום" : DAYS[dt.getDay()]) + "</span><b>" + dt.getDate() + "." + (dt.getMonth() + 1) + "</b></button>";
+      return '<button type="button" class="day' + (d < dstr(now) ? " pastd" : "") + '" data-day="' + d + '" aria-pressed="' + (d === TVG.day) + '"><span>' + (d === dstr(now) ? "היום" : DAYS[dt.getDay()]) + "</span><b>" + dt.getDate() + "." + (dt.getMonth() + 1) + "</b></button>";
     }).join("") + "</div>";
     return h;
   }

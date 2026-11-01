@@ -755,3 +755,8 @@
   .pill .pillact { color: #B04600; }
   :root[data-theme="dark"] .pill { background: rgba(92,58,34,.58); color: #FFF0E2; border-color: rgba(255,200,160,.22); box-shadow: 0 0 0 .5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12), 0 10px 30px rgba(0,0,0,.4); }
   :root[data-theme="dark"] .pill .pillact { color: #FFA45C; }
+
+  /* "שודר": ימים שעברו בפס הימים (מעומעמים) והכותרת מעל הרשימה */
+  .day.pastd span, .day.pastd b { color: color-mix(in srgb, var(--muted) 70%, transparent); }
+  .day.pastd[aria-pressed="true"] span, .day.pastd[aria-pressed="true"] b { color: var(--ink); }
+  .pastlbl { display: flex; align-items: center; gap: 6px; margin: 2px 4px 10px; font-size: 13px; color: var(--muted); }

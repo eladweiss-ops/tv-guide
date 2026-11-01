@@ -56,7 +56,7 @@
 
 ## 4. צינור הנתונים (GitHub Action `update.yml`, כל לילה 03:00 UTC + הרצה ידנית)
 
-סדר: `scrape.mjs --all --range 3690 3850` → `enrich13` (רשת 13) → `enrich_sport1` → `enrich_sport5` → `enrich_kan` (כאן 11) → `enrich_one` → `enrich_keshet` (קשת/mako) → `extra_channels` (ערוץ 14, i24NEWS, כאן חינוכית, ערוץ הכנסת) → `enrich_hot --apply-cache` → `desc_memory` (זיכרון תקצירים: אותו ערוץ+שם, אותו תקציר ב-2 ימים לפחות, שם עם תקציר אחר נפסל; `desc-memory.json`, 30 יום) → `netflix` (אם יש `TMDB_API_KEY`; בונה `netflix.json` ו-`disney.json`. ל-TMDB אין נתוני דיסני+ בישראל, לכן דיסני+ לפי הקטלוג בבריטניה, `region:"GB"`, והלקוח מציג "ייתכנו הבדלים בישראל") → commit.
+סדר: `archive_past.mjs` (לפני שהלוח נבנה מחדש: כל יום שעבר מ-guide.json הקודם נשמר ב-`past/YYYY-MM-DD.json`, שבוע אחורה, ו-`past/index.json`; הלוח מציג אותם בפס הימים ומוריד יום רק כשבוחרים בו) → `scrape.mjs --all --range 3690 3850` → `enrich13` (רשת 13) → `enrich_sport1` → `enrich_sport5` → `enrich_kan` (כאן 11) → `enrich_one` → `enrich_keshet` (קשת/mako) → `extra_channels` (ערוץ 14, i24NEWS, כאן חינוכית, ערוץ הכנסת) → `enrich_hot --apply-cache` → `desc_memory` (זיכרון תקצירים: אותו ערוץ+שם, אותו תקציר ב-2 ימים לפחות, שם עם תקציר אחר נפסל; `desc-memory.json`, 30 יום) → `netflix` (אם יש `TMDB_API_KEY`; בונה `netflix.json` ו-`disney.json`. ל-TMDB אין נתוני דיסני+ בישראל, לכן דיסני+ לפי הקטלוג בבריטניה, `region:"GB"`, והלקוח מציג "ייתכנו הבדלים בישראל") → commit.
 כל שלב העשרה `continue-on-error` ויוצא עם 0 בכישלון – אף פעם לא שובר את הלוח.
 
 ### מקורות ומלכודות ידועות (כל אחד מהם עלה לנו בבאג)

@@ -749,3 +749,9 @@
   .tonow.show { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); }
   body:has(.scrim:not([hidden])) .tonow { display: none; }
   @media (prefers-reduced-motion: reduce) { .tonow { transition: opacity .15s; } }
+
+  /* הודעה קופצת: גוון חם (קרם/קפה) במקום שחור */
+  .pill { background: #FFF1E3; color: #3B1F0B; box-shadow: 0 0 0 1px rgba(255,122,26,.3), 0 8px 28px rgba(120,60,10,.22); }
+  .pill .pillact { color: #B04600; }
+  :root[data-theme="dark"] .pill { background: #3A2718; color: #FFE8D2; box-shadow: 0 0 0 1px rgba(255,150,80,.32), 0 8px 28px rgba(0,0,0,.45); }
+  :root[data-theme="dark"] .pill .pillact { color: #FFA45C; }

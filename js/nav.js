@@ -102,7 +102,7 @@
     if (nt === "nf" && !TVG.NF) return;
     if (!$("#qwrap").hidden) TVG.setSearch(false);
     TVG.prevTab = TVG.tab; TVG.SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", nt);
-    TVG.scrollNext = nt === "grid" && TVG.SCR.grid == null; TVG.render(); window.scrollTo(0, TVG.SCR[nt] || 0);
+    TVG.scrollNext = nt === "grid"; TVG.render(); if (!(nt === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, TVG.SCR[nt] || 0);
   }
   function openQuery(q) {
     if (!$("#qwrap").hidden && !q) { $("#q").focus(); return; }

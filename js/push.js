@@ -9,6 +9,7 @@
   TVG.openPersonal = openPersonal;
   TVG.pChips = pChips;
   TVG.pushCard = pushCard;
+  TVG.statusCards = statusCards;
   TVG.pushReg = pushReg;
   TVG.savePersonal = savePersonal;
 
@@ -103,8 +104,20 @@
     if (addRec(rec, d) === "pending") return;
     TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח יומן Google. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
+  var PUSH_BODY = '<p class="remnote">🔔 תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div>';
+  function calBody() {
+    return '<p class="remnote">📅 כל תזכורת שמוסיפים או מבטלים כאן מתעדכנת ביומן לבד (בדרך כלל תוך רבע שעה).</p>' +
+      '<div class="bar"><a class="ghost" data-calsub href="' + esc(TVG.calUrl()) + '">חיבור היומן מחדש</a><button type="button" class="ghost" data-calics>להפסיק להשתמש ביומן הייעודי</button></div>' +
+      '<p class="credit">"חיבור מחדש" – אם מחקת את היומן מהטלפון או החלפת מכשיר. "להפסיק" – תזכורות חדשות ייכנסו ליומן הרגיל של הטלפון, אחת-אחת.</p>';
+  }
+  // ראש מסך התזכורות: כשהכול תקין – שורה אחת מקופלת וקטנה (הפרטים בפתיחה). כשמשהו דורש פעולה – הכרטיסים המלאים
+  function statusCards() {
+    var calOk = !TVG.isAndroid && TVG.calMode === "sub" && !TVG.syncBad;
+    if (TVG.pushOn && (calOk || TVG.isAndroid)) return '<details class="calopt okline"><summary>✓ ' + (calOk ? "התראות ויומן פעילים" : "התראות פעילות") + "</summary>" + PUSH_BODY + (calOk ? calBody() : "") + "</details>";
+    return pushCard() + calCard();
+  }
   function pushCard() {
-    if (TVG.pushOn) return '<details class="calopt"><summary>🔔 התראות לטלפון פעילות ✓</summary><p class="remnote">תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div></details>';
+    if (TVG.pushOn) return '<details class="calopt"><summary>🔔 התראות לטלפון פעילות ✓</summary>' + PUSH_BODY + "</details>";
     if (TVG.canPush) return '<div class="note pushnote">🔔 <b>קבלו התראה ישירות לטלפון</b>, בדיוק בזמן שבחרתם, גם כשהאפליקציה סגורה.<div class="bar"><button type="button" class="btn sm" data-pushon>הפעלת התראות</button></div></div>';
     if (isIOS && !standalone) return '<div class="note">🔔 כדי לקבל התראות ישירות לטלפון, פתחו את האפליקציה מהאייקון במסך הבית.</div>';
     return "";
@@ -112,9 +125,7 @@
   function calCard() {
     if (TVG.isAndroid) return ""; // יומן מנוי (webcal) לא עובד באנדרואיד
     if (TVG.calMode === "sub") return (TVG.syncBad ? '<div class="note">⚠️ השינוי האחרון עוד לא הגיע ליומן. <button type="button" class="ghost" data-calsync>לנסות שוב</button></div>' : "") +
-      '<details class="calopt"><summary>📅 יומן "לוח שידורים" מחובר ✓</summary><p class="remnote">כל תזכורת שמוסיפים או מבטלים כאן מתעדכנת ביומן לבד (בדרך כלל תוך רבע שעה).</p>' +
-      '<div class="bar"><a class="ghost" data-calsub href="' + esc(TVG.calUrl()) + '">חיבור היומן מחדש</a><button type="button" class="ghost" data-calics>להפסיק להשתמש ביומן הייעודי</button></div>' +
-      '<p class="credit">"חיבור מחדש" – אם מחקת את היומן מהטלפון או החלפת מכשיר. "להפסיק" – תזכורות חדשות ייכנסו ליומן הרגיל של הטלפון, אחת-אחת.</p></details>';
+      '<details class="calopt"><summary>📅 היומן מחובר ✓</summary>' + calBody() + "</details>";
     return '<div class="note">📅 אפשר להקים יומן נפרד בשם "לוח שידורים" שמתעדכן לבד, כולל ביטולים.<div class="bar"><button type="button" class="ghost" data-calsetup>הקמת יומן ייעודי</button></div></div>';
   }
 })(window.TVG);

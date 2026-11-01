@@ -101,8 +101,8 @@
       var nt = tb.getAttribute("data-tab");
       if (!$("#qwrap").hidden) { TVG.setSearch(false); if (nt === TVG.tab) { window.scrollTo(0, SCR[TVG.tab] || 0); return; } } // לשונית סוגרת את החיפוש
       if (nt === TVG.tab) { if (TVG.prevTab && TVG.prevTab !== TVG.tab) nt = TVG.prevTab; else { window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); return; } } // לחיצה שנייה: חזרה למסך הקודם
-      TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.tab === "grid" && SCR.grid == null; TVG.render();
-      window.scrollTo(0, SCR[TVG.tab] || 0); return;
+      TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.tab === "grid"; TVG.render();
+      if (!(TVG.tab === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, SCR[TVG.tab] || 0); return; // לוח: תמיד ממורכז על מה שמשודר עכשיו (מיקום ישן כבר לא רלוונטי)
     }
     var pd = t.closest("[data-day]"); if (pd) { TVG.day = pd.getAttribute("data-day"); TVG.scrub = null; TVG.scrollNext = true; TVG.render(); return; }
     var th = t.closest("[data-theme-set]"); if (th) { TVG.setTheme(th.getAttribute("data-theme-set")); return; }

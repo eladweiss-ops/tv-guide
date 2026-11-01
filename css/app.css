@@ -283,6 +283,10 @@
   details.calopt summary::-webkit-details-marker { display: none; }
   details.calopt summary::after { content: " ›"; color: var(--muted); }
   details.calopt[open] summary::after { content: " ‹"; }
+  /* הכול תקין: שורה אחת קטנה ושקטה במקום שני כרטיסים (נפתחת לפרטים) */
+  details.calopt.okline { display: block; width: fit-content; max-width: 100%; margin: 0 auto 12px; padding: 0 16px; border-radius: 999px; background: transparent; border: 1px solid var(--line, rgba(127,127,127,.25)); }
+  details.calopt.okline summary { font-weight: 600; font-size: 14px; color: var(--muted); justify-content: center; }
+  details.calopt.okline[open] { width: auto; border-radius: 16px; padding: 0 14px 10px; background: var(--soft); border-color: transparent; }
   .lp { align-items: center; }
   .chips.lp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; margin: 6px 0 4px; }
   .chips.lp .chip { min-height: 40px; padding: 0 11px; font-size: .9rem; }

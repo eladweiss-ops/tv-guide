@@ -226,6 +226,20 @@ function dsFixtureData() {
       const b = await page.evaluate(() => ({ day: TVG.day, now: !!document.querySelector("#main .row.now"), show: document.getElementById("toNow").classList.contains("show") }));
       T(b.day === "2026-11-01" && b.now && !b.show, "back to today: " + JSON.stringify(b));
     });
+    await step("grid_midnight", async () => { // אחרי חצות: מה שמשודר עכשיו התחיל אתמול - הלוח נפתח על אתמול, וכפתור "עכשיו" מיום אחר מחזיר אליו
+      const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
+      await page.clock.setFixedTime(new Date("2026-11-02T00:05:00+02:00"));
+      try {
+        await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(900);
+        const st = () => page.evaluate(() => { const b = document.getElementById("toNow"), nd = document.querySelector(".nextday"); return { day: TVG.day, now: !!document.querySelector("#main .row.now"), lbl: !!document.querySelector(".pastlbl"), nd: nd ? nd.textContent : "", show: b.classList.contains("show"), txt: b.textContent }; });
+        let s = await st(); T(s.day === "2026-11-01" && s.now && !s.lbl && /^היום, יום שני 2\.11/.test(s.nd), "opens on yesterday with now-row: " + JSON.stringify(s));
+        await snap("02f_grid_midnight");
+        await page.click(".nextday"); await page.waitForTimeout(500);
+        s = await st(); T(s.day === "2026-11-02" && s.show && s.txt === "→עכשיו", "today shows '→עכשיו': " + JSON.stringify(s));
+        await page.click("#toNow"); await page.waitForTimeout(600);
+        s = await st(); T(s.day === "2026-11-01" && s.now && !s.show, "back to now: " + JSON.stringify(s));
+      } finally { await page.clock.setFixedTime(new Date(FIXED_NOW)); }
+    });
     await step("synopsis", async () => {
       await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(600);
       await page.click("[data-opentog]"); await page.waitForTimeout(500); await snap("03_synopsis_now");

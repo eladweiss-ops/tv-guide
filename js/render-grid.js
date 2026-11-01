@@ -6,13 +6,16 @@
   TVG.vGrid = vGrid;
   TVG.updToNow = updToNow;
   TVG.nextDay = nextDay;
+  TVG.nowDay = nowDay;
 
   function vGrid() {
-    var now = new Date(), h = TVG.pickers(now), td = dstr(now), isPast = TVG.day < td;
+    var now = new Date(), td = dstr(now); TVG.pickers(now); // קובע ערוץ ויום ברירת מחדל
+    if (TVG.scrollNext && TVG.day === td) TVG.day = nowDay(); // אחרי חצות: מה שמשודר עכשיו התחיל אתמול - נכנסים ליום שלו
+    var h = TVG.pickers(now), isPast = TVG.day < td;
     var rows = (TVG.by.get(TVG.chId) || []).filter(function (p) { return dstr(p.s) === TVG.day; });
-    var st = isPast ? TVG.pastState[TVG.day] : "ok";
+    var st = isPast && TVG.PAST.indexOf(TVG.day) >= 0 ? TVG.pastState[TVG.day] : "ok"; // אתמול שעוד לא בארכיון - כבר בלוח
     if (isPast && !st) { TVG.loadPast(TVG.day); st = "loading"; }
-    if (isPast) h += '<p class="pastlbl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>שודר ב' + esc(dayTxt(TVG.day)) + "</p>";
+    if (isPast && TVG.day !== nowDay()) h += '<p class="pastlbl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>שודר ב' + esc(dayTxt(TVG.day)) + "</p>";
     if (isPast && st === "loading" && !rows.length) return h + '<div class="list"><div class="row"><span></span><span class="none">טוען…</span></div></div>';
     h += '<div class="list">' + (rows.length ? rows.map(function (p) {
       var cls = p.s <= now && now < p.e ? " now" : (p.e <= now && !isPast ? " past" : "");
@@ -24,6 +27,12 @@
     return h;
   }
 
+  // היום שבו התחילה התוכנית שמשודרת עכשיו בערוץ הנבחר (אחרי חצות זה אתמול); אם אין - היום
+  function nowDay() {
+    var a = TVG.by.get(TVG.chId) || [], n = Date.now();
+    for (var i = 0; i < a.length; i++) if (a[i].s <= n && n < a[i].e) return dstr(a[i].s);
+    return dstr(new Date());
+  }
   // היום הבא שיש לו נתונים בלוח (אחרי היום שנבחר), או "" ביום האחרון
   function nextDay() { var days = TVG.allDays(), i = days.indexOf(TVG.day); return i >= 0 && i < days.length - 1 ? days[i + 1] : ""; }
   // "מחר, יום שני 2.11" / "יום שלישי 3.11"
@@ -42,7 +51,8 @@
     }
     var grid = TVG.tab === "grid" && !TVG.q.trim() && !!document.querySelector("#main .list"), td = dstr(new Date());
     var el = grid && document.querySelector("#main .row.now"), dir = "", lbl = "עכשיו";
-    if (grid && TVG.day && TVG.day !== td) { dir = TVG.day < td ? "←" : "→"; lbl = "חזרה להיום"; } // יום אחר: חזרה להיום (בעברית "קדימה" בזמן הוא שמאלה)
+    var nd = grid ? nowDay() : td;
+    if (grid && TVG.day && TVG.day !== nd) { dir = TVG.day < nd ? "←" : "→"; lbl = nd === td ? "חזרה להיום" : "עכשיו"; } // יום אחר: חזרה ליום של מה שמשודר עכשיו (בעברית "קדימה" בזמן הוא שמאלה)
     else if (el) {
       var r = el.getBoundingClientRect(), hd = document.querySelector("header.top"), dk = document.querySelector(".dock");
       var top = hd ? hd.getBoundingClientRect().bottom : 0, bot = dk ? dk.getBoundingClientRect().top : window.innerHeight;

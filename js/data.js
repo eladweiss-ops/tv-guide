@@ -191,7 +191,10 @@
     var s = new Set(); TVG.by.forEach(function (a) { a.forEach(function (p) { s.add(dstr(p.s)); }); });
     var all = Array.from(s).sort(), td = dstr(new Date()), fut = all.filter(function (d) { return d >= td; });
     if (!fut.length) return all.slice(0, 8);
-    return TVG.PAST.filter(function (d) { return d < td; }).concat(fut.slice(0, 8)); // ימים שעברו (מהארכיון) + כל מה שיש בלוח (בדרך כלל שבוע)
+    var yd = new Date(); yd.setDate(yd.getDate() - 1); yd = dstr(yd);
+    var past = TVG.PAST.filter(function (d) { return d < td; });
+    if (past.indexOf(yd) < 0 && all.indexOf(yd) >= 0) past.push(yd); // אתמול עוד לא בארכיון (נשמר רק בלילה), אבל עדיין בלוח
+    return past.concat(fut.slice(0, 8)); // ימים שעברו (מהארכיון) + כל מה שיש בלוח (בדרך כלל שבוע)
   }
 
   // ===== "שודר": ימים שעברו, מהארכיון past/ (archive_past.mjs). יום יורד רק כשבוחרים בו =====

@@ -240,7 +240,7 @@ export const SERVICES = {
     base: ["popular", "recent", "top"], order: NEW_ORDER, meta: ROW_META, specs: newRowSpecs, priority: ["popular", "top", "israeli", "recent"],
   },
   disney: {
-    id: "disney", file: "disney.json", providerId: DISNEY, resolveName: /^disney\s*(plus|\+)/i, fallbackRegion: "US", linkBase: "https://www.disneyplus.com/he-il/search?q=",
+    id: "disney", file: "disney.json", providerId: DISNEY, resolveName: /^disney\s*(plus|\+)/i, fallbackRegion: "GB", linkBase: "https://www.disneyplus.com/he-il/search?q=",
     base: ["popular", "top"], order: DISNEY_ORDER, meta: DISNEY_META, specs: disneyRowSpecs, priority: ["popular", "top", "week"],
   },
 };
@@ -431,12 +431,13 @@ async function buildService(svc, ctx) {
     const t2 = await tmdb("/discover/movie", Object.assign({}, d2, { page: 1 }));
     console.log(`${svc.id}: provider=${pid} total(flatrate)=${t1 && t1.total_results} total(any)=${t2 && t2.total_results}`);
   } catch (e) { console.log(`${svc.id}: provider=${pid} diag failed ${e.message}`); }
-  // TMDB לא מחזיר רשימות discover לדיסני+ בישראל (0 תוצאות), אבל יודע לכל כותר אם הוא בדיסני+ ישראל.
-  // לכן: מועמדים מאזור גיבוי (ארה"ב), ואחר כך סינון לפי זמינות בישראל בדף הספקים של כל כותר
-  let dd = d, ilCheck = false;
+  // TMDB לא מחזיר נתוני זמינות לדיסני+ בישראל (גם לא לכל כותר בנפרד; נבדק 1.11.2026). לכן: הקטלוג של אזור הגיבוי
+  // (בריטניה, הקרוב ביותר לישראל), והקובץ מסומן region כדי שהלקוח יציג "ייתכנו הבדלים בישראל".
+  // אם יום אחד יופיעו נתונים לישראל, הבדיקה הראשונה מחזירה תוצאות ואזור הגיבוי לא בשימוש
+  let dd = d, region = "";
   if (svc.fallbackRegion) {
     const probe = await tmdb("/discover/movie", Object.assign({}, d, { page: 1 })).catch(() => null);
-    if (!probe || !(probe.total_results || (probe.results || []).length)) { dd = Object.assign({}, d, { watch_region: svc.fallbackRegion }); ilCheck = true; console.log(svc.id + ": אין רשימות לישראל ב-TMDB, מועמדים מ-" + svc.fallbackRegion + " + סינון זמינות בישראל"); }
+    if (!probe || !(probe.total_results || (probe.results || []).length)) { dd = Object.assign({}, d, { watch_region: svc.fallbackRegion }); region = svc.fallbackRegion; console.log(svc.id + ": אין נתונים לישראל ב-TMDB, הקטלוג של " + region); }
   }
   const from = day(-60), to = day(0);
   const byPop = (a, b) => b.pop - a.pop;
@@ -464,19 +465,6 @@ async function buildService(svc, ctx) {
   const uniq = new Map();
   for (const r of Object.values(refs).flat()) uniq.set(key(r.type, r.id), r);
 
-  if (ilCheck) {
-    const ok = new Set(), all = uniq.size;
-    await pool([...uniq.entries()].map(([k, r]) => async () => {
-      try {
-        const j = await tmdb("/" + r.type + "/" + r.id + "/watch/providers", {});
-        const il = j && j.results && j.results.IL;
-        if (il && (il.flatrate || []).some((p) => String(p.provider_id) === String(pid))) ok.add(k);
-      } catch (e) {}
-    }));
-    for (const name of Object.keys(refs)) refs[name] = refs[name].filter((r) => ok.has(key(r.type, r.id)));
-    for (const k of [...uniq.keys()]) if (!ok.has(k)) uniq.delete(k);
-    console.log(svc.id + ": " + ok.size + " מתוך " + all + " מועמדים זמינים בישראל");
-  }
   const items = {};
   await pool(
     [...uniq.entries()].map(([k, r]) => async () => {
@@ -531,6 +519,7 @@ async function buildService(svc, ctx) {
   const hero = pickHero(rows.popular, items);
   const { rows: outRows, items: outItems, rowMeta } = finalize(rows, items, svc);
   const out = { v: SCHEMA, updated: new Date().toISOString(), hero, rows: outRows, rowMeta, items: outItems };
+  if (region) out.region = region; // הקטלוג של אזור אחר (לא ישראל)
   await writeFile(dir + "/" + svc.file, JSON.stringify(out));
   console.log(`${svc.file}: ${Object.keys(outItems).length} פריטים; ` + Object.keys(outRows).map((n) => `${n}=${outRows[n].length}`).join(" "));
   return out;

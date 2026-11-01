@@ -392,6 +392,24 @@ test("run disney: ספק מזוהה לפי שם, קישור דיסני+, שור�
   await assert.rejects(readFile(join(dir, "netflix.json"), "utf8"));
 });
 
+test("run disney: אין נתונים לישראל, הקטלוג של בריטניה מסומן region:GB", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "ds-"));
+  const log = [], inner = disneyMock(log);
+  globalThis.fetch = async (u, i) => {
+    const url = new URL(String(u));
+    if (url.pathname.startsWith("/3/discover/") && url.searchParams.get("watch_region") === "IL") return json({ page: 1, total_results: 0, total_pages: 0, results: [] });
+    return inner(u, i);
+  };
+  const out = await run({ tmdbKey: "k", omdbKey: "", dir, service: "disney" });
+  assert.ok(out && out.region === "GB" && out.rows.popular.length >= 4);
+  assert.ok(log.filter((c) => c.q.watch_region).every((c) => c.q.watch_region === "GB"));
+  assert.equal(JSON.parse(await readFile(join(dir, "disney.json"), "utf8")).region, "GB");
+  // עם נתונים לישראל: בלי region
+  globalThis.fetch = disneyMock([]);
+  const o2 = await run({ tmdbKey: "k", omdbKey: "", dir, service: "disney" });
+  assert.ok(o2 && !("region" in o2));
+});
+
 test("run disney: זיהוי ספק נכשל משתמש ב-337", async () => {
   const dir = await mkdtemp(join(tmpdir(), "ds-"));
   const log = [];

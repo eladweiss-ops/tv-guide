@@ -104,7 +104,7 @@ function dsFixtureData() {
   const ks = Object.keys(items), pick = (n, off) => Array.from({ length: n }, (_, i) => ks[(i + off) % ks.length]);
   const rows = { popular: pick(20, 0), week: pick(12, 8), series: ks.filter((k) => k[0] === "t").slice(0, 14), movies: ks.filter((k) => k[0] === "m").slice(0, 16), kids: pick(12, 20), marvel: pick(10, 30), starwars: pick(8, 40), pixar: pick(8, 50), top: pick(12, 55) };
   const rowMeta = { popular: { title: "🔥 הכי נצפים" }, week: { title: "🆕 יצא החודש" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, kids: { title: "🧸 ילדים ומשפחה" }, marvel: { title: "🦸 מארוול" }, starwars: { title: "⭐ מלחמת הכוכבים" }, pixar: { title: "🎈 פיקסאר" }, top: { title: "🏆 הכי מדורגים" } };
-  return { v: 2, updated: "2026-10-31T01:00:00.000Z", hero: key(0), rows, rowMeta, items };
+  return { v: 2, updated: "2026-10-31T01:00:00.000Z", hero: key(0), rows, rowMeta, items, region: "GB" };
 }
 
 (async () => {
@@ -345,11 +345,13 @@ function dsFixtureData() {
       dsChk(await page.evaluate(() => document.querySelector("#main").firstElementChild.classList.contains("nfsvc")), "switch is at the very top");
       const w = await page.evaluate(() => { const b = document.querySelector(".nfsvc").getBoundingClientRect(), m = document.querySelector(".nfhero").getBoundingClientRect(); return { r: Math.round(b.right), l: Math.round(b.left), vw: innerWidth, bh: Math.round(b.height), gap: Math.round(m.top - b.bottom) }; });
       dsChk(w.l >= 12 && w.vw - w.r >= 12 && w.bh >= 44, "switch fits with 16px-ish gutters and 44px height: " + JSON.stringify(w));
+      dsChk(await page.evaluate(() => !document.querySelector("#main .nfreg")), "no region note on the Netflix side");
       await snap("50_ds_switch_netflix");
       await page.click('[data-nfsvc="disney"]'); await page.waitForTimeout(1200);
       dsChk(await page.evaluate(() => localStorage.getItem("tvg.svc")) === "disney", "choice remembered in tvg.svc");
       dsChk((await dsNames()).join() === "popular,week,series,movies,kids,marvel,starwars,pixar,top", "disney rows order " + (await dsNames()).join());
       dsChk(await page.evaluate(() => document.querySelectorAll("#main .nfhero").length === 1 && document.querySelector('[data-nfsvc="disney"]').getAttribute("aria-pressed") === "true"), "disney selected + hero");
+      dsChk(await page.evaluate(() => { const n = document.querySelector("#main .nfreg"); return !!n && /בבריטניה/.test(n.textContent) && /ייתכנו הבדלים בישראל/.test(n.textContent) && n.nextElementSibling.classList.contains("nfhero"); }), "region note (GB) under the switch");
       dsChk(await page.evaluate(() => document.querySelector("#main .nfhero").nextElementSibling.getAttribute("data-nfrow") === "popular"), "hero then popular");
       await snap("51_ds_top");
       await page.evaluate(() => window.scrollTo(0, 1000)); await page.waitForTimeout(700); await snap("51_ds_mid");

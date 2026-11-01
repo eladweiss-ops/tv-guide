@@ -49,7 +49,7 @@
     svc = svc === "disney" ? "disney" : "netflix";
     var j = j0, order = svc === "disney" ? ORDER_DS : ORDER;
     if (j0 && typeof j0 === "object" && j0.items && typeof j0.items === "object") {
-      j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {}, disney: j0.disney === true };
+      j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {}, disney: j0.disney === true, region: /^[A-Z]{2}$/.test(j0.region || "") ? j0.region : "" };
       Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k], svc === "disney" ? RE_DLINK : RE_LINK, svc); });
     }
     if (!j || typeof j !== "object" || !(j.v >= 2) || !j.items || typeof j.items !== "object") return null;
@@ -69,7 +69,7 @@
     if (!hero) hero = flat[0];
     var all = [];
     flat.concat(Object.keys(j.items)).forEach(function (k) { if (!seen[k] && j.items[k] && j.items[k].title) { seen[k] = 1; all.push(k); } });
-    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all, svc: svc, disney: j.disney === true };
+    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all, svc: svc, disney: j.disney === true, region: j.region || "" };
   }
 
   // ---- ⭐ שמורים (tvg.nffav): תמונת מצב של הפריט, כדי שיעבוד גם לתוצאות חיפוש. נפרד מ-tvg.fav (מועדפי שידור) ----
@@ -197,6 +197,13 @@
       (x.overview ? '<span class="nfho">' + esc(x.overview) + "</span>" : "") + "</span></button>";
   }
 
+  // קטלוג של אזור אחר (דיסני+: TMDB לא מכיר את הקטלוג בישראל, לכן בריטניה). שמות אזורים מוכרים בעברית, אחרת בלי שם
+  var REGION_HE = { GB: "בבריטניה", US: "בארה״ב" };
+  function regionNote(D) {
+    if (!D || !D.region || D.region === "IL") return "";
+    return '<p class="nfreg">ℹ️ הרשימה לפי ' + (D.svc === "disney" ? "<bdi>דיסני+</bdi>" : "השירות") + (REGION_HE[D.region] ? " " + REGION_HE[D.region] : " באזור אחר") + ". ייתכנו הבדלים בישראל.</p>";
+  }
+
   function vNf() {
     var t = TVG.q.trim().toLowerCase(), h = "";
     // בחיפוש תמיד רשימות נטפליקס + חיפוש מלא (nfsearch.js, עם תג לכל שירות); המתג מוצג רק בלי חיפוש
@@ -214,7 +221,7 @@
       if (!res.length && !rem.any) h = '<div class="nfempty"><b>לא נמצא <bdi>״' + esc(TVG.q.trim()) + '״</bdi> במאגר</b><span>לפעמים השם בעברית בנטפליקס שונה מהשם במאגר. נסו את השם באנגלית, שחקן או במאי, או חפשו ישירות בנטפליקס.</span>' +
         '<a class="ghost" href="https://www.netflix.com/search?q=' + encodeURIComponent(TVG.q.trim()) + '" target="_blank" rel="noopener">🔎 חיפוש בנטפליקס</a></div>';
     } else {
-      h += sw;
+      h += sw + regionNote(NF);
       if (NF.hero && NF.items[NF.hero]) h += heroHtml(NF.hero, NF.items[NF.hero]);
       var fr = favRowHtml(), n = fr ? 1 : 0;
       h += fr;

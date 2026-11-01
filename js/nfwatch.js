@@ -79,6 +79,8 @@
     return '<p class="credit">ההתראות מגיעות כהתראת פוש, והן כבויות כרגע. <button type="button" class="linkbtn" data-pushon>להפעלת התראות</button></p>';
   }
   function alertsHtml(x) {
+    // כבר בנטפליקס/דיסני+ (דף מהרשימות): "פתח" למטה מספיק, ו"תודיע לי" רק מבלבל. נשאר לתוכן שעוד לא שם (חיפוש), או כשכבר נבחרה התראה (כדי שאפשר יהיה לבטל)
+    if ((TVG.nfIsNf(x) || TVG.nfSvc(x) === "disney") && !KINDS.some(function (kd) { return wlHas(x.k, kd[0]); })) return "";
     var chips = KINDS.filter(function (kd) {
       if (kd[0] === "nf") return wlHas(x.k, "nf") || (TVG.nfSvc(x) !== "disney" && !TVG.nfIsNf(x));   // כבר בנטפליקס: אין מה להתריע. בדף של דיסני+ לא מציעים
       if (kd[0] === "season") return x.type === "tv";

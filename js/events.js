@@ -104,6 +104,8 @@
       TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.tab === "grid"; TVG.render();
       if (!(TVG.tab === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, SCR[TVG.tab] || 0); return; // לוח: תמיד ממורכז על מה שמשודר עכשיו (מיקום ישן כבר לא רלוונטי)
     }
+    if (t.closest("[data-tonow]")) { var nr = document.querySelector("#main .row.now"); if (nr) nr.scrollIntoView({ block: "center", behavior: TVG.reducedMotion && TVG.reducedMotion() ? "auto" : "smooth" }); return; }
+    var nx = t.closest("[data-nextday]"); if (nx) { TVG.day = nx.getAttribute("data-nextday"); TVG.scrub = null; TVG.render(); window.scrollTo(0, 0); return; } // פס הימים למעלה כבר מראה את היום החדש (הודעה קופצת הסתירה אותו)
     var pd = t.closest("[data-day]"); if (pd) { TVG.day = pd.getAttribute("data-day"); TVG.scrub = null; TVG.scrollNext = true; TVG.render(); return; }
     var th = t.closest("[data-theme-set]"); if (th) { TVG.setTheme(th.getAttribute("data-theme-set")); return; }
     var cc = t.closest("[data-chip]"); if (cc) { TVG.gen = cc.getAttribute("data-chip"); TVG.render(); return; }

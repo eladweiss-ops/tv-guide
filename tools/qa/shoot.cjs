@@ -199,6 +199,20 @@ function dsFixtureData() {
     for (const t of ["now", "grid", "rems"]) {
       await step(t, async () => { await fresh(); await page.click('[data-tab="' + t + '"]'); await page.waitForTimeout(700); await snap("02_tab_" + t); });
     }
+    await step("grid_nav", async () => { // לוח: כפתור צף "עכשיו" ומעבר ליום הבא בסוף הרשימה
+      const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
+      const st = () => page.evaluate(() => { const b = document.getElementById("toNow"), nd = document.querySelector(".nextday"); return { show: !!b && b.classList.contains("show"), txt: b ? b.textContent : "", nd: nd ? nd.textContent : "", day: TVG.day, y: window.scrollY }; });
+      await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(700); /* דרך "עכשיו": הקשה על הלשונית הפעילה גוללת לראש */
+      let s = await st(); T(!s.show, "toNow hidden when now-row centered"); T(/^מחר, יום שני 2\.11/.test(s.nd), "nextday label: " + s.nd);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(400);
+      s = await st(); if (s.show) T(s.txt === "↑עכשיו", "arrow up at bottom: " + s.txt); await snap("02b_grid_end");
+      await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(400);
+      s = await st(); if (s.show) T(s.txt === "↓עכשיו", "arrow down at top: " + s.txt); await snap("02c_grid_top");
+      if (s.show) { await page.click("#toNow"); await page.waitForTimeout(900); s = await st(); T(!s.show, "toNow hides after tap"); }
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(300);
+      await page.click(".nextday"); await page.waitForTimeout(500);
+      s = await st(); T(s.day === "2026-11-02" && s.y === 0 && !s.show, "nextday → 2.11 at top: " + JSON.stringify(s)); await snap("02d_grid_nextday");
+    });
     await step("synopsis", async () => {
       await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(600);
       await page.click("[data-opentog]"); await page.waitForTimeout(500); await snap("03_synopsis_now");

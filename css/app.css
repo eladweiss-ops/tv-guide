@@ -740,3 +740,12 @@
   .wl-note { margin: 0; text-align: center; color: var(--muted); font-size: .92rem; line-height: 1.5; }
   .wl-bar { display: flex; flex-direction: column; gap: 8px; }
   .wl-bar .btn, .wl-bar .ghost { width: 100%; min-height: 52px; }
+
+  /* לוח: מעבר ליום הבא בסוף הרשימה, וכפתור צף "עכשיו" מעל הסרגל התחתון */
+  .nextday { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; margin: 12px 0 0; padding: 0 18px; border: 0; border-radius: 26px; background: var(--soft); color: var(--ink); font: inherit; font-weight: 700; font-size: 1rem; }
+  .nextday span { color: var(--accent); font-size: 1.1rem; }
+  .tonow { position: fixed; z-index: 9; left: 50%; bottom: calc(14px + 64px + 12px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 18px; border-radius: 22px; color: var(--ink); font: inherit; font-weight: 700; font-size: .92rem; opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, 12px); transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1), visibility 0s .25s; }
+  .tonow span { color: var(--accent); font-size: 1rem; }
+  .tonow.show { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); }
+  body:has(.scrim:not([hidden])) .tonow { display: none; }
+  @media (prefers-reduced-motion: reduce) { .tonow { transition: opacity .15s; } }

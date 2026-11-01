@@ -4,7 +4,7 @@
    מעל ~10px נועלים כיוון: אופקי / גלילה פנימית עוברים לדפדפן. עוקבים אחרי האצבע 1:1 (בלי קפיצה: הנקודה בה נעלנו היא אפס).
    שחרור: הקרנת תנופה (TVG.project). חצתה ~40% מגובה החלון, או מהירות כלפי מטה מעל 800px/s -> יוצא מטה בקפיץ; אחרת חוזר בקפיץ.
    יציאה = TVG.closeTop() (אותה סגירה כמו Escape / "חזור" / כפתור: close של השכבה ב-nav.js, ההיסטוריה מתנקה שם), רק אחרי שהחלון יצא מהמסך.
-   הרקע הכהה (scrim) דועך עם הגרירה. בהפחתת תנועה: בלי קפיץ, דעיכת שקיפות קצרה. אפשר לאחוז באמצע אנימציה: ממשיכים מהמקום החי. */
+   הקרסים TVG.onSheetDrag(el, p) / TVG.onSheetSettle(el) מעדכנים את cardstack.js (הדף שמאחור). הרקע הכהה (scrim) דועך עם הגרירה. בהפחתת תנועה: בלי קפיץ, דעיכת שקיפות קצרה. אפשר לאחוז באמצע אנימציה: ממשיכים מהמקום החי. */
 (function (TVG) {
   TVG.files["sheetdrag"] = 1;
   var $ = TVG.$;
@@ -15,18 +15,20 @@
 
   function now() { return window.performance && performance.now ? performance.now() : Date.now(); }
   function scrimOf(el) { return $(el.id === "sheet" ? "#scrim" : "#scrim2"); }
-  function alone() { return document.querySelectorAll(".sheet:not([hidden])").length < 2; } // יש חלון נוסף מתחת? אז הרקע המשותף לא דועך
+  function alone() { return document.querySelectorAll(".sheet:not([hidden]):not(.sgh)").length < 2; } // יש חלון נוסף מתחת? אז הרקע המשותף לא דועך
   function setY(el, y) {
     var H = el.offsetHeight || 1;
     el.style.transform = y ? "translate3d(0," + y.toFixed(2) + "px,0)" : "";
     var s = scrimOf(el); if (s && alone()) s.style.opacity = y > 0 ? String(Math.max(0, 1 - y / H)) : "";
     cur = { el: el, y: y };
+    if (TVG.onSheetDrag) TVG.onSheetDrag(el, y > 0 ? Math.min(1, y / H) : 0); // cardstack.js: הדף שמאחור חוזר ל-1 ביחס לירידת החלון
   }
   function reset(el) {
     el.style.transform = ""; el.style.opacity = ""; el.style.transition = ""; el.style.willChange = "";
     var s = scrimOf(el); if (s) { s.style.opacity = ""; s.style.transition = ""; }
     if (cur && cur.el === el) cur = null;
     if (an && an.el === el) { an.h.stop(); an = null; }
+    if (TVG.onSheetSettle) TVG.onSheetSettle(el); // cardstack.js
   }
   function offY(el) { var r = el.getBoundingClientRect(), y = cur && cur.el === el ? cur.y : 0; return window.innerHeight - (r.top - y) + 6; } // כמה למטה כדי לצאת מהמסך
 
@@ -71,6 +73,8 @@
     if (d || !e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     var t = e.target, sheet = t && t.closest ? t.closest(".sheet") : null; if (!sheet || sheet.hidden || TVG.topLayerEl() !== sheet) return;
     if (t.closest("input,textarea,select,[contenteditable],[data-nodrag],.lnd-isheet")) return;
+    var ey = TVG.sheetEnterLive ? TVG.sheetEnterLive(sheet) : 0; // אוחזים באמצע כניסת החלון (cardstack.js): ממשיכים מהמיקום החי, בלי קפיצה
+    if (ey > 0.5 && !(an && an.el === sheet)) { if (an) an.h.stop(); an = { el: sheet, y: ey, kind: "back", to: 0, h: { stop: function () {} } }; setY(sheet, ey); }
     var r = sheet.getBoundingClientRect(), zone = e.clientY - r.top < TOP, si = scrollInfo(t, sheet), grab = !!(an && an.el === sheet);
     if (e.pointerType === "mouse" && !zone && !grab) return; // עכבר: רק מרצועת האחיזה (בלי להפריע לסימון טקסט)
     var base = 0;

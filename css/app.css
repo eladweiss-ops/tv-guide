@@ -750,8 +750,8 @@
   body:has(.scrim:not([hidden])) .tonow { display: none; }
   @media (prefers-reduced-motion: reduce) { .tonow { transition: opacity .15s; } }
 
-  /* הודעה קופצת: גוון חם (קרם/קפה) במקום שחור */
-  .pill { background: #FFF1E3; color: #3B1F0B; box-shadow: 0 0 0 1px rgba(255,122,26,.3), 0 8px 28px rgba(120,60,10,.22); }
+  /* הודעה קופצת: בועת זכוכית שקופה (כמו באייפון) עם גוון חם */
+  .pill { background: rgba(255,232,210,.66); color: #2E1806; -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%); border: 1px solid rgba(255,255,255,.75); box-shadow: 0 0 0 .5px rgba(150,80,20,.18), inset 0 1px 0 rgba(255,255,255,.6), 0 10px 30px rgba(120,60,10,.18); }
   .pill .pillact { color: #B04600; }
-  :root[data-theme="dark"] .pill { background: #3A2718; color: #FFE8D2; box-shadow: 0 0 0 1px rgba(255,150,80,.32), 0 8px 28px rgba(0,0,0,.45); }
+  :root[data-theme="dark"] .pill { background: rgba(92,58,34,.58); color: #FFF0E2; border-color: rgba(255,200,160,.22); box-shadow: 0 0 0 .5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12), 0 10px 30px rgba(0,0,0,.4); }
   :root[data-theme="dark"] .pill .pillact { color: #FFA45C; }

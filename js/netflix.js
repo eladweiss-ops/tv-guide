@@ -49,7 +49,7 @@
     svc = svc === "disney" ? "disney" : "netflix";
     var j = j0, order = svc === "disney" ? ORDER_DS : ORDER;
     if (j0 && typeof j0 === "object" && j0.items && typeof j0.items === "object") {
-      j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {} };
+      j = { v: j0.v, updated: j0.updated, hero: j0.hero, rows: j0.rows, items: {}, disney: j0.disney === true };
       Object.keys(j0.items).forEach(function (k) { if (j0.items[k] && typeof j0.items[k] === "object") j.items[k] = clean(j0.items[k], svc === "disney" ? RE_DLINK : RE_LINK, svc); });
     }
     if (!j || typeof j !== "object" || !(j.v >= 2) || !j.items || typeof j.items !== "object") return null;
@@ -69,7 +69,7 @@
     if (!hero) hero = flat[0];
     var all = [];
     flat.concat(Object.keys(j.items)).forEach(function (k) { if (!seen[k] && j.items[k] && j.items[k].title) { seen[k] = 1; all.push(k); } });
-    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all, svc: svc };
+    return { v: j.v, updated: j.updated, hero: hero, rows: rows, titles: titles, names: names, items: j.items, all: all, svc: svc, disney: j.disney === true };
   }
 
   // ---- ⭐ שמורים (tvg.nffav): תמונת מצב של הפריט, כדי שיעבוד גם לתוצאות חיפוש. נפרד מ-tvg.fav (מועדפי שידור) ----
@@ -111,9 +111,9 @@
   TVG.svc = TVG.store("tvg.svc") === "disney" ? "disney" : "netflix"; // נשמר במכשיר
   TVG.DS = null; TVG.dsState = "idle"; // idle | loading | err | ok
   // דיסני+ מוצג רק כשיש disney.json בשרת (TMDB לא מחזיר כרגע נתוני זמינות לישראל). בלעדיו: אין מתג, ונטפליקס בלבד
-  TVG.dsOn = false;
-  try { fetch("disney.json", { method: "HEAD", cache: "no-store" }).then(function (r) { if (r.ok) { TVG.dsOn = true; if (TVG.tab === "nf") TVG.render(); } }).catch(function () {}); } catch (e) {}
-  function curSvc() { return TVG.dsOn && TVG.svc === "disney" ? "disney" : "netflix"; }
+  // הסימון disney:true ב-netflix.json (נכתב בבנייה רק כשיש disney.json). בלעדיו אין מתג ואין בקשה ל-disney.json
+  function dsOn() { return !!(TVG.NF && TVG.NF.disney); }
+  function curSvc() { return dsOn() && TVG.svc === "disney" ? "disney" : "netflix"; }
   function curData() { return curSvc() === "disney" ? TVG.DS : TVG.NF; }
   function isDs(x) { return !!x && (x.svc === "disney" || x.ds === true); }
   // באיזה שירות "▶ פתח ב…": פריט מ-disney.json, או תוצאת חיפוש שאינה בנטפליקס ובכל זאת בדיסני+
@@ -121,7 +121,7 @@
   function linkOf(x) { return !x ? "" : svcOf(x) === "disney" ? (x.svc === "disney" ? x.link : x.dlink) || "" : x.link || ""; }
   function svcName(x) { return svcOf(x) === "disney" ? "דיסני+" : "נטפליקס"; }
   function svcSwitchHtml() {
-    if (!TVG.dsOn) return "";
+    if (!dsOn()) return "";
     var c = curSvc();
     return '<div class="seg nfsvc" role="group" aria-label="שירות סטרימינג">' +
       '<button type="button" data-nfsvc="netflix" aria-pressed="' + (c === "netflix") + '">נטפליקס</button>' +

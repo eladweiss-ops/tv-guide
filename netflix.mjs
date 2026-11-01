@@ -558,6 +558,16 @@ export async function runAll(opts = {}) {
     if (!ctx) { out[id] = null; continue; }
     try { out[id] = await buildService(SERVICES[id], ctx); } catch (e) { console.error(SERVICES[id].file + " נכשל: " + e.message); out[id] = null; }
   }
+  // הלקוח מציג את מתג דיסני+ רק כש-netflix.json מסמן disney:true (כך אין בקשת 404 ל-disney.json כשאין נתונים)
+  if (out.netflix && ctx && ctx.dir) {
+    try {
+      let has = !!out.disney;
+      if (!has) { try { await readFile(ctx.dir + "/disney.json", "utf8"); has = true; } catch (e) {} }
+      const p = ctx.dir + "/netflix.json", j = JSON.parse(await readFile(p, "utf8"));
+      if (has) j.disney = true; else delete j.disney;
+      await writeFile(p, JSON.stringify(j));
+    } catch (e) { console.error("סימון דיסני+ ב-netflix.json נכשל: " + e.message); }
+  }
   return out;
 }
 

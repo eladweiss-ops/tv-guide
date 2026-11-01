@@ -189,8 +189,8 @@ function dsFixtureData() {
         await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(dsFixtureData()) });
       });
       await page.route("**/netflix.json*", async (route) => {
-        if (!nfFixture) return route.continue();
-        await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(nfFixtureData()) });
+        if (!nfFixture) { const rr = await route.fetch(); let jj = null; try { jj = await rr.json(); } catch (e) {} if (!jj) return route.fulfill({ response: rr }); if (dsMode !== "fail") jj.disney = true; return route.fulfill({ response: rr, body: JSON.stringify(jj) }); }
+        await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(Object.assign(nfFixtureData(), dsMode === "fail" ? {} : { disney: true })) }); /* הסימון disney:true מראה את מתג דיסני+ (בלעדיו: נטפליקס בלבד) */
       });
     };
     await setupPage();

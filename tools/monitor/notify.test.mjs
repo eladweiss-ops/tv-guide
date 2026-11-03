@@ -51,8 +51,35 @@ test("יומי: מציג מספרים, UX, ו'✔ תוקן מאז אתמול'", 
   const d2 = run(d1.state, [], "daily", NOW, UXOK);
   assert.equal(d2.send, true);
   assert.match(d2.text, /^‏?☀️/); assert.match(d2.text, /29,737 תוכניות/); assert.match(d2.text, /UX תקין/);
-  assert.match(d2.text, /✔ תוקן מאז אתמול: נטפליקס לא התעדכן/);
+  assert.match(d2.text, /✔ תוקן מאז הסיכום הקודם: נטפליקס לא התעדכן/);
   assert.equal(d2.state.lastSummaryDate, "2026-10-30");
+  assert.equal(d2.state.lastSummaryAt, NOW.toISOString());
+});
+
+test("סיכום: מתי הלוח עודכן, המחשב בבית, סטרימינג וגרסה", () => {
+  const h = { problems: [], info: { build: "2026-11-02.77",
+    guide: { ...HEALTH.info.guide, updated: "2026-10-29T22:31:00Z" },
+    netflix: { items: 174, updated: "2026-10-30T00:05:00Z" }, disney: { items: 145 },
+    caches: { x14At: "2026-10-30T05:00:00Z", hotNewest: "2026-11-02T01:58" }, home: { status: "ok" } } };
+  const d = decide({ prev: {}, problems: [], mode: "daily", health: h, ux: UXOK, now: NOW });
+  assert.match(d.text, /הלוח<\/b>: עודכן היום 00:31 \(לפני 8 שעות\)/);
+  assert.match(d.text, /29,737 תוכניות · 10 ימים קדימה · 40.8% עם תקציר/);
+  assert.match(d.text, /ערוץ 14 עודכן היום 07:00 \(לפני 1 שעות\) · תקצירי HOT עד 2\.11/);
+  assert.match(d.text, /נטפליקס 174 · דיסני\+ 145 · עודכנו היום 02:05/);
+  assert.match(d.text, /גרסה באתר: 2026-11-02\.77/);
+  const old = decide({ prev: {}, problems: [], mode: "daily", health: { ...h, info: { ...h.info, guide: { ...h.info.guide, updated: "2026-10-28T10:00:00Z" } } }, ux: UXOK, now: NOW });
+  assert.match(old.text, /עודכן 28\.10 12:00/);
+});
+
+test("ערב: 🌙, תקלות מאז סיכום הבוקר, לא נוגע ב-lastSummaryDate", () => {
+  const m = run({}, [], "daily", NOW, UXOK);
+  const c = run(m.state, ["נטפליקס לא התעדכן 40 שעות"], "check", at("2026-10-30T10:05:00Z"));
+  const e = run(c.state, [], "evening", at("2026-10-30T18:05:00Z"), UXOK);
+  assert.equal(e.send, true); assert.match(e.text, /^‏?🌙/);
+  assert.match(e.text, /✔ תוקן מאז הסיכום הקודם: נטפליקס/); assert.match(e.text, /תקלות שנפתחו מאז הסיכום הקודם: 1/);
+  assert.equal(e.state.lastEveningDate, "2026-10-30"); assert.equal(e.state.lastSummaryDate, "2026-10-30");
+  const e2 = run(e.state, [], "evening", at("2026-10-31T18:05:00Z"), UXOK);
+  assert.match(e2.text, /בלי תקלות חדשות מאז הסיכום הקודם/);
 });
 
 test("יומי עם תקלות פתוחות", () => {
@@ -96,6 +123,12 @@ test("pickMode: חלון 08-12, פעם ביום, ראשון=שבועי, 1 לחו
   assert.equal(pickMode({ prev: { lastSummaryDate: "2026-10-30" }, now: at("2026-10-30T06:05:00Z") }), "check");
   assert.equal(pickMode({ prev: null, now: at("2026-10-30T12:00:00Z") }), "check"); // 14:00
   assert.equal(pickMode({ prev: { lastSummaryDate: "2026-10-30" }, force: true, now: at("2026-10-30T12:00:00Z") }), "daily");
+  // ערב: 20:00-23:59, פעם ביום. חורף 18:00 UTC = 20:00, קיץ 17:00 UTC = 20:00
+  assert.equal(pickMode({ prev: { lastSummaryDate: "2026-11-03" }, now: at("2026-11-03T18:05:00Z") }), "evening");
+  assert.equal(pickMode({ prev: null, now: at("2026-07-01T17:05:00Z") }), "evening");
+  assert.equal(pickMode({ prev: null, now: at("2026-11-03T17:05:00Z") }), "check"); // 19:05 בחורף
+  assert.equal(pickMode({ prev: { lastEveningDate: "2026-11-03" }, now: at("2026-11-03T20:05:00Z") }), "check"); // כבר נשלח
+  assert.equal(pickMode({ prev: { lastEveningDate: "2026-11-03" }, now: at("2026-11-04T06:05:00Z") }), "daily"); // בוקר למחרת
 });
 
 test("escapeHtml והודעות", () => {

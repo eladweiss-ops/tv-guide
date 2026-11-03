@@ -58,6 +58,7 @@ export function evaluateGuide(guide, now = new Date()) {
   info.programs = progs.length; info.channels = chans.length;
   if (!guide || !guide.updated) problems.push("guide.json: אין שדה updated");
   else {
+    info.updated = guide.updated;
     const age = hoursSince(guide.updated, now); info.guideAgeH = Math.round(age * 10) / 10;
     if (!(age < T.GUIDE_MAX_AGE_H)) problems.push("הלוח לא התעדכן " + fmtAge(age) + " (מותר עד " + T.GUIDE_MAX_AGE_H + " שעות)");
   }
@@ -108,7 +109,7 @@ export function evaluateStreaming(nf, { file, label, minItems, maxAgeH }, now = 
   const list = nf.items ? (Array.isArray(nf.items) ? nf.items : Object.values(nf.items)) : [];
   info.items = list.length;
   if (list.length < minItems) problems.push(label + ": " + list.length + " פריטים (מינימום " + minItems + ")");
-  if (nf.updated) { const age = hoursSince(nf.updated, now); info.ageH = Math.round(age * 10) / 10; if (!(age < maxAgeH)) problems.push(label + " לא התעדכן " + fmtAge(age)); }
+  if (nf.updated) { info.updated = nf.updated; const age = hoursSince(nf.updated, now); info.ageH = Math.round(age * 10) / 10; if (!(age < maxAgeH)) problems.push(label + " לא התעדכן " + fmtAge(age)); }
   else problems.push(file + ": אין שדה updated");
   info.rated = list.filter((i) => i && i.ratings && i.ratings.imdb != null).length; // ציוני IMDb מ-OMDb (מידע בלבד)
   return { problems, info };

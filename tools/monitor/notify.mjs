@@ -2,10 +2,11 @@
 /*
  * התראות טלגרם על תוצאות הניטור. Node 22, בלי תלויות. בטלגרם יש רק ארבעה סוגי הודעות:
  *   🔴 תקלה   – רק במעבר מתקין לתקלה, או כשמתווספת תקלה חדשה (אין הודעת "חזר לתקין"; ההתאוששות מופיעה בסיכום הבא)
- *   ☀️ יומי   – 08:00 ישראל: מצב טכני + UX + מספרים + תקלות שנפתחו/נסגרו ב-24 שעות
+ *   ☀️ בוקר   – 08:00 ישראל: מצב טכני + UX + מתי הלוח עודכן + מספרים + המחשב בבית + תקלות מאז הסיכום הקודם
+ *   🌙 ערב    – 20:00 ישראל: אותו מבנה (evening)
  *   📅 שבועי  – יום ראשון בבוקר, במקום היומי
  *   🗓 חודשי  – ב-1 לחודש בבוקר, במקום היומי
- *   node tools/monitor/notify.mjs --print-mode --state S [--force]     (check|daily|weekly|monthly)
+ *   node tools/monitor/notify.mjs --print-mode --state S [--force]     (check|daily|evening|weekly|monthly)
  *   node tools/monitor/notify.mjs --health H --state S --mode M [--ux ux.txt] [--shots dir]
  * בלי TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID – לא שולח ולא נכשל.
  *
@@ -63,10 +64,12 @@ export const uxProblems = (ux) => {
 export const problemKey = (t) => String(t).replace(/\d+([.,]\d+)*/g, "#").replace(/\s+/g, " ").trim();
 
 // ───────── בחירת מצב ─────────
-// בין 08:00 ל-11:59 בישראל, פעם ביום (עמיד לעיכובי cron): ב-1 לחודש חודשי, ביום ראשון שבועי, אחרת יומי.
+// בוקר: בין 08:00 ל-11:59 בישראל, פעם ביום (עמיד לעיכובי cron): ב-1 לחודש חודשי, ביום ראשון שבועי, אחרת יומי.
+// ערב: בין 20:00 ל-23:59, פעם ביום – סיכום ערב (evening), באותו מבנה כמו היומי.
 export function pickMode({ prev, force = false, now = new Date() }) {
   const il = israelNow(now), hour = +il.slice(11, 13), today = il.slice(0, 10);
-  if (!force && !(hour >= 8 && hour < 12 && (!prev || prev.lastSummaryDate !== today))) return "check";
+  const morning = force || (hour >= 8 && hour < 12 && (!prev || prev.lastSummaryDate !== today));
+  if (!morning) return hour >= 20 && (!prev || prev.lastEveningDate !== today) ? "evening" : "check";
   if (today.endsWith("-01")) return "monthly";
   if (dow(today) === 0) return "weekly";
   return "daily";
@@ -110,10 +113,12 @@ export function decide({ prev, problems, mode, health, ux, now = new Date() }) {
   let text = null;
   const all = Object.values(cur);
   if (mode === "check") { if (fresh.length) text = buildAlert(fresh, all.filter((p) => !fresh.includes(p))); }
-  else if (mode === "daily") text = buildDaily(st, all, health, ux, now);
+  else if (mode === "daily" || mode === "evening") text = buildDaily(st, all, health, ux, now, mode === "evening");
   else if (mode === "weekly") text = buildPeriod(st, all, health, ux, now, 7);
   else if (mode === "monthly") text = buildPeriod(st, all, health, ux, now, 30);
-  if (mode !== "check") st.lastSummaryDate = israelNow(now).slice(0, 10);
+  if (mode === "evening") st.lastEveningDate = israelNow(now).slice(0, 10);
+  else if (mode !== "check") st.lastSummaryDate = israelNow(now).slice(0, 10);
+  if (mode !== "check") st.lastSummaryAt = nowIso;
   return { send: text != null, text, state: st };
 }
 
@@ -125,25 +130,52 @@ function buildAlert(fresh, still) {
   return out.join("\n");
 }
 export function fmtDur(ms) { const h = ms / H; return h < 1 ? Math.max(1, Math.round(h * 60)) + " דקות" : h < 48 ? Math.round(h) + " שעות" : Math.round(h / 24) + " ימים"; }
-function statusBlock(all, health, ux) {
+// "היום 12:31 (לפני 6 שעות)" / "אתמול 22:10 (…)" / "1.11 10:00 (…)" – שעון ישראל
+const dmShort = (ymd) => ymd.slice(5).split("-").reverse().map(Number).join(".");
+export function whenIL(iso, now) {
+  const t = Date.parse(iso);
+  if (!iso || isNaN(t)) return null;
+  const il = israelNow(new Date(t)), today = israelNow(now).slice(0, 10), d = il.slice(0, 10);
+  const day = d === today ? "היום" : d === addDays(today, -1) ? "אתמול" : dmShort(d);
+  return day + " " + il.slice(11) + " (לפני " + fmtDur(Math.max(0, now.getTime() - t)) + ")";
+}
+// פירוט קבוע בכל סיכום: מתי הלוח עודכן, כמה יש בו, המחשב בבית, סטרימינג, גרסת האתר
+function detailsBlock(health, now) {
+  const inf = health.info || {}, g = inf.guide || {}, c = inf.caches || {}, nf = inf.netflix || {}, ds = inf.disney || {};
+  const out = [];
+  out.push(line("📺 <b>הלוח</b>: " + (g.updated ? "עודכן " + whenIL(g.updated, now) : "לא נבדק")));
+  if (g.programs) out.push(line("   " + g.programs.toLocaleString("en-US") + " תוכניות · " + (g.days || 0) + " ימים קדימה · " + (g.synopsisPct || 0) + "% עם תקציר ב-72 השעות הקרובות"));
+  const home = [];
+  if (c.x14At) home.push("ערוץ 14 עודכן " + whenIL(c.x14At, now));
+  if (c.hotNewest) home.push("תקצירי HOT עד " + dmShort(c.hotNewest.slice(0, 10)));
+  if (inf.home && inf.home.status === "needs-approval") home.push("⚠️ מחכה לאישור קוד");
+  out.push(line("🏠 <b>המחשב בבית</b>: " + (home.length ? home.join(" · ") : "לא נבדק")));
+  if (nf.items != null || ds.items != null) out.push(line("🎬 נטפליקס " + (nf.items || 0) + " · דיסני+ " + (ds.items || 0) + (nf.updated ? " · עודכנו " + whenIL(nf.updated, now) : "")));
+  if (inf.build) out.push(line("🌐 גרסה באתר: " + escapeHtml(inf.build)));
+  return out;
+}
+function statusBlock(all, health, ux, now) {
   const out = [];
   if (!all.length) {
-    out.push(line("✅ " + escapeHtml(summaryLine(health))));
+    out.push(line("✅ <b>המערכת תקינה</b>"));
     out.push(line(ux.ran && ux.devices.length ? "✅ UX תקין · " + ux.devices.length + " מכשירים, בלי שגיאות וגלילה אופקית" + (ux.audit && Object.keys(ux.audit.devices).length ? " · ביקורת פריסה: 0 בעיות" : "") : "UX: לא נבדק"));
   } else {
     out.push(line("🔴 <b>" + all.length + " תקלות פתוחות</b>"), ...bullets(all));
     if (!health.problems.length && !(ux.ran && uxProblems(ux).length)) out.push(line("UX: לא נבדק"));
   }
+  out.push(...detailsBlock(health, now));
   return out;
 }
-function buildDaily(st, all, health, ux, now) {
-  const since = now.getTime() - DAY;
-  const out = [line("☀️ <b>סיכום יומי · זפזופ</b>"), ...statusBlock(all, health, ux)];
-  const fixed = st.incidents.filter((i) => i.closed && Date.parse(i.closed) >= since);
-  const opened = st.incidents.filter((i) => Date.parse(i.opened) >= since);
-  if (fixed.length) out.push(line("✔ תוקן מאז אתמול: " + escapeHtml(fixed.map((i) => i.text.replace(/:.*$/, "")).join(", "))));
-  if (opened.length) out.push(line("🆕 נפתחו ב-24 השעות האחרונות: " + opened.length + (fixed.length ? " (מהן " + opened.filter((i) => i.closed).length + " נסגרו)" : "")));
-  if (!fixed.length && !opened.length) out.push(line("בלי תקלות חדשות ב-24 השעות האחרונות"));
+function buildDaily(st, all, health, ux, now, evening = false) {
+  // תקלות מאז הסיכום הקודם (בוקר או ערב); בלי סיכום קודם – 12 שעות אחורה
+  const prevAt = Date.parse(st.lastSummaryAt || "");
+  const since = isNaN(prevAt) ? now.getTime() - 12 * H : prevAt;
+  const out = [line(evening ? "🌙 <b>סיכום ערב · זפזופ</b>" : "☀️ <b>סיכום בוקר · זפזופ</b>"), ...statusBlock(all, health, ux, now)];
+  const fixed = st.incidents.filter((i) => i.closed && Date.parse(i.closed) > since);
+  const opened = st.incidents.filter((i) => Date.parse(i.opened) > since);
+  if (fixed.length) out.push(line("✔ תוקן מאז הסיכום הקודם: " + escapeHtml(fixed.map((i) => i.text.replace(/:.*$/, "")).join(", "))));
+  if (opened.length) out.push(line("🆕 תקלות שנפתחו מאז הסיכום הקודם: " + opened.length + (fixed.length ? " (מהן " + opened.filter((i) => i.closed).length + " נסגרו)" : "")));
+  if (!fixed.length && !opened.length) out.push(line("בלי תקלות חדשות מאז הסיכום הקודם"));
   return out.join("\n");
 }
 
@@ -165,7 +197,7 @@ export function buildPeriod(st, all, health, ux, now, days) {
   const baseName = weekly ? "לעומת השבוע הקודם" : "לעומת תחילת החודש";
   const num = (a, k) => avg(a.map((h) => h[k]));
   const out = [line(weekly ? "📅 <b>סיכום שבועי · זפזופ</b>" : "🗓 <b>סיכום חודשי · זפזופ</b>")];
-  out.push(...statusBlock(all, health, ux));
+  out.push(...statusBlock(all, health, ux, now));
   const okN = inW.filter((h) => h.ok).length;
   out.push(line("<b>זמינות</b>: " + (inW.length ? f1((okN / inW.length) * 100) + "% (" + okN + " מתוך " + inW.length + " בדיקות)" : "אין נתונים")));
   const incs = st.incidents.filter((i) => !i.closed || Date.parse(i.closed) >= start);

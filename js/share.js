@@ -190,6 +190,7 @@
   }
   function done(msg) { // אחרי שליחה/העתקה: סוגרים את חלון השיתוף ומאשרים בהודעה קטנה
     if (!$("#rem").hidden) TVG.closeRem();
+    if (msg.indexOf("📤") === 0) TVG.celebrate && TVG.celebrate("share");
     TVG.pill(msg, 1800);
   }
   function send() {

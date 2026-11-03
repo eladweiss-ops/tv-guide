@@ -51,7 +51,7 @@
           if (pendRec) {
             var pr = pendRec; pendRec = null; TVG.REMS.push(pr); TVG.saveRems(); TVG.syncRems(); TVG.render();
             // עם ביטול (גם לתזכורת צפייה מדף נטפליקס, שנשארת פתוח ומתעדכנת)
-            TVG.pill("⏰ נזכיר לך " + (pr.k.indexOf("nf|") === 0 ? "ב־" + hhmm(new Date(pr.ts)) : TVG.leadTxt(pr.lead, pr.ts)), 5000, "ביטול", function () { TVG.REMS = TVG.REMS.filter(function (x) { return x.k !== pr.k; }); TVG.saveRems(); TVG.syncRems(); TVG.render(); if (TVG.nfReopen) TVG.nfReopen(); TVG.pill("בוטל", 1200); });
+            TVG.celebrate && TVG.celebrate("rem"); TVG.pill("⏰ נזכיר לך " + (pr.k.indexOf("nf|") === 0 ? "ב־" + hhmm(new Date(pr.ts)) : TVG.leadTxt(pr.lead, pr.ts)), 5000, "ביטול", function () { TVG.REMS = TVG.REMS.filter(function (x) { return x.k !== pr.k; }); TVG.saveRems(); TVG.syncRems(); TVG.render(); if (TVG.nfReopen) TVG.nfReopen(); TVG.pill("בוטל", 1200); });
           }
           else if (pend && !TVG.hasRem(TVG.remKey(pend.id, pend.p.s))) TVG.quickAdd([pend]); else TVG.render();
           if (TVG.nfReopen) TVG.nfReopen(); // דף נטפליקס פתוח: מתעדכן (רמז ההתראות נעלם)
@@ -102,7 +102,7 @@
     if (ts < Date.now() + 60000) { TVG.pill("בחרו זמן עתידי", 1500); return; }
     var rec = { k: "p|" + ts + "|" + Math.random().toString(36).slice(2, 7), id: "", ts: ts, end: ts + 3600000, title: title, ch: "תזכורת אישית", desc: "", lead: TVG.fitLead(ts, TVG.pLead), at: Date.now() };
     if (addRec(rec, d) === "pending") return;
-    TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח יומן Google. לוחצים שם ״שמירה״", 3500); return; } TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
+    TVG.closeRem(); TVG.render(); if (TVG.isAndroid && !TVG.srv()) { TVG.pill("נפתח יומן Google. לוחצים שם ״שמירה״", 3500); return; } TVG.celebrate && TVG.celebrate("rem"); TVG.pill("⏰ נזכיר לך " + (rec.lead ? TVG.leadTxt(rec.lead, ts) : "ב-" + hhmm(d)), 2200);
   }
   var PUSH_BODY = '<p class="remnote">🔔 תזכורת קופצת כהתראה בטלפון בזמן שבחרתם, גם כשהאפליקציה סגורה.</p><div class="bar"><button type="button" class="ghost" data-pushtest>שליחת התראת בדיקה</button></div>';
   function calBody() {

@@ -135,7 +135,7 @@
     if (!TVG.calMode && !TVG.pushOn) { askCal(); return; }
     TVG.REMS.push(recOf(TVG.rem));
     TVG.saveRems();
-    if (TVG.srv()) { TVG.syncRems().then(function (ok) { TVG.pill(TVG.pushOn ? "⏰ נזכיר לך " + leadTxt(TVG.REMS[TVG.REMS.length - 1].lead, TVG.REMS[TVG.REMS.length - 1].ts) : ok ? "נוסף ליומן 'לוח שידורים'" : "נשמר. היומן יתעדכן כשיהיה חיבור", 1800); }); }
+    if (TVG.srv()) { TVG.syncRems().then(function (ok) { if (TVG.pushOn || ok) TVG.celebrate && TVG.celebrate("rem"); TVG.pill(TVG.pushOn ? "⏰ נזכיר לך " + leadTxt(TVG.REMS[TVG.REMS.length - 1].lead, TVG.REMS[TVG.REMS.length - 1].ts) : ok ? "נוסף ליומן 'לוח שידורים'" : "נשמר. היומן יתעדכן כשיהיה חיבור", 1800); }); }
     else { calAdd(TVG.rem); TVG.pill(TVG.isAndroid ? "נפתח יומן Google. לוחצים שם ״שמירה״" : "נוסף ליומן", TVG.isAndroid ? 3500 : 1600); }
     closeRem(); TVG.render();
   }
@@ -154,6 +154,7 @@
     if (!add.length) { TVG.pill(list.some(function (r) { return r.p.s > new Date(); }) ? "כבר יש תזכורת לכל אלה ✓" : "התוכנית כבר התחילה", 1500); return; }
     TVG.REMS = TVG.REMS.concat(add); TVG.saveRems(); TVG.syncRems(); TVG.render();
     var ks = add.map(function (x) { return x.k; });
+    TVG.celebrate && TVG.celebrate("rem");
     TVG.pill(add.length === 1 ? "⏰ נזכיר לך " + leadTxt(add[0].lead, add[0].ts) : "⏰ נוספו " + add.length + " תזכורות", 5000, "ביטול", function () {
       TVG.REMS = TVG.REMS.filter(function (x) { return ks.indexOf(x.k) < 0; }); TVG.saveRems(); TVG.syncRems(); TVG.render(); TVG.pill("בוטל", 1200);
     }, "🔔 שינוי", function () { openLead(ks); });

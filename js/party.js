@@ -173,7 +173,7 @@
   }
   function afterCreate(id, msg) {
     TVG.store("tvg.name", CR.name || "");
-    closePty(); TVG.render();
+    closePty(); TVG.render(); TVG.celebrate && TVG.celebrate("party");
     TVG.pill(msg, 6000, "ביטול", function () { cancelQuiet(id).then(function () { TVG.render(); TVG.pill("הערב בוטל", 1500); }); });
   }
   function createFail(e) {
@@ -239,7 +239,7 @@
   function resend() {
     var p = mine(HS.id); if (!p) return;
     openWa(textOf({ title: p.title, at: p.at, place: p.place, name: p.name || "" }, p.id));
-    closePty(); TVG.pill("📤 נשלח לוואטסאפ", 1800);
+    closePty(); TVG.celebrate && TVG.celebrate("share"); TVG.pill("📤 נשלח לוואטסאפ", 1800);
   }
   function doCancel() {
     var id = HS.id, p = mine(id); if (!p) return;
@@ -435,7 +435,7 @@
     apiPost({ action: "rsvp", id: gv.id, gid: myGid(), name: name, ans: ans, t: TVG.myTok() }).then(function (v) {
       gv.busy = false; if (GV !== gv) return;
       TVG.store("tvg.name", name); gv.v = v; gv.off = v.now - Date.now(); paintLand(true);
-      TVG.pill(ans === "yes" ? "👍 נשמר: אני בפנים" : ans === "maybe" ? "🤔 נשמר: אולי" : "נשמר: לא הפעם", 2200);
+      if (ans === "yes") TVG.celebrate && TVG.celebrate("party"); TVG.pill(ans === "yes" ? "👍 נשמר: אני בפנים" : ans === "maybe" ? "🤔 נשמר: אולי" : "נשמר: לא הפעם", 2200);
       syncPush();
     }).catch(function (e) { gv.busy = false; TVG.pill(errMsg(e), 2800); });
   }
@@ -464,7 +464,7 @@
     var rec = { k: k, id: "", ts: v.at, end: v.at + 3 * HOUR, title: "🍿 " + v.title, ch: "ערב צפייה", desc: "", lead: lead, at: Date.now() };
     if (TVG.addRec(rec, ilWall(v.at)) === "pending") return; // הפעלת התראות בדרך; ההודעה מגיעה מ-push.js
     paintLand(true);
-    TVG.pill("⏰ נזכיר לך " + TVG.leadTxt(lead, v.at), 5000, "ביטול", function () { TVG.cancelRem(k); if (GV) paintLand(true); });
+    TVG.celebrate && TVG.celebrate("rem"); TVG.pill("⏰ נזכיר לך " + TVG.leadTxt(lead, v.at), 5000, "ביטול", function () { TVG.cancelRem(k); if (GV) paintLand(true); });
   }
   function openParty(id, go) { // נקרא מ-nav.js: ?w=<id>[&go=1], ומתזכורת/הודעה
     if (!RE_ID.test(String(id || ""))) { TVG.pill("לא מצאנו את הערב הזה", 2200); return; }

@@ -760,3 +760,8 @@
   .day.pastd span, .day.pastd b { color: color-mix(in srgb, var(--muted) 70%, transparent); }
   .day.pastd[aria-pressed="true"] span, .day.pastd[aria-pressed="true"] b { color: var(--ink); }
   .pastlbl { display: flex; align-items: center; gap: 6px; margin: 2px 4px 10px; font-size: 13px; color: var(--muted); }
+
+  /* 🎉 חגיגה (celebrate.js): שכבה מתחת לסרגל (.dock z 10) ולכפתור עכשיו (.tonow z 9), לחלונות ולהודעה – לא מסתירה כפתורים */
+  #fx { position: fixed; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
+  #fx i { position: absolute; left: 0; top: 0; font-style: normal; line-height: 1; will-change: transform, opacity; }
+  #fx b { display: block; font-weight: 400; will-change: transform; }

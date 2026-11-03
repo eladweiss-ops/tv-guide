@@ -120,7 +120,7 @@
     if (TVG.addRec(rec, d) === "pending") return; // הפעלת התראות בדרך; ההודעה (עם ביטול) מגיעה מ-push.js
     TVG.nfPick = null; TVG.render(); if (TVG.nfReopen) TVG.nfReopen();
     var w = ilWall(d), same = dstr(w) === dstr(TVG.ilNow());
-    TVG.pill("⏰ נזכיר לך " + (same ? "" : dayTxt(w) + " ") + "ב־" + hhmm(w), 5000, "ביטול", function () { undoRem(rec.k); });
+    TVG.celebrate && TVG.celebrate("rem"); TVG.pill("⏰ נזכיר לך " + (same ? "" : dayTxt(w) + " ") + "ב־" + hhmm(w), 5000, "ביטול", function () { undoRem(rec.k); });
   }
   function undoRem(k) {
     TVG.REMS = TVG.REMS.filter(function (r) { return r.k !== k; }); TVG.saveRems(); TVG.syncRems(); TVG.render(); if (TVG.nfReopen) TVG.nfReopen(); TVG.pill("בוטל", 1200);

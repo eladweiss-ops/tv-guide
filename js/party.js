@@ -93,7 +93,7 @@
   cutOld();
 
   // ---- כפתורי כניסה ----
-  function nfBtn() { return '<button type="button" class="ghost" data-ptynf>🍿 קביעת ערב צפייה</button>'; } // 🍿 ערב צפייה (netflix.js barHtml)
+  function nfBtn() { return '<button type="button" class="ghost" data-ptynf>🍿 ערב צפייה</button>'; } // 🍿 ערב צפייה (netflix.js barHtml)
   function tvBtn(p, cid) { // 🍿 ערב צפייה (reminder-sheet.js openRem). תוכנית שנגמרה: לא מציעים
     if (!cid || TVG.ilTs(p.e) <= Date.now() || TVG.ilTs(p.s) < Date.now() - GO_BEFORE) return "";
     return '<button type="button" class="ghost shbtn" data-ptytv="' + esc(cid) + "|" + p.s.getTime() + '">🍿 קביעת ערב צפייה</button>';

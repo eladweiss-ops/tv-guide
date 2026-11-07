@@ -248,11 +248,16 @@
   }, true);
 
   // ---- דף תוכן ----
+  // כל קובייה = קישור לביקורות באתר שלה (נפתח בדפדפן). IMDb ישירות לדף הביקורות לפי המזהה; ל-RT/Metacritic אין מזהה – חיפוש לפי השם המקורי
+  function rateA(cls, href, label, val, site) {
+    return '<a class="nfr ' + cls + '" href="' + esc(href) + '" target="_blank" rel="noopener" aria-label="' + esc(label) + '"><b><bdi dir="ltr">' + val + "</bdi></b><i>" + site + ' <span aria-hidden="true">↗</span></i></a>';
+  }
   function ratesHtml(x) {
-    var r = x.ratings || {}, a = [], im = imdbOf(x);
-    if (im) a.push('<span class="nfr im"><b><bdi dir="ltr">⭐ ' + fmtRate(im) + "</bdi></b><i>IMDb</i></span>");
-    if (typeof r.rt === "number") a.push('<span class="nfr rt"><b><bdi dir="ltr">🍅 ' + Math.round(r.rt) + "%</bdi></b><i>Rotten Tomatoes</i></span>");
-    if (typeof r.mc === "number") a.push('<span class="nfr mc"><b><bdi dir="ltr">' + Math.round(r.mc) + "</bdi></b><i>Metacritic</i></span>");
+    var r = x.ratings || {}, a = [], im = imdbOf(x), q = encodeURIComponent(String(x.orig || x.title || "").slice(0, 80));
+    var imU = /^ttd{5,10}$/.test(x.imdb_id || "") ? "https://www.imdb.com/title/" + x.imdb_id + "/reviews/" : "https://www.imdb.com/find/?q=" + q;
+    if (im) a.push(rateA("im", imU, "ביקורות ב-IMDb", "⭐ " + fmtRate(im), "IMDb"));
+    if (typeof r.rt === "number") a.push(rateA("rt", "https://www.rottentomatoes.com/search?search=" + q, "ביקורות ב-Rotten Tomatoes", "🍅 " + Math.round(r.rt) + "%", "Rotten Tomatoes"));
+    if (typeof r.mc === "number") a.push(rateA("mc", "https://www.metacritic.com/search/" + q + "/", "ביקורות ב-Metacritic", String(Math.round(r.mc)), "Metacritic"));
     return a.length ? '<div class="nfrates">' + a.join("") + "</div>" : "";
   }
   function pageHtml(x) {
@@ -292,15 +297,22 @@
     var dsv = svcOf(x) === "disney", lk = linkOf(x), ok = (dsv ? isDs(x) && RE_DLINK.test(lk) : isNf(x) && RE_LINK.test(lk));
     var sv = k && RE_KEY.test(k) ? isFav(k) : null;
     // ⭐ שמירה ו-🍿 באותה שורה (משניים, 44px): הכתום נשאר אחד, למטה
-    var row = (sv === null ? "" : '<button type="button" class="ghost nffv' + (sv ? " on" : "") + '" data-nffav="' + esc(k) + '" aria-pressed="' + sv + '">' + (sv ? "★ שמור" : "⭐ שמירה") + "</button>") + (TVG.partyNfBtn ? TVG.partyNfBtn() : ""); /* 🍿 ערב צפייה */
+    var row = (sv === null ? "" : '<button type="button" class="ghost nffv' + (sv ? " on" : "") + '" data-nffav="' + esc(k) + '" aria-pressed="' + sv + '">' + (sv ? "★ שמור" : "⭐ שמירה") + "</button>") + (k && RE_KEY.test(k) && TVG.openShareNf ? '<button type="button" class="ghost nfrec" data-nfrec="' + esc(k) + '">💌 המלצה</button>' : "") + (TVG.partyNfBtn ? TVG.partyNfBtn() : ""); /* 💌 המלצה לחבר (share.js), 🍿 ערב צפייה */
     return (ok ? '<a class="btn nfgo" href="' + esc(lk) + '" target="_blank" rel="noopener">▶ פתח ב' + (dsv ? "דיסני+" : "נטפליקס") + "</a>" : '<p class="none nfnolink">אין קישור ישיר ל' + (dsv ? "דיסני+" : "נטפליקס") + " לתוכן הזה.</p>") +
       (row ? '<div class="nfbar2">' + row + "</div>" : "") +
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
+  var stubT = null;   // שם התוכן מקישור המלצה (t=), לתוכן שלא ברשימות
+  function stubItem(k, t, ds) {
+    return { k: k, type: k[0] === "t" ? "tv" : "movie", title: t, orig: "", year: 0, poster: "", genres: [], link: (ds ? "https://www.disneyplus.com/he-il/search?q=" : "https://www.netflix.com/search?q=") + encodeURIComponent(t), others: [], svc: ds ? "disney" : undefined, _wl: true };
+  }
   function openNf(k, ev, pref) {
     if (pref === "disney" && dsOn() && !TVG.DS && TVG.dsState !== "err") { pendOpen = [k, ev, pref]; loadDs(); return; }
+    if (TVG.recvNfTitle) { stubT = { k: k, t: TVG.recvNfTitle }; TVG.recvNfTitle = null; }
     TVG.nfOpenEv = ev || null; prefSvc = pref === "disney" ? "disney" : null;
     var x = getItem(k);
+    if (!x && !TVG.NF && !TVG.nfLoadDone) { TVG.nfWait = [k, ev, pref]; return; } // קישור שנפתח לפני ש-netflix.json נטען (boot.js פותח שוב אחרי הטעינה)
+    if (!x && stubT && stubT.k === k) x = stubItem(k, stubT.t, pref === "disney"); // 💌 המלצה על תוכן מחוץ לרשימות: שלד מהשם, ו-nfEnsure משלים מהחיפוש
     if (!x && ev === "rem" && !TVG.nfRemTry && TVG.calTok && TVG.CAL_API) { // תזכורת שלא שמורה במכשיר הזה (נוצרה בספארי/מכשיר אחר): מושכים מהשרת ומנסים שוב פעם אחת
       TVG.nfRemTry = true;
       fetch(TVG.CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
@@ -434,6 +446,7 @@
     }
     if (t.closest("[data-nfdsretry]")) { TVG.dsState = "idle"; TVG.render(); return; }
     var fv = t.closest("[data-nffav]"); if (fv) { toggleFav(fv.getAttribute("data-nffav")); return; }
+    var rc = t.closest("[data-nfrec]"); if (rc) { var rk = rc.getAttribute("data-nfrec"), rx = getItem(rk); if (rx && TVG.openShareNf) TVG.openShareNf(rx, rk); return; } // 💌 המלצה
     var mo = t.closest("[data-nfmore]"); if (mo) { openNfList(mo.getAttribute("data-nfmore")); return; }
     var o = t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen"), null, o.getAttribute("data-nfpref")); return; }
     if (t.closest("[data-nfclose]")) closeNf();

@@ -13,7 +13,7 @@
   TVG.topLayerEl = function () { var L = order[order.length - 1]; return L ? $(L.sel) : null; }; // השכבה הפתוחה העליונה (גרירת חלון תחתון, sheetdrag.js)
   TVG.closeTop = function () { return closeTop(); }; // אותה סגירה כמו Escape / "חזור": דרך ה-close של השכבה, וההיסטוריה מתנקה ב-sync
 
-  var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q", "from"]; // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
+  var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q", "from", "t", "s"]; // t: שם התוכן בקישור 💌 המלצה, לתוכן מחוץ לרשימות; s=d: התוכן בדיסני+ (share.js) // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -118,10 +118,11 @@
     // קדימות (מקום אחד): rem > nf > w > p > q > tab. w: ערב צפייה (party.js). rem: נודניק; nf: דף תוכן נטפליקס מהודעת התראה (netflix.js openNf); p: תוכנית ששיתפו (share.js); q: חיפוש; tab: לשונית (בעלייה נקבעת כבר למעלה)
     var tab = p.get("tab"), rem = p.get("rem"), nfk = p.get("nf"), pw = p.get("w"), pp = p.get("p"), hasQ = p.has("q"), q = (p.get("q") || "").slice(0, 100);
     if (tab && !isBoot && !rem && !nfk && !pw && pp == null) switchTab(tab);
+    TVG.recvNfTitle = nfk && !rem ? String(p.get("t") || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80) || null : null;
     if (rem && /^w\|[A-Za-z0-9_-]{22}\|/.test(rem)) { if (TVG.openParty) TVG.openParty(rem.split("|")[1]); } // 🍿 ערב צפייה: הקשה על תזכורת לערב (party.js)
     else if (rem && /^nf\|[mt][0-9]{1,9}\|/.test(rem)) { if (TVG.openNf) TVG.openNf(rem.split("|")[1], "rem"); } // תזכורת צפייה בנטפליקס: דף התוכן, לא חלון הנודניק של שידור
     else if (rem) { if (TVG.openSnooze) TVG.openSnooze(rem); }
-    else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk, p.get("e") === "nf" ? "nf" : null); }
+    else if (nfk) { if (/^[mt][0-9]{1,9}$/.test(nfk) && TVG.openNf) TVG.openNf(nfk, p.get("e") === "nf" ? "nf" : null, p.get("s") === "d" ? "disney" : null); }
     else if (pw) { if (TVG.openParty) TVG.openParty(pw, p.get("go") === "1"); } // 🍿 ערב צפייה: ?w=<id>[&go=1]
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);

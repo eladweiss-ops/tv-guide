@@ -8,6 +8,7 @@
   TVG.shareCard = shareCard;
   TVG.shareParts = parts;
   TVG.shareText = function (r, cardOnly) { return textOf(parts(r), cardOnly); };
+  TVG.openShareNf = openShareNf; // 💌 המלצה מדף תוכן בנטפליקס/דיסני+ (netflix.js)
 
   var APP = "https://eladweiss-ops.github.io/tv-guide/";
   var S = null; // {id, p, mode: "text" | "card", blob, url}
@@ -16,6 +17,9 @@
   function startStr(d) { return dstr(d) + "T" + hhmm(d); }
   // קישור קצר ונקי: ?p=<ערוץ>.<YYMMDDHHMM> (הישן ?p=<ערוץ>|<YYYY-MM-DDTHH:MM> עדיין נקרא)
   function linkOf(id, p) { var t = startStr(p.s).replace(/\D/g, "").slice(2); return APP + "?p=" + encodeURIComponent(id) + "." + t; }
+  // מילה אישית: נכנסת לראש ההודעה בוואטסאפ (לא לקישור)
+  var MSG_MAX = 140;
+  function cleanMsg(m) { return String(m || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, MSG_MAX); }
   function synOf(p) { // תקציר קצר לשיתוף: עד ~140 תווים, חיתוך במילה שלמה
     var d = String(p.desc || "").replace(/\s+/g, " ").trim();
     if (!d || d === p.title) return "";
@@ -51,22 +55,25 @@
       kind: TVG.kindOf(r.id, p.title)
     };
   }
-  var RLM = "\u200F", CTA = "👇 לשמירה ביומן לחצו כאן:";
+  var RLM = "\u200F", CTA = "👇 לשמירה ביומן לחצו כאן:", CTA_NF = "👇 לפרטים ולצפייה:";
   function textOf(x, cardOnly) { // במצב כרטיס: רק הקריאה לפעולה והקישור (הפרטים כבר בתמונה)
     // RLM רק בתחילת שורה שמתחילה באימוג'י (לא צמוד ל-_ או *, שוואטסאפ לא מזהה כעיצוב אחרת); שורות שמתחילות בעברית כבר RTL
-    if (cardOnly) return [RLM + CTA, x.link].join("\n");
-    var l = [RLM + x.emoji + " *" + x.title + "*", x.day + " · " + x.time + " · " + x.chRaw + (x.live ? " · ישיר" : "")];
+    var head = x.msg ? [RLM + "💬 " + x.msg, ""] : [], cta = x.nf ? CTA_NF : CTA;
+    if (cardOnly) return head.concat([RLM + cta, x.link]).join("\n");
+    var l = head.concat([RLM + x.emoji + " *" + x.title + "*", x.nf ? x.day : x.day + " · " + x.time + " · " + x.chRaw + (x.live ? " · ישיר" : "")]);
     if (x.syn) l.push("_" + x.syn.replace(/_/g, " ") + "_");
-    l.push("", RLM + CTA, x.link);
+    l.push("", RLM + cta, x.link);
     return l.join("\n");
   }
   function bubbleHtml(x, mode, imgUrl) {
     // וואטסאפ לא תומך במילה עם קישור: הוא מציג את הכתובת, ומעליה (במצב טקסט) כרטיס תצוגה מקדימה מתגיות og של האתר
     var strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>זפזופ 📺</b><span>לחצו לשמירה ביומן ולתזכורת</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
-    var cta = '<div class="shl2">' + CTA + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
-    if (mode === "card") return '<div class="shbub" dir="rtl"><div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
-    return '<div class="shbub" dir="rtl">' + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +
-      '<div class="shl2">' + esc(x.day) + " · " + x.time + " · <bdi dir=\"rtl\">" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "") + "</div>" +
+    var note = x.msg ? '<div class="shmsg">💬 <bdi dir="auto">' + esc(x.msg) + "</bdi></div>" : "";
+    var cta = '<div class="shl2">' + (x.nf ? CTA_NF : CTA) + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
+    if (mode === "card") return '<div class="shbub" dir="rtl">' + note + '<div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
+    if (x.nf) strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>זפזופ 📺</b><span>פרטים, ציונים ו־▶ פתיחה ב' + esc(x.svc) + '</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
+    return '<div class="shbub" dir="rtl">' + note + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +
+      '<div class="shl2">' + (x.nf ? esc(x.day) : esc(x.day) + " · " + x.time + " · <bdi dir=\"rtl\">" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "")) + "</div>" +
       (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") + '<div class="shgap"></div>' + cta + "</div>";
   }
   function shareBtn(p, cid) {
@@ -154,21 +161,51 @@
   }
 
   // ---- החלון התחתון ----
+  var MSG_FIELD = '<label class="shmsgf"><span>מילה אישית <i>(לא חובה)</i></span><textarea id="shMsg" rows="2" maxlength="' + MSG_MAX + '" placeholder="למשל: זו הסדרה שסיפרתי לך עליה בצהריים" dir="auto"></textarea></label>';
   function openShare(r) {
     if (S && S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
-    S = { id: r.id, p: r.p, mode: "text", blob: null, url: null };
+    S = { id: r.id, p: r.p, mode: "text", blob: null, url: null, msg: "" };
     TVG.rem = null; TVG.LP = null;
-    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
+    $("#rem").classList.remove("over");
+    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
       '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div><p class="shnote" id="shNote" hidden>הקישור מופיע גם בתמונה</p>' +
       '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
     // היסטוריה: #rem רשום ב-nav.js כשכבה. אם החלון כבר פתוח (שיתוף מתוך חלון תזכורת) לא משתנה hidden, ולכן אין רשומה כפולה
   }
+  // 💌 המלצה על תוכן בנטפליקס/דיסני+: אותו חלון, בלי כרטיס צבעוני; הקישור ?nf=<k> פותח את דף התוכן
+  function openShareNf(x, k) {
+    if (!x || !/^[mt][0-9]{1,9}$/.test(k || "")) return;
+    if (S && S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
+    S = { nf: { x: x, k: k }, mode: "text", blob: null, url: null, msg: "" };
+    TVG.rem = null; TVG.LP = null;
+    $("#rem").classList.add("over"); // מעל דף התוכן (#nfsheet, אותה שכבה)
+    $("#remBody").innerHTML = '<h2>💌 המלצה</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
+      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
+    paintPrev();
+    $("#rem").hidden = false; $("#scrim2").hidden = false;
+  }
+  function inList(k, svc) { var L = svc === "דיסני+" ? TVG.DS : TVG.NF; return !!(L && L.items && L.items[k]); }
+  function nfParts(x, k) {
+    var svc = TVG.nfSvc && TVG.nfSvc(x) === "disney" ? "דיסני+" : "נטפליקס", d = String(x.overview || "").replace(/\s+/g, " ").trim();
+    if (d.length > 140) { d = d.slice(0, 140); d = d.slice(0, Math.max(d.lastIndexOf(" "), 100)) + "…"; }
+    return {
+      nf: true, svc: svc, emoji: x.type === "tv" ? "📺" : "🎬",
+      title: String(x.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
+      day: [x.type === "tv" ? "סדרה" : "סרט", x.year ? String(x.year) : "", svc].filter(Boolean).join(" · "),
+      syn: d, link: APP + "?nf=" + k + (svc === "דיסני+" ? "&s=d" : "") + (inList(k, svc) ? "" : "&t=" + encodeURIComponent(String(x.title || "").slice(0, 60))) // s=d: דיסני+ (טוען את disney.json לפני הפתיחה); t= רק לתוכן מחוץ לרשימות (נפתח מהשם)
+    };
+  }
+  function curParts() { // החלקים להודעה הנוכחית, עם המילה האישית
+    var x = S.nf ? nfParts(S.nf.x, S.nf.k) : parts({ id: S.id, p: S.p });
+    x.msg = S.msg; // המילה האישית רק בטקסט ההודעה: עברית בכתובת הופכת ל-%D7%… ארוך ומכוער בוואטסאפ
+    return x;
+  }
   function paintPrev() {
     var el = $("#shPrev"); if (!el || !S) return;
     var r = { id: S.id, p: S.p };
-    el.innerHTML = bubbleHtml(parts(r), S.mode, S.url);
+    el.innerHTML = bubbleHtml(curParts(), S.mode, S.url);
     if (S.mode === "text") return;
     if (S.blob) return;
     var cur = S; // הגנה מפני החלפת תוכנית באמצע
@@ -194,7 +231,7 @@
     TVG.pill(msg, 1800);
   }
   function send() {
-    var x = parts({ id: S.id, p: S.p }), text = textOf(x, S.mode === "card");
+    var x = curParts(), text = textOf(x, S.mode === "card");
     if (S.mode === "text") { openWa(text); done("📤 נשלח לוואטסאפ"); return; }
     if (!S.blob) { TVG.pill("הכרטיס עוד בהכנה, עוד רגע", 1500); return; }
     var file = null; try { file = new File([S.blob], "tv-guide.png", { type: "image/png" }); } catch (e) {}
@@ -204,7 +241,7 @@
     } else fallback();
   }
   function copyLink() {
-    var l = parts({ id: S.id, p: S.p }).link, ok = function () { done("🔗 הקישור הועתק"); };
+    var l = curParts().link, ok = function () { done("🔗 הקישור הועתק"); };
     function old() {
       var t = document.createElement("textarea"); t.value = l; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;opacity:0"; document.body.appendChild(t); t.select();
       var good = false; try { good = document.execCommand("copy"); } catch (e) {} t.remove(); if (good) ok(); else TVG.pill("לא הצלחנו להעתיק", 1800);
@@ -220,6 +257,11 @@
     if (t.closest("[data-shwa]")) { e.stopPropagation(); send(); return; }
     if (t.closest("[data-shcopy]")) { e.stopPropagation(); copyLink(); return; }
   }, true);
+
+  document.addEventListener("input", function (e) {
+    if (!S || !e.target || e.target.id !== "shMsg") return;
+    S.msg = cleanMsg(e.target.value); paintPrev();
+  });
 
   // קישור עמוק ?p=: דף הנחיתה ב-landing.js (TVG.openShared)
 })(window.TVG);

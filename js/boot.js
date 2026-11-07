@@ -35,7 +35,9 @@
         TVG.NF = nf;
         if (TVG.store("tvg.tab") === "nf") { TVG.tab = "nf"; if (!$("#sheet").hidden) TVG.openSheet(false); }
         TVG.render();
-      }).catch(function () {});
+      }).catch(function () {}).then(function () { // קישור ?nf= שהגיע לפני הטעינה (netflix.js openNf)
+        TVG.nfLoadDone = true; var w = TVG.nfWait; TVG.nfWait = null; if (w && TVG.openNf) TVG.openNf(w[0], w[1], w[2]);
+      });
   });
   TVG.booted = true;
 })(window.TVG);

@@ -422,6 +422,12 @@
   .btn.wa { background: #25D366; color: #05301E; }
   .ghost.shcopy { background: var(--soft); border: 0; color: var(--ink); } /* כמו כפתור משני רגיל (.ghost) */
   .ghost.shbtn { margin-top: 4px; }
+  #rem.over { z-index: 23; } /* 💌 מעל דף התוכן של נטפליקס (#nfsheet, אותה שכבה 21) */
+  .shmsg { margin-bottom: 6px; font-weight: 700; } /* המילה האישית בראש ההודעה */
+  .shmsgf { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: .95rem; }
+  .shmsgf i { font-style: normal; font-weight: 500; color: var(--muted); }
+  .shmsgf textarea { font: inherit; font-weight: 400; font-size: 16px; line-height: 1.45; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); resize: none; min-height: 64px; }
+  .shmsgf textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   /* ===== נטפליקס 2.0: לשונית ודף תוכן ===== */
   .nfsec { display: flex; flex-direction: column; gap: 8px; }
   .nfsec .sech { margin: 0; }
@@ -466,7 +472,8 @@
   .nfsv { position: absolute; top: 6px; inset-inline-end: 6px; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); color: #F5C518; font-size: .85rem; line-height: 1; }
   .nfbar2 { display: flex; gap: 8px; }
   .nfs-bar .nfbar2 .ghost { width: auto; flex: 1 1 auto; min-width: 0; padding-inline: 12px; }
-  .nfs-bar .nfbar2 .nffv { flex: 0 0 auto; min-width: 104px; }
+  .nfs-bar .nfbar2 .nffv { flex: 0 0 auto; }
+  .nfs-bar .nfbar2 .ghost { white-space: nowrap; padding-inline: 8px; font-size: .95rem; } /* שלושה כפתורים (⭐ 💌 🍿) בשורה אחת, בלי שבירה */
   .nffv.on { background: color-mix(in srgb, #F5C518 24%, transparent) !important; font-weight: 800; }
   .nfl-in { padding: 22px 22px 12px; display: flex; flex-direction: column; gap: 6px; }
   .nfl-in .nfgrid { margin-top: 10px; }
@@ -493,6 +500,7 @@
   .nfr b, .nfr i { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nfr b { font-size: 1.15rem; font-weight: 800; }
   .nfr i { font-style: normal; font-size: .6rem; letter-spacing: -.01em; white-space: nowrap; color: var(--muted); font-weight: 600; direction: ltr; }
+  a.nfr { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform .12s; } a.nfr:active { transform: scale(.96); }
   .nfr.im b { color: #F5C518; } .nfr.rt b { color: #FA6E59; } .nfr.mc b { color: #66CC33; }
   :root:not([data-theme="dark"]) .nfr.im b { color: #8a6d00; } :root:not([data-theme="dark"]) .nfr.rt b { color: #c0391f; } :root:not([data-theme="dark"]) .nfr.mc b { color: #2f7d12; }
   .nfov { margin: 0; line-height: 1.6; font-size: 1rem; }
@@ -765,3 +773,7 @@
   #fx { position: fixed; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
   #fx i { position: absolute; left: 0; top: 0; font-style: normal; line-height: 1; will-change: transform, opacity; }
   #fx b { display: block; font-weight: 400; will-change: transform; }
+  #fxpop { position: fixed; inset: 0; z-index: 25; pointer-events: none; overflow: hidden; }
+  #fxpop i { position: absolute; left: 0; top: 0; font-style: normal; line-height: 1; will-change: transform, opacity; }
+  #fxpop .pop { font-size: 52px; filter: drop-shadow(0 6px 14px rgba(0,0,0,.25)); }
+  #fxpop .spk { font-size: 18px; }

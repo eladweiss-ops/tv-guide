@@ -73,10 +73,10 @@
     var h = '<label class="sel"><span class="lbl">ערוץ</span><select id="chSel">' + list.map(function (c) {
       return '<option value="' + esc(c.id) + '"' + (c.id === TVG.chId ? " selected" : "") + ">" + esc(c.name) + "</option>";
     }).join("") + "</select></label>";
-    h += '<div class="days" role="group" aria-label="יום">' + days.map(function (d) {
+    h += '<div class="daysw"><div class="days" role="group" aria-label="יום">' + days.map(function (d) { // daysw: רקע ומרווח; days: הגלילה (יום לא מציץ במרווח)
       var dt = TVG.dObj(d);
       return '<button type="button" class="day' + (d < dstr(now) ? " pastd" : "") + '" data-day="' + d + '" aria-pressed="' + (d === TVG.day) + '"><span>' + (d === dstr(now) ? "היום" : DAYS[dt.getDay()]) + "</span><b>" + dt.getDate() + "." + (dt.getMonth() + 1) + "</b></button>";
-    }).join("") + "</div>";
+    }).join("") + "</div></div>";
     return h;
   }
 })(window.TVG);

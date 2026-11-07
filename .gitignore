@@ -7,3 +7,4 @@ hot-local.log
 # מפתחות שירות (Firebase וכו׳) – לעולם לא למאגר
 *adminsdk*.json
 *service-account*.json
+hot-raw.json

@@ -170,8 +170,12 @@
     var l = TVG.G.channels.filter(function (c) { return sel.has(c.id); });
     return l.length ? l : (TVG.G.channels.length > MANY ? [] : TVG.G.channels);
   }
+  // ערוץ בלי שום תוכנית מעכשיו והלאה (למשל ערוץ 24: בוואלה הלוח תקוע על שבוע ישן) לא מוצג. כשהלוח חוזר – חוזר לבד
+  // (המערך ממוין, אז מספיק לבדוק את האחרונה; "מהיום" ולא "מעכשיו" – כדי שערוץ לא ייעלם באמצע היום האחרון שבלוח)
+  function live(c) { var a = TVG.by.get(c.id), t = new Date(); t.setHours(0, 0, 0, 0); return !!a && a.length > 0 && a[a.length - 1].e > t; }
   function chans() {
-    var l = baseChans();
+    var l0 = baseChans(), l = l0.filter(live);
+    if (!l.length) l = l0;
     if (TVG.gen !== "all") {
       var f = l.filter(function (c) { return c._n === TVG.gen; });
       if (f.length) l = f; else TVG.gen = "all";
@@ -180,7 +184,7 @@
   }
   function chipsHtml() {
     var cnt = {}, kinds = 0;
-    baseChans().forEach(function (c) { if (c._n) { if (!cnt[c._n]) kinds++; cnt[c._n] = (cnt[c._n] || 0) + 1; } });
+    baseChans().filter(live).forEach(function (c) { if (c._n) { if (!cnt[c._n]) kinds++; cnt[c._n] = (cnt[c._n] || 0) + 1; } });
     if (kinds < 2) return "";
     return '<div class="chips" role="group" aria-label="סינון לפי סוג"><button type="button" class="chip" data-chip="all" aria-pressed="' + (TVG.gen === "all") + '">הכל</button>' +
       GENRES.filter(function (g) { return cnt[g[0]]; }).map(function (g) {

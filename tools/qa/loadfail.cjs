@@ -26,6 +26,8 @@ const srv = http.createServer((req, res) => {
   for (const m of ["once", "always"]) {
     mode = m; hits = 0;
     const ctx = await b.newContext({ viewport: { width: 393, height: 852 }, locale: "he-IL" });
+    // לא כותבים לשרת האמיתי מהבדיקה (גיבוי ראשון = "👤 משתמש חדש" מזויף בטלגרם)
+    await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
     await ctx.addInitScript(() => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(["208", "199", "3787"])); localStorage.setItem("tvg.bkAt", "1"); } } catch (e) {} });
     const p = await ctx.newPage();
     await p.goto(base + "index.html", { waitUntil: "networkidle" }); await p.waitForTimeout(2500);

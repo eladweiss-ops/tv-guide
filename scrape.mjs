@@ -63,15 +63,13 @@ const WD = { "ראשון": 0, "שני": 1, "שלישי": 2, "רביעי": 3, "ח
 export function toStart(item, today) {
   let y = today.getFullYear();
   if (item.m < today.getMonth() + 1 - 6) y += 1; // מעבר דצמבר → ינואר
-  let dt = new Date(Date.UTC(y, item.m - 1, item.d));
-  // בחלק מהערוצים בוואלה התאריך לא תואם את שם היום (למשל "שישי 1.11" כשיום שישי הוא 30.10).
-  // שם היום נכון (התוכן מתאים לו), אז מתקנים את התאריך ליום הקרוב עם אותו שם.
+  const dt = new Date(Date.UTC(y, item.m - 1, item.d));
+  // תאריך שלא תואם לשם היום = עמוד ישן בוואלה (ערוץ 24: "שישי 1.11 … שלישי 5.11" הוא לוח מ-2024, כשמ-1.11 היה שישי).
+  // לא "מתקנים" אותו לשבוע הנוכחי – מחזירים null והתוכנית נזרקת
   const want = WD[item.wd];
-  if (want != null && dt.getUTCDay() !== want) {
-    let best = 0;
-    for (const s of [-1, 1, -2, 2, -3, 3]) if ((dt.getUTCDay() + s + 7) % 7 === want) { best = s; break; }
-    dt = new Date(dt.getTime() + best * 864e5);
-  }
+  if (want != null && dt.getUTCDay() !== want) return null;
+  const ms = dt.getTime(), t0 = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  if (ms < t0 - 2 * 864e5 || ms > t0 + 14 * 864e5) return null; // בדיקת שפיות: מאתמול-שלשום עד שבועיים קדימה
   return dt.toISOString().slice(0, 10) + "T" + item.time;
 }
 
@@ -135,11 +133,18 @@ async function main() {
         await sleep(300);
         continue;
       }
+      const starts = items.map((it) => toStart(it, today)), bad = starts.filter((x) => !x).length;
+      if (bad > items.length / 2) { // רוב העמוד ישן/לא תואם: מדלגים על הערוץ כולו (עדיף "אין לוח" מלוח מזויף)
+        console.error(`channel ${id} ${name}: ${bad}/${items.length} תאריכים לא תואמים לשם היום (לוח ישן) – מדלגים`);
+        await sleep(300);
+        continue;
+      }
       const pv = prov.get(id);
       channels.push({ id, name: name || `ערוץ ${id}`, prov: pv ? (pv.yes && pv.hot ? "both" : pv.yes ? "yes" : pv.hot ? "hot" : "") : "" });
       const seen = new Set();
-      for (const it of items) {
-        const start = toStart(it, today);
+      for (const [i, it] of items.entries()) {
+        const start = starts[i];
+        if (!start) continue;
         const key = start + it.title;
         if (seen.has(key)) continue;
         seen.add(key);

@@ -101,6 +101,7 @@
     if (!TABS[nt] || nt === TVG.tab) return;
     if (nt === "nf" && !TVG.NF) return;
     if (!$("#qwrap").hidden) TVG.setSearch(false);
+    if (nt === "nf" && TVG.svc !== "netflix") { TVG.svc = "netflix"; TVG.SCR.nf = 0; }
     TVG.prevTab = TVG.tab; TVG.SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", nt);
     TVG.scrollNext = TVG.enterGrid = nt === "grid"; TVG.render(); if (!(nt === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, TVG.SCR[nt] || 0);
   }

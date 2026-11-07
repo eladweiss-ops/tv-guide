@@ -88,9 +88,16 @@ async function main() {
   }
   // רץ על מחשב בישראל: מושך מ-HOT, מעדכן את הלוח ושומר מטמון
   const now = new Date(), end = new Date(now.getTime() + 7 * 864e5), iso = (d) => d.toISOString().slice(0, 10);
-  const res = await fetch(API, { method: "POST", headers: HEADERS, body: JSON.stringify({ ProgramsStartDateTime: iso(now) + "T00:00:00", ProgramsEndDateTime: iso(end) + "T23:59:59" }) });
-  if (!res.ok) throw new Error(`hot → ${res.status}`);
-  const hot = parseHot(await res.json()).sort((a, b) => (a.start < b.start ? -1 : 1));
+  // --from hot-raw.json: ב-GitHub, הנתונים כבר נמשכו דרך הממסר בתל אביב (tools/il-relay/fetch.mjs)
+  const fi = process.argv.indexOf("--from");
+  let raw;
+  if (fi > 0) raw = JSON.parse(await readFile(process.argv[fi + 1], "utf8"));
+  else {
+    const res = await fetch(API, { method: "POST", headers: HEADERS, body: JSON.stringify({ ProgramsStartDateTime: iso(now) + "T00:00:00", ProgramsEndDateTime: iso(end) + "T23:59:59" }) });
+    if (!res.ok) throw new Error(`hot → ${res.status}`);
+    raw = await res.json();
+  }
+  const hot = parseHot(raw).sort((a, b) => (a.start < b.start ? -1 : 1));
   const before = new Set(guide.programs.filter((p) => p.desc).map((p) => p.ch + "|" + p.start));
   const r = enrich(guide, hot);
   const keep = new Date(now.getTime() - 864e5).toISOString().slice(0, 10), out = {};

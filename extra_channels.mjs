@@ -3,6 +3,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { nextDays } from "./fill.mjs";
 import { parseKan } from "./enrich_kan.mjs";
+import { parseHot } from "./enrich_hot.mjs";
 
 const UA = { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-language": "he" };
 const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -88,8 +89,19 @@ async function get(url, json) {
   return json ? r.json() : r.text();
 }
 
+// גיבוי לערוץ 14 (האתר חוסם גם חוות שרתים בישראל): ערוץ 645 של HOT הוא ערוץ 14 (נבדק 7.11.26 – אותן תוכניות באותן שעות).
+// hot-raw.json נוצר ב-GitHub דרך הממסר בתל אביב (tools/il-relay). בלעדיו – נכשל, והמטמון נשאר
+export const HOT_C14 = "645";
+export function c14FromHot(j) {
+  return parseHot(j).filter((h) => h.ch === HOT_C14).map((h) => ({ start: h.start, title: clean(h.title.replace(/^ישיר!?s*/, "")), desc: h.desc || "" }));
+}
+async function loadC14() {
+  try { const a = parseC14(await get("https://www.c14.co.il/shidurim")); if (a.length >= 10) return a; } catch (e) { console.log("ערוץ 14 מהאתר:", e.message, "– מנסים דרך HOT"); }
+  return c14FromHot(JSON.parse(await readFile("hot-raw.json", "utf8")));
+}
+
 const SOURCES = [
-  { id: "x14", name: "ערוץ 14", prov: "both", load: async () => parseC14(await get("https://www.c14.co.il/shidurim")) },
+  { id: "x14", name: "ערוץ 14", prov: "both", load: loadC14 },
   { id: "xi24", name: "i24NEWS", prov: "both", load: async (days) => expandI24(await get("https://api.i24news.tv/v2/he/schedules", true), days) },
   { id: "xknesset", name: "ערוץ הכנסת", prov: "both", load: async (days) => parseKnesset(await get("https://www.knesset.tv/%D7%A2%D7%9B%D7%A9%D7%99%D7%95-%D7%9E%D7%A0%D7%92%D7%9F-%D7%91%D7%A2%D7%A8%D7%95%D7%A5/"), days[0]) },
   { id: "xkids", name: "כאן חינוכית", prov: "both", load: async (days) => {

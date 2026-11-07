@@ -115,7 +115,7 @@
   function openInGuide() {
     var pr = SZ && SZ.prog; if (!pr) return;
     stopTimer(); TVG.closeRem();
-    if (!TVG.chans().some(function (c) { return c.id === pr.id; })) { TVG.sel.add(pr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); }
+    if (!TVG.chans().some(function (c) { return c.id === pr.id; })) { TVG.gen = "all"; if (!TVG.sel.has(pr.id)) { TVG.sel.add(pr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); } }
     if (!$("#qwrap").hidden) TVG.setSearch(false);
     TVG.prevTab = TVG.tab; TVG.chId = pr.id; TVG.day = dstr(pr.p.s); TVG.scrub = null; TVG.tab = "grid"; TVG.store("tvg.tab", "grid"); TVG.scrollNext = false;
     TVG.render();

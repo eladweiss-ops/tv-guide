@@ -1,5 +1,5 @@
 /* js/netflix.js - לשונית 'סטרימינג' (נטפליקס ודיסני+, סכמה v2 לשניהם): כרטיס ראשי, שורות פוסטרים, דף תוכן בחלון תחתון.
-   המתג בראש הלשונית (tvg.svc) בוחר שירות; disney.json נטען בעצלתיים בהחלפה הראשונה (TVG.DS). מזהה הלשונית נשאר nf (קישורים ישנים).
+   המתג בראש הלשונית בוחר שירות (כל כניסה ללשונית מתחילה בנטפליקס); disney.json נטען בעצלתיים בהחלפה הראשונה (TVG.DS). מזהה הלשונית נשאר nf (קישורים ישנים).
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid. */
 (function (TVG) {
   TVG.files["netflix"] = 1;
@@ -108,7 +108,7 @@
   }
 
   // ---- שירות פעיל ----
-  TVG.svc = TVG.store("tvg.svc") === "disney" ? "disney" : "netflix"; // נשמר במכשיר
+  TVG.svc = "netflix"; // כל כניסה ללשונית נפתחת על נטפליקס (events.js/nav.js); דיסני+ רק בבחירה במתג
   TVG.DS = null; TVG.dsState = "idle"; // idle | loading | err | ok
   // דיסני+ מוצג רק כשיש disney.json בשרת (TMDB לא מחזיר כרגע נתוני זמינות לישראל). בלעדיו: אין מתג, ונטפליקס בלבד
   // הסימון disney:true ב-netflix.json (נכתב בבנייה רק כשיש disney.json). בלעדיו אין מתג ואין בקשה ל-disney.json
@@ -135,8 +135,9 @@
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) { var d = nfPrep(j, "disney"); if (!d) throw 0; TVG.DS = d; TVG.dsState = "ok"; })
       .catch(function () { TVG.dsState = "err"; })
-      .then(function () { if (TVG.tab === "nf" && curSvc() === "disney") TVG.render(); if (TVG.nfOpen) reopen(); });
+      .then(function () { if (TVG.tab === "nf" && curSvc() === "disney") TVG.render(); var po = pendOpen; pendOpen = null; if (po) openNf(po[0], po[1], po[2]); else if (TVG.nfOpen) reopen(); });
   }
+  var pendOpen = null; // פריט דיסני+ שנפתח מקישור/תזכורת/מועדף לפני ש-disney.json נטען (הלשונית תמיד מתחילה בנטפליקס)
   function dsWaitHtml() {
     if (TVG.dsState === "err") return '<div class="nfempty"><b>לא הצלחנו לטעון את דיסני+</b><span>בדקו את החיבור ונסו שוב.</span><button type="button" class="ghost" data-nfdsretry>נסו שוב</button></div>';
     var sec = ""; for (var i = 0; i < 3; i++) sec += '<section class="nfsec" aria-hidden="true"><h2 class="sech nfskh"></h2><div class="nfrow">' + skelRow() + "</div></section>";
@@ -297,6 +298,7 @@
       '<button type="button" class="ghost nfcl" data-nfclose>סגירה</button>';
   }
   function openNf(k, ev, pref) {
+    if (pref === "disney" && dsOn() && !TVG.DS && TVG.dsState !== "err") { pendOpen = [k, ev, pref]; loadDs(); return; }
     TVG.nfOpenEv = ev || null; prefSvc = pref === "disney" ? "disney" : null;
     var x = getItem(k);
     if (!x && ev === "rem" && !TVG.nfRemTry && TVG.calTok && TVG.CAL_API) { // תזכורת שלא שמורה במכשיר הזה (נוצרה בספארי/מכשיר אחר): מושכים מהשרת ומנסים שוב פעם אחת
@@ -427,7 +429,7 @@
     var sv0 = t.closest("[data-nfsvc]");
     if (sv0) {
       var ns = sv0.getAttribute("data-nfsvc") === "disney" ? "disney" : "netflix";
-      if (ns !== curSvc()) { TVG.svc = ns; TVG.store("tvg.svc", ns); TVG.render(); window.scrollTo(0, 0); }
+      if (ns !== curSvc()) { TVG.svc = ns; TVG.render(); window.scrollTo(0, 0); }
       return;
     }
     if (t.closest("[data-nfdsretry]")) { TVG.dsState = "idle"; TVG.render(); return; }

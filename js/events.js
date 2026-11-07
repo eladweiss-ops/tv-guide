@@ -92,7 +92,7 @@
     if (jp) {
       if (TVG.q.trim()) TVG.addRecent(TVG.qExact || TVG.q, !!TVG.qExact);
       var jr = TVG.findProg(jp.getAttribute("data-jump"));
-      if (jr) { if (!TVG.chans().some(function (c) { return c.id === jr.id; })) { sel.add(jr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); } TVG.setSearch(false); TVG.chId = jr.id; TVG.day = dstr(jr.p.s); TVG.scrub = Math.round((jr.p.s - TVG.dObj(TVG.day)) / 60000); TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render(); window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); }
+      if (jr) { if (!TVG.chans().some(function (c) { return c.id === jr.id; })) { TVG.gen = "all"; if (!sel.has(jr.id)) { sel.add(jr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); } } TVG.setSearch(false); TVG.chId = jr.id; TVG.day = dstr(jr.p.s); TVG.scrub = Math.round((jr.p.s - TVG.dObj(TVG.day)) / 60000); TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render(); window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); }
       return;
     }
     if (t.closest("[data-install]")) { TVG.install(); return; }
@@ -101,6 +101,7 @@
       var nt = tb.getAttribute("data-tab");
       if (!$("#qwrap").hidden) { TVG.setSearch(false); if (nt === TVG.tab) { window.scrollTo(0, SCR[TVG.tab] || 0); return; } } // לשונית סוגרת את החיפוש
       if (nt === TVG.tab) { if (TVG.prevTab && TVG.prevTab !== TVG.tab) nt = TVG.prevTab; else { window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); return; } } // לחיצה שנייה: חזרה למסך הקודם
+      if (nt === "nf" && TVG.svc !== "netflix") { TVG.svc = "netflix"; SCR.nf = 0; }
       TVG.prevTab = TVG.tab; SCR[TVG.tab] = window.scrollY; TVG.tab = nt; TVG.store("tvg.tab", TVG.tab); TVG.scrollNext = TVG.enterGrid = TVG.tab === "grid"; TVG.render();
       if (!(TVG.tab === "grid" && document.querySelector(".row.now"))) window.scrollTo(0, SCR[TVG.tab] || 0); return; // לוח: תמיד ממורכז על מה שמשודר עכשיו (מיקום ישן כבר לא רלוונטי)
     }

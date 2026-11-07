@@ -141,8 +141,9 @@ function dsFixtureData() {
     browser = await chromium.launch({ channel: "chrome", headless: true, args: process.env.TVG_CHROME_ARGS ? process.env.TVG_CHROME_ARGS.split(" ") : [] });
     const ctx = await browser.newContext({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: d.dpr, isMobile: true, hasTouch: true, userAgent: d.ua, locale: "he-IL", timezoneId: "Asia/Jerusalem", storageState: phase === "nfs" ? undefined : savedState[d.name] || undefined });
     await ctx.addInitScript((sel) => { try { if (!localStorage.getItem("tvg.sel")) { localStorage.setItem("tvg.sel", JSON.stringify(sel)); localStorage.setItem("tvg.bkAt", "1"); localStorage.setItem("tvg.v5", "1"); localStorage.setItem("tvg.theme", "light"); } } catch (e) {} }, SEL);
-    // TVG_NO_WRITES=1 (הניטור מול האתר החי): חוסם כל בקשה שאינה GET לשרת התזכורות, כדי שהבדיקה לא תכתוב גיבויים/תזכורות
-    if (process.env.TVG_NO_WRITES) await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
+    // תמיד (גם בהרצה מקומית): חוסם כל בקשה שאינה GET לשרת התזכורות, כדי שהבדיקה לא תכתוב גיבויים/תזכורות לשרת האמיתי.
+    // (הרצה מקומית בלי החסימה יצרה "👤 משתמש חדש" מזויף בטלגרם על כל דפדפן נקי.) TVG_ALLOW_WRITES=1 – רק אם באמת צריך לבדוק כתיבה
+    if (!process.env.TVG_ALLOW_WRITES) await ctx.route(/tv-guide-cal\.vercel\.app/, (r) => (r.request().method() === "GET" ? r.continue() : r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: "{\"ok\":true}" })));
     // חיפוש נטפליקס / רשימת מעקב / סנכרון תזכורות: תמיד מדומה (אין קריאות חיות לשרת). wlPosts = גופי ה-POST לבדיקות
     const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" };
     const wlPosts = [], nfQueries = [];
@@ -189,8 +190,8 @@ function dsFixtureData() {
         await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(dsFixtureData()) });
       });
       await page.route("**/netflix.json*", async (route) => {
-        if (!nfFixture) { const rr = await route.fetch(); let jj = null; try { jj = await rr.json(); } catch (e) {} if (!jj) return route.fulfill({ response: rr }); if (dsMode !== "fail") jj.disney = true; return route.fulfill({ response: rr, body: JSON.stringify(jj) }); }
-        await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify(Object.assign(nfFixtureData(), dsMode === "fail" ? {} : { disney: true })) }); /* הסימון disney:true מראה את מתג דיסני+ (בלעדיו: נטפליקס בלבד) */
+        if (!nfFixture) { const rr = await route.fetch(); let jj = null; try { jj = await rr.json(); } catch (e) {} if (!jj) return route.fulfill({ response: rr }); if (dsMode !== "fail") jj.disney = true; else delete jj.disney; return route.fulfill({ response: rr, body: JSON.stringify(jj) }); }
+        await route.fulfill({ status: 200, contentType: "application/json; charset=utf-8", body: JSON.stringify((function (j) { if (dsMode === "fail") delete j.disney; else j.disney = true; return j; })(nfFixtureData())) }); /* netflix.json האמיתי כבר מסומן disney:true – במצב fail מוחקים */ /* הסימון disney:true מראה את מתג דיסני+ (בלעדיו: נטפליקס בלבד) */
       });
     };
     await setupPage();
@@ -378,8 +379,9 @@ function dsFixtureData() {
     const dsNames = () => page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("#main [data-nfrow]"), (s) => s.getAttribute("data-nfrow")));
     const dsOpenTab = async (svc, mode) => { // מצב נקי: שמורים ובחירת שירות, ואז לשונית הסטרימינג
       nfFixture = true; dsMode = mode || "ok";
-      await fresh(); await page.evaluate((v) => { try { localStorage.removeItem("tvg.nffav"); localStorage.setItem("tvg.theme", "light"); if (v) localStorage.setItem("tvg.svc", v); else localStorage.removeItem("tvg.svc"); } catch (e) {} }, svc || "");
-      await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(svc === "disney" ? 1400 : 700);
+      await fresh(); await page.evaluate((v) => { try { localStorage.removeItem("tvg.nffav"); localStorage.setItem("tvg.theme", "light"); } catch (e) {} });
+      await fresh(); await page.click('[data-tab="nf"]'); await page.waitForTimeout(700);
+      if (svc === "disney") { await page.click('[data-nfsvc="disney"]').catch(() => {}); await page.waitForTimeout(1400); } // כניסה ללשונית תמיד על נטפליקס; דיסני+ בלחיצה על המתג
     };
     await step("ds-switch", async () => {
       await dsOpenTab("");
@@ -392,7 +394,6 @@ function dsFixtureData() {
       dsChk(await page.evaluate(() => !document.querySelector("#main .nfreg")), "no region note on the Netflix side");
       await snap("50_ds_switch_netflix");
       await page.click('[data-nfsvc="disney"]'); await page.waitForTimeout(1200);
-      dsChk(await page.evaluate(() => localStorage.getItem("tvg.svc")) === "disney", "choice remembered in tvg.svc");
       dsChk((await dsNames()).join() === "popular,week,series,movies,kids,marvel,starwars,pixar,top", "disney rows order " + (await dsNames()).join());
       dsChk(await page.evaluate(() => document.querySelectorAll("#main .nfhero").length === 1 && document.querySelector('[data-nfsvc="disney"]').getAttribute("aria-pressed") === "true"), "disney selected + hero");
       dsChk(await page.evaluate(() => { const n = document.querySelector("#main .nfreg"); return !!n && /בבריטניה/.test(n.textContent) && /ייתכנו הבדלים בישראל/.test(n.textContent) && n.nextElementSibling.classList.contains("nfhero"); }), "region note (GB) under the switch");
@@ -407,7 +408,8 @@ function dsFixtureData() {
       await snap("51_ds_bottom");
       await page.evaluate(() => window.scrollTo(0, 0)); await page.click('[data-nfsvc="netflix"]'); await page.waitForTimeout(700);
       dsChk((await dsNames()).join() === "popular,israeli,week,recent,series,movies,top,comedy,crime,docu,family", "netflix rows unchanged " + (await dsNames()).join());
-      dsChk(await page.evaluate(() => localStorage.getItem("tvg.svc")) === "netflix", "back to Netflix remembered");
+      await page.click('[data-nfsvc="disney"]'); await page.waitForTimeout(900); await page.click('[data-tab="dial"]'); await page.waitForTimeout(400); await page.click('[data-tab="nf"]'); await page.waitForTimeout(700);
+      dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="netflix"]').getAttribute("aria-pressed") === "true"), "re-entering the tab opens on Netflix");
     });
     await step("ds-more-open-save", async () => {
       await dsOpenTab("disney");
@@ -446,11 +448,10 @@ function dsFixtureData() {
     });
     await step("ds-remember-reload", async () => {
       await dsOpenTab("disney");
-      await fresh(); // רענון מלא: אותה בחירה, בלי ללחוץ שוב על המתג
+      await fresh(); // רענון מלא: חוזרים לנטפליקס
       await page.waitForTimeout(600);
-      dsChk(await page.evaluate(() => TVG.tab) === "nf" || true, "tab");
-      await page.click('[data-tab="nf"]').catch(() => {}); await page.waitForTimeout(1400);
-      dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="disney"]').getAttribute("aria-pressed") === "true" && !!document.querySelector('[data-nfrow="marvel"]')), "disney still selected after reload");
+      await page.click('[data-tab="nf"]').catch(() => {}); await page.waitForTimeout(900);
+      dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="netflix"]').getAttribute("aria-pressed") === "true" && !document.querySelector('[data-nfrow="marvel"]')), "Netflix after reload");
       await snap("55_ds_after_reload");
       await page.evaluate(() => localStorage.removeItem("tvg.svc"));
     });

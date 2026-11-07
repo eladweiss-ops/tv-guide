@@ -490,10 +490,9 @@
   .nfsk .nft { min-height: 2.6em; }
   .nfsk .nft::before { content: ""; display: block; height: .9em; width: 70%; border-radius: 6px; background: var(--soft); }
   .nfsv { position: absolute; top: 6px; inset-inline-end: 6px; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); color: #F5C518; font-size: .85rem; line-height: 1; }
-  .nfbar2 { display: flex; gap: 8px; }
+  .nfbar2 { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; } /* עמודים שווים: כל כפתור ממורכז בשליש שלו */
   .nfs-bar .nfbar2 .ghost { width: auto; flex: 1 1 auto; min-width: 0; padding-inline: 12px; }
-  .nfs-bar .nfbar2 .nffv { flex: 0 0 auto; }
-  .nfs-bar .nfbar2 .ghost { white-space: nowrap; padding-inline: 8px; font-size: .95rem; } /* שלושה כפתורים (⭐ 💌 🍿) בשורה אחת, בלי שבירה */
+  .nfs-bar .nfbar2 .ghost { white-space: nowrap; padding-inline: 0; font-size: .9rem; justify-content: center; text-align: center; } /* שלושה כפתורים (⭐ 💌 🍿) בשורה אחת, בלי שבירה */
   .nffv.on { background: color-mix(in srgb, #F5C518 24%, transparent) !important; font-weight: 800; }
   .nfl-in { padding: 22px 22px 12px; display: flex; flex-direction: column; gap: 6px; }
   .nfl-in .nfgrid { margin-top: 10px; }

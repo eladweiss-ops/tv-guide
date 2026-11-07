@@ -165,7 +165,11 @@
         return '<div class="srow sgrow"><button type="button" class="go sg" data-sug="' + esc(x.t) + '"><span class="ttl">' + esc(x.t) + '<br><span class="sub">' + x.n + " שידורים · " + x.k + (x.k === 1 ? " ערוץ" : " ערוצים") + "</span></span></button>" + starBtn(x.t) + "</div>";
       }).join("");
     }
-    if (!hits.length) return h + aux1 + '<p class="none">לא נמצאו שידורים עתידיים בשם הזה.</p>';
+    var gs = term.length >= 2 && !TVG.favPick && !TVG.topicAdd && TVG.nfGlobal ? TVG.nfGlobal() : { html: "", state: "empty" }; // 🎬 בסטרימינג (nfsearch.js)
+    if (!hits.length) {
+      if (gs.state === "ok" || gs.state === "loading") return h + '<p class="none">אין שידורים בלוח בשבוע הקרוב.</p>' + gs.html + aux1;
+      return h + aux1 + '<p class="none">' + (gs.state === "empty" && !TVG.qExact ? "לא מצאנו את \"" + esc(TVG.q.trim()) + "\" בלוח ובשירותי הסטרימינג. ייתכן שיש ב-yes או ב-HOT." : "לא נמצאו שידורים עתידיים בשם הזה.") + "</p>";
+    }
     if (series) h += '<div class="chips seg3" role="group" aria-label="סוג שידור">' + [["all", "הכל"], ["new", "✨ פרקים חדשים (" + nNew + ")"], ["rerun", "🔁 שידורים חוזרים (" + nRr + ")"]].map(function (w) { return '<button type="button" class="chip" data-kind="' + w[0] + '" aria-pressed="' + (TVG.sKind === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
     if (serFollow && !TVG.favPick) {
       var fk = TVG.folKey(exT), fl = TVG.folFind(fk);
@@ -195,7 +199,7 @@
     if (g2.length) h += '<h2 class="sech">' + (g1.length || gl.length ? "עוד בהמשך" : "שידורים קרובים") + " (" + g2.length + ")</h2>" + g2.slice(0, cap).map(row).join("");
     h += aux2;
     if (g3.length) h += '<h2 class="sech">🔁 חוזרים ומוקלטים (' + g3.length + ")</h2>" + g3.slice(0, cap).map(row).join("");
-    return h + aux1;
+    return h + gs.html + aux1;
   }
   function startSearch(text, exact) {
     TVG.closeFavs(); $("#qwrap").hidden = false; $("#qx").hidden = !text; $("#q").value = text || ""; TVG.q = text || ""; TVG.qExact = exact ? text : null;

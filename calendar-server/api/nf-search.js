@@ -5,11 +5,13 @@
 //   → מזהי TMDB מ-P4983 (סדרה, "t<id>") ו-P4947 (סרט, "m<id>"), עד 3 פריטים, ב-titles עם via:"wikidata". כשל/timeout (4 שניות) בוויקינתונים = partial
 //   (נשמר בזיכרון 5 דקות בלבד ומנסים שוב), כדי ש"אין תוצאות" לא יינעל ל-12 שעות. אחריו, אם עדיין אין כלום: תעתיק לאנגלית. כינוי שנלמד (alias) קודם לכל זה.
 // מטמון: זיכרון + Firestore דרך _db.js (cache/nf/<hash>.json) ל-12 שעות. קצב: 30 בדקה ל-IP. שגיאות: 400 קלט, 429 קצב, 502 TMDB, 503 לא מוגדר.
-// POST /api/nf-search {q, k, t} → לומד כינוי בעברית (alias/<hash>.json): חיפוש בעברית שלא מצא, ואחריו בחירת k מחיפוש t באנגלית.
-//   מעכשיו חיפוש q מחפש את t (גם אצל כל המשתמשים). אימות: q בעברית, t בלי עברית, וחיפוש t באמת מחזיר את k. הראשון קובע. קצב: 5 בשעה ל-IP.
+// POST /api/nf-search {q, k, t} → כינוי בעברית (alias/<hash>.json), רק אחרי אישור מפורש של המשתמש בדף התוכן ("זו 'חילופי בתים'? כן, לזכור").
+//   מעכשיו חיפוש q מחפש את t (גם אצל כל המשתמשים), והתשובה מסומנת alias=t כדי שהלקוח יציג "לא נכון?". אימות: q בעברית, t בלי עברית,
+//   וחיפוש t באמת מחזיר את k. אישור חדש מחליף את הקודם (תיקון). POST {q, del:1} → מחיקה ("לא נכון?"). קצב: 5 בשעה ל-IP.
 import { createHash } from "node:crypto";
 import { searchNf, cleanQuery, norm, SEARCH_TTL } from "./_nfs.js";
 import { readJson, writeJson } from "./_push.js";
+import { delJson } from "./_db.js";
 import { allow, clientIp, tooMany, fail } from "./_guard.js";
 
 const mem = new Map();      // hash -> {t, v}
@@ -37,9 +39,14 @@ async function aliasOf(q, rj, now) {
 }
 export async function handleAlias(body, d = {}) {
   const q = cleanQuery(body && body.q), t = cleanQuery(body && body.t), k = String((body && body.k) || "");
+  const now = d.now ? d.now() : Date.now(), wj = d.writeJson || writeJson, dj = d.delJson || delJson;
+  if (body && body.del) { // "לא נכון?": מוחקים את הכינוי
+    if (!q || !HEB.test(q) || q.length > 40) return { status: 400, json: { error: "bad alias" } };
+    await dj(aliasPath(q)); aliasMem.delete(norm(q));
+    return { status: 200, json: { ok: true, deleted: true } };
+  }
   if (!q || !HEB.test(q) || q.length > 40 || !t || HEB.test(t) || t.length > 80 || !/^[mt][0-9]{1,9}$/.test(k)) return { status: 400, json: { error: "bad alias" } };
-  const now = d.now ? d.now() : Date.now(), rj = d.readJson || readJson, wj = d.writeJson || writeJson;
-  try { const old = await rj(aliasPath(q), null); if (old && old.t) return { status: 200, json: { ok: true, kept: true } }; } catch (e) { return { status: 503, json: { error: "store" } }; }
+  aliasMem.delete(norm(q)); // החיפוש לאימות הוא על t, לא על q
   const r = await handleSearch(t, d); // אימות: החיפוש באנגלית באמת מוצא את k
   const j = r && r.json, found = !!(j && j.items && j.items[k]);
   if (!found) return { status: 422, json: { error: "no match" } };
@@ -56,7 +63,7 @@ export async function handleSearch(q0, d = {}) {
   const now = d.now ? d.now() : Date.now(), rj = d.readJson || readJson, wj = d.writeJson || writeJson;
   const via = await aliasOf(q1, rj, now), q = via || q1; // "חילופי בתים" → "A Couple of Lies"
   const h = hashOf(q), path = `cache/nf/${h}.json`;
-  const back = (v) => (via ? { ...v, q: q1 } : v); // התשובה עם השאילתה המקורית (הלקוח משווה למה שהוקלד)
+  const back = (v) => (via ? { ...v, q: q1, alias: via } : v); // השאילתה המקורית (הלקוח משווה למה שהוקלד) + alias, ל"לא נכון?"
   const m = mem.get(h);
   if (m && now < m.exp) return { status: 200, json: back(m.v), cache: "mem" };
   try {

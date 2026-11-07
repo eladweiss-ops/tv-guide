@@ -533,6 +533,13 @@
   .nfb.nf { background: rgba(229,9,20,.14); color: #d1060f; }
   .nfb.tv { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--ink); }
   .nfb.no { background: var(--soft); color: var(--muted); font-weight: 600; }
+  .nfb.ot { background: var(--soft); color: var(--ink); font-weight: 600; } /* זמין בשירות אחר (Apple TV+, HBO…) – מידע בלבד */
+  .gst { margin-top: 18px; } /* 🎬 בסטרימינג בחיפוש הראשי */
+  .ghost.gsmore { margin-top: 10px; width: auto; }
+  /* "זו הסדרה שחיפשת בשם…? כן, לזכור" בראש דף התוכן (nfsearch.js) */
+  .aliask { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: 16px; background: var(--soft); font-size: 1rem; line-height: 1.45; }
+  .aliasb { display: flex; gap: 8px; } .aliasb .btn, .aliasb .ghost { width: auto; flex: 1 1 0; }
+  .linkb { border: 0; background: none; padding: 0 4px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; min-height: 32px; }
   :root[data-theme="dark"] .nfb.nf { background: rgba(255,69,80,.2); color: #ff6b73; }
   .nfb.ds { background: rgba(26,70,209,.12); color: #1a46d1; }
   :root[data-theme="dark"] .nfb.ds { background: rgba(110,150,255,.2); color: #9db8ff; }

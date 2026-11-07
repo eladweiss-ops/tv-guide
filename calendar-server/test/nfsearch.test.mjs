@@ -236,7 +236,7 @@ test("כינוי בעברית: נלמד רק כשהחיפוש באנגלית ב�
   const { handleAlias, aliasPath } = await import("../api/nf-search.js");
   const fx = tmdb({ "/search/multi": (u) => (u.searchParams.get("query") === "A Couple of Lies" ? { results: [{ media_type: "tv", id: 336240, name: "A Couple of Lies", original_name: "Bytet", first_air_date: "2026-10-30", overview: "x", poster_path: "/abcde12345.jpg" }] } : { results: [] }) });
   const store = {};
-  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, now: () => 2_000_000 };
+  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, delJson: async (p) => { delete store[p]; }, now: () => 2_000_000 };
   const before = await handleSearch("חילופי בתים", d);
   assert.equal(before.json.titles.length, 0, "לפני: אין תוצאה");
   // קלט לא תקין
@@ -252,9 +252,14 @@ test("כינוי בעברית: נלמד רק כשהחיפוש באנגלית ב�
   const after = await handleSearch("  חילופי   בתים ", d);
   assert.deepEqual(after.json.titles, ["t336240"], "אחרי: נמצא");
   assert.equal(after.json.q, "חילופי בתים", "השאילתה המקורית בתשובה");
-  // הראשון קובע
-  const r2 = await handleAlias({ q: "חילופי בתים", t: "Something Else", k: "t1" }, d);
-  assert.equal(r2.json.kept, true); assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
+  assert.equal(after.json.alias, "A Couple of Lies", "מסומן כינוי (ל'לא נכון?')");
+  // אישור שגוי (k שלא נמצא בחיפוש) לא דורס
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "Something Else", k: "t1" }, d)).status, 422);
+  assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
+  // "לא נכון?": מחיקה, ואז חיפוש בעברית שוב ריק
+  assert.equal((await handleAlias({ q: "חילופי בתים", del: 1 }, d)).json.deleted, true);
+  assert.ok(!store[aliasPath("חילופי בתים")]);
+  assert.equal((await handleSearch("חילופי בתים", d)).json.titles.length, 0);
 });
 
 test("POST /api/nf-search: קצב 5 בשעה ל-IP", async () => {

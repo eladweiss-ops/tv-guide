@@ -263,7 +263,7 @@
   function pageHtml(x) {
     var bd = imgUrl(x.backdrop), u = bd || imgUrl(x.poster);
     var h = '<div class="nfbd' + (u ? "" : " er") + (bd ? "" : " ispo") + '">' + (u ? '<img alt="" decoding="async" src="' + esc(u) + '">' : "") + '<span class="nfph" aria-hidden="true">🎬</span></div>';
-    h += '<div class="nfpg"><h2 id="nfsT"><bdi>' + esc(x.title) + "</bdi></h2>";
+    h += '<div class="nfpg">' + (TVG.aliasAskHtml ? TVG.aliasAskHtml(TVG.nfOpen) : "") + '<h2 id="nfsT"><bdi>' + esc(x.title) + "</bdi></h2>";
     if (showOrig(x)) h += '<div class="nforig"><bdi dir="ltr">' + esc(x.orig) + "</bdi></div>";
     h += '<div class="nfmeta">' + bdis([kindTxt(x), x.year ? String(x.year) : "", lenTxt(x), (x.genres || []).slice(0, 3).join(", ")]) + "</div>";
     h += ratesHtml(x);

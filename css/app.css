@@ -428,11 +428,26 @@
   .shmsgf i { font-style: normal; font-weight: 500; color: var(--muted); }
   .shmsgf textarea { font: inherit; font-weight: 400; font-size: 16px; line-height: 1.45; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); resize: none; min-height: 64px; }
   .shmsgf textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .shmsgf textarea { direction: rtl; text-align: right; }
+  .shmsgf textarea::placeholder { color: var(--muted); opacity: 1; text-align: right; }
+  .shsug { gap: 6px; }
+  .shsug .chip { min-height: 44px; padding: 4px 13px; font-weight: 500; font-size: .9rem; line-height: 1.25; text-align: right; color: var(--ink); }
+  .shsug .chip[aria-pressed="true"] { font-weight: 700; }
+  /* 💌: תצוגה מקדימה של הקישור כמו בוואטסאפ – תמונה רחבה מעל, או פוסטר קטן בצד */
+  .shlnk.pst img { width: 44px; height: 66px; border-radius: 8px; object-fit: cover; }
+  .shlnk.big { flex-direction: column; align-items: stretch; gap: 0; padding: 0; overflow: hidden; }
+  .shlnk.big img { width: 100%; height: 110px; border-radius: 0; object-fit: cover; background: rgba(0,0,0,.12); } /* קומפקטי: שהכפתור הירוק ייראה בלי גלילה */
+  #shPrev .shsyn { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .shmsgf textarea { min-height: 52px; }
+  #remBody .shsub { margin-top: 2px; }
+  .shlnk.big div { padding: 8px 10px; }
+  .shlnk div b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* ===== נטפליקס 2.0: לשונית ודף תוכן ===== */
   .nfsec { display: flex; flex-direction: column; gap: 8px; }
   .nfsec .sech { margin: 0; }
   .nfrow { display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; margin-inline: -16px; padding: 2px 16px 6px; scroll-padding-inline: 16px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
   .nfrow::-webkit-scrollbar { display: none; }
+  .nfrow { contain: content; transform: translateZ(0); } /* ביצועים: גלילה אופקית בשכבה נפרדת, בלי לצבוע מחדש את שאר הדף */
   .nfc { flex: 0 0 auto; width: 112px; border: 0; background: none; padding: 0; color: var(--ink); font: inherit; text-align: start; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .nfc:active .nfp { transform: scale(.97); }
   .nfp { position: relative; display: block; width: 100%; aspect-ratio: 2 / 3; border-radius: 14px; overflow: hidden; background: var(--soft); transition: transform .12s; }
@@ -535,11 +550,10 @@
   .nfb.no { background: var(--soft); color: var(--muted); font-weight: 600; }
   .nfb.ot { background: var(--soft); color: var(--ink); font-weight: 600; } /* זמין בשירות אחר (Apple TV+, HBO…) – מידע בלבד */
   .gst { margin-top: 18px; } /* 🎬 בסטרימינג בחיפוש הראשי */
-  .ghost.gsmore { margin-top: 10px; width: auto; }
   /* "זו הסדרה שחיפשת בשם…? כן, לזכור" בראש דף התוכן (nfsearch.js) */
   .aliask { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: 16px; background: var(--soft); font-size: 1rem; line-height: 1.45; }
   .aliasb { display: flex; gap: 8px; } .aliasb .btn, .aliasb .ghost { width: auto; flex: 1 1 0; }
-  .linkb { border: 0; background: none; padding: 0 4px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; min-height: 32px; }
+  .linkb { border: 0; background: none; padding: 0 4px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; min-height: 44px; }
   :root[data-theme="dark"] .nfb.nf { background: rgba(255,69,80,.2); color: #ff6b73; }
   .nfb.ds { background: rgba(26,70,209,.12); color: #1a46d1; }
   :root[data-theme="dark"] .nfb.ds { background: rgba(110,150,255,.2); color: #9db8ff; }

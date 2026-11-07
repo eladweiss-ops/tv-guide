@@ -195,14 +195,16 @@ function saveClip(frames, name) { // frames -> mp4 60fps + contact sheet
       const { ctx, page, cdp } = await mk();
       await fresh(page); await page.click('[data-tab="grid"]'); await page.waitForTimeout(700);
       const day0 = await page.evaluate(() => TVG.day), days = await page.evaluate(() => TVG.allDays());
-      A(days.length >= 2, "days available: " + days.length);
+      const i0 = days.indexOf(day0); // היום (לא בהכרח הראשון: ימים שעברו מ-past/ לפניו)
+      A(days.length >= 2 && i0 >= 0 && i0 < days.length - 1, "days available: " + days.length + ", today at " + i0);
       const midY = d.h * 0.55, wrapSel = ".list";
       // dx>0 = היום הבא (כמו תמיד)
       await T.drag(cdp, [[d.w * 0.25, midY], [d.w * 0.7, midY]], 120); await page.waitForTimeout(800);
-      const day1 = await page.evaluate(() => TVG.day); A(day1 === days[1], "swipe right (dx>0) -> next day (" + day0 + " -> " + day1 + ")");
+      const day1 = await page.evaluate(() => TVG.day); A(day1 === days[i0 + 1], "swipe right (dx>0) -> next day (" + day0 + " -> " + day1 + ")");
       await T.drag(cdp, [[d.w * 0.7, midY], [d.w * 0.25, midY]], 120); await page.waitForTimeout(800);
-      const day2 = await page.evaluate(() => TVG.day); A(day2 === days[0], "swipe left (dx<0) -> previous day (" + day2 + ")");
+      const day2 = await page.evaluate(() => TVG.day); A(day2 === day0, "swipe left (dx<0) -> previous day (" + day2 + ")");
       // קצה: היום הראשון, החלקה שמאלה = אין יום קודם -> גומי וחוזר
+      await page.evaluate((first) => { TVG.day = first; TVG.render(); }, days[0]); await page.waitForTimeout(500);
       await T.startFrameLog(page, wrapSel);
       const cast = await T.startCast(cdp);
       await T.drag(cdp, [[d.w * 0.7, midY], [d.w * 0.15, midY]], 300, { hold: 150, release: false });

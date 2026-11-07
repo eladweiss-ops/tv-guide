@@ -167,8 +167,11 @@
     }
     var gs = term.length >= 2 && !TVG.favPick && !TVG.topicAdd && TVG.nfGlobal ? TVG.nfGlobal() : { html: "", state: "empty" }; // 🎬 בסטרימינג (nfsearch.js)
     if (!hits.length) {
-      if (gs.state === "ok" || gs.state === "loading") return h + '<p class="none">אין שידורים בלוח בשבוע הקרוב.</p>' + gs.html + aux1;
-      return h + aux1 + '<p class="none">' + (gs.state === "empty" && !TVG.qExact ? "לא מצאנו את \"" + esc(TVG.q.trim()) + "\" בלוח ובשירותי הסטרימינג. ייתכן שיש ב-yes או ב-HOT." : "לא נמצאו שידורים עתידיים בשם הזה.") + "</p>";
+      // לפי המסננים: "אין שידורים הערב בערוצים שלך" ולא קביעה כללית שגויה
+      var when = TVG.sWhen === "live" ? " עכשיו" : TVG.sWhen === "today" ? " הערב" : TVG.sWhen === "week" ? " השבוע" : " בשבוע הקרוב", where = TVG.scope === "mine" ? " בערוצים שלך" : " בלוח";
+      var noneTv = "אין שידורים" + where + when + ".";
+      if (gs.state === "empty" && !TVG.qExact && TVG.scope !== "mine" && TVG.sWhen === "all") noneTv = "לא מצאנו את <bdi>״" + esc(TVG.q.trim()) + "״</bdi> בלוח ובשירותי הסטרימינג.";
+      return h + '<p class="none">' + noneTv + "</p>" + gs.html + aux1;
     }
     if (series) h += '<div class="chips seg3" role="group" aria-label="סוג שידור">' + [["all", "הכל"], ["new", "✨ פרקים חדשים (" + nNew + ")"], ["rerun", "🔁 שידורים חוזרים (" + nRr + ")"]].map(function (w) { return '<button type="button" class="chip" data-kind="' + w[0] + '" aria-pressed="' + (TVG.sKind === w[0]) + '">' + w[1] + "</button>"; }).join("") + "</div>";
     if (serFollow && !TVG.favPick) {

@@ -19,6 +19,7 @@
     }
     $("#main").innerHTML = isl + (nf ? "" : note) + chips + body;
     document.body.classList.toggle("tab-dial", TVG.tab === "dial" && !nf && !picking && !searching && !srchOpen);
+    if (TVG.swipeArm) TVG.swipeArm((TVG.tab === "dial" || TVG.tab === "grid" || TVG.tab === "now") && !nf && !picking && !searching && !srchOpen); // החלקה בין ימים (swipe.js)
     $("#tabNf").setAttribute("aria-selected", String(!!nf));
     $("#chCount").textContent = ""; // מספר הערוצים הוא לא התראה - לא מציגים
     TVG.updFav();

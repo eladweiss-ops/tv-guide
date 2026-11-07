@@ -43,24 +43,20 @@
   TVG.isIOS = /iPhone|iPad|iPod/.test(UA);
   TVG.isAndroid = !TVG.isIOS && /Android/i.test(UA);
   TVG.isStandalone = !!((window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone);
-  // פתיחת וואטסאפ עם טקסט. בטלפון: ישר לאפליקציה (whatsapp://) – באייפון, wa.me מתוך אפליקציית מסך הבית נפתח בדפדפן פנימי
-  // שנשאר ריק (עם X), או בדף ההורדה של וואטסאפ. לכן באייפון אין מעבר אוטומטי ל-wa.me: iOS שואל לפעמים "לפתוח בוואטסאפ?",
-  // ובזמן השאלה הדף לא מוסתר – המעבר האוטומטי (1.5 שניות) שלח לדף ההורדה. אם אחרי 4 שניות לא יצאנו מהאפליקציה: הודעה עם "העתקת ההודעה".
-  // אנדרואיד: wa.me כגיבוי (נפתח באפליקציה). במחשב: wa.me בחלון חדש
+  // פתיחת וואטסאפ עם טקסט. אייפון: רק whatsapp:// ישר לאפליקציה – בלי טיימר, בלי wa.me ובלי הודעת "לא נפתח?"
+  // (wa.me מתוך אפליקציית מסך הבית נפתח בדפדפן פנימי ריק או בדף ההורדה; וההודעה המושהית קפצה גם כשוואטסאפ כן נפתח,
+  // כי iOS שואל לפעמים "לפתוח בוואטסאפ?" והדף לא מוסתר בזמן השאלה). אנדרואיד: whatsapp:// ואחרי 1.5 שניות wa.me כגיבוי
+  // אם לא יצאנו מהדף. מחשב: wa.me בחלון חדש
   TVG.openWa = function (text) {
     var enc = encodeURIComponent(text), web = "https://wa.me/?text=" + enc;
-    if (TVG.isIOS || TVG.isAndroid) {
+    if (TVG.isIOS) { location.href = "whatsapp://send?text=" + enc; return; }
+    if (TVG.isAndroid) {
       var left = false, onHide = function () { if (document.hidden) left = true; }, onBlur = function () { left = true; };
-      document.addEventListener("visibilitychange", onHide); window.addEventListener("blur", onBlur); // blur: גם חלון השאלה של iOS
+      document.addEventListener("visibilitychange", onHide); window.addEventListener("blur", onBlur);
       setTimeout(function () {
         document.removeEventListener("visibilitychange", onHide); window.removeEventListener("blur", onBlur);
-        if (left || document.hidden) return;
-        if (TVG.isAndroid) { location.href = web; return; }
-        TVG.pill("לא נפתח?", 7000, "העתקת ההודעה", function () {
-          var ok = function () { TVG.pill("ההודעה הועתקה – מדביקים בוואטסאפ", 2500); };
-          try { navigator.clipboard.writeText(text).then(ok, function () { TVG.pill("לא הצלחנו להעתיק", 1800); }); } catch (e) { TVG.pill("לא הצלחנו להעתיק", 1800); }
-        });
-      }, TVG.isIOS ? 4000 : 1500);
+        if (!left && !document.hidden) location.href = web;
+      }, 1500);
       location.href = "whatsapp://send?text=" + enc;
       return;
     }

@@ -20,27 +20,28 @@
   // רק אישור מפורש נשמר בשרת (לכל המשתמשים). כינוי שגוי: "לא נכון?" ליד התוצאות מוחק אותו ----
   var HEB = /[\u0590-\u05FF]/, miss = null;
   TVG.aliasAsk = null; // {q, t, k}: מוצג בדף התוכן של k (netflix.js pageHtml דרך TVG.aliasAskHtml)
-  function aliasPost(body, ok) {
+  function aliasPost(body, ok, failMsg) {
     if (!TVG.CAL_API) return;
     fetch(TVG.CAL_API + "/api/nf-search", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { if (r.ok) ok(); else TVG.pill(r.status === 429 ? "יותר מדי פעמים. נסו שוב בעוד שעה" : "לא הצלחנו לשמור", 2200); })
+      .then(function (r) { if (r.ok) ok(); else TVG.pill(r.status === 429 ? "יותר מדי פעמים. נסו שוב בעוד שעה" : failMsg, 2200); })
       .catch(function () { TVG.pill("אין חיבור. נסו שוב", 2000); });
   }
   TVG.aliasAskHtml = function (k) {
     var a = TVG.aliasAsk; if (!a || a.k !== k) return "";
-    return '<div class="aliask"><span>💡 זו הסדרה שחיפשת בשם „<bdi>' + esc(a.q) + '</bdi>”?</span><div class="aliasb"><button type="button" class="btn sm" data-aliasyes>כן, לזכור</button><button type="button" class="ghost sm" data-aliasno>לא</button></div></div>';
+    if (Date.now() - a.at > 600000) { TVG.aliasAsk = null; return ""; }
+    return '<div class="aliask"><span>💡 ' + (a.type === "movie" ? "זה הסרט" : "זו הסדרה") + ' שחיפשת בשם <bdi>״' + esc(a.q) + '״</bdi>?</span><div class="aliasb"><button type="button" class="ghost sm" data-aliasyes>כן, לזכור</button><button type="button" class="ghost sm" data-aliasno>לא</button></div></div>';
   };
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t || !t.closest) return;
-    if (t.closest("[data-aliasyes]")) { var a = TVG.aliasAsk; TVG.aliasAsk = null; if (TVG.nfReopen) TVG.nfReopen(); if (a) aliasPost({ q: a.q, t: a.t, k: a.k }, function () { delete cache[a.q]; TVG.pill("👍 מעכשיו „" + a.q + "” ימצא את זה", 2600); }); return; }
+    if (t.closest("[data-aliasyes]")) { var a = TVG.aliasAsk; TVG.aliasAsk = null; if (TVG.nfReopen) TVG.nfReopen(); if (a) aliasPost({ q: a.q, t: a.t, k: a.k }, function () { delete cache[a.q]; TVG.pill("👍 מעכשיו ״" + a.q + "״ ימצא את זה", 2600); }, "לא הצלחנו לשמור"); return; }
     if (t.closest("[data-aliasno]")) { TVG.aliasAsk = null; if (TVG.nfReopen) TVG.nfReopen(); return; }
     var dl = t.closest("[data-aliasdel]");
-    if (dl) { var dq = dl.getAttribute("data-aliasdel"); aliasPost({ q: dq, del: 1 }, function () { delete cache[dq.toLowerCase()]; TVG.pill("תודה! הקישור נמחק", 2000); TVG.render(); }); return; }
+    if (dl) { var dq = dl.getAttribute("data-aliasdel"), dt = dl.getAttribute("data-aliast") || ""; aliasPost({ q: dq, del: 1, t: dt }, function () { delete cache[dq.toLowerCase()]; if (S.key === dq.toLowerCase()) S.key = ""; TVG.pill("בסדר, ״" + dq + "״ כבר לא יחפש את " + dt, 2600); TVG.render(); }, "לא הצלחנו לבטל"); return; }
     var b = t.closest("[data-nfopen]"); if (!b || !miss) return;
     var k = b.getAttribute("data-nfopen"), q = String(TVG.q || "").trim();
     if (Date.now() - miss.t > 600000) { miss = null; return; }
     if (!RE_K.test(k || "") || !TVG.nfX[k] || q.length < 2 || HEB.test(q)) return;
-    TVG.aliasAsk = { q: miss.q, t: q, k: k }; miss = null;
+    TVG.aliasAsk = { q: miss.q, t: q, k: k, type: TVG.nfX[k].type, at: Date.now() }; miss = null;
   }, true);
 
   // ---- ניקוי תשובת השרת (עוד שכבה מעל הרשימה הלבנה בשרת) ----
@@ -63,7 +64,7 @@
     var col = j.collection && typeof j.collection === "object" ? { name: str(j.collection.name, 120), keys: keysOf(j.collection.keys) } : null;
     var br = j.brand && typeof j.brand === "object" ? { name: str(j.brand.name, 80), keys: keysOf(j.brand.keys) } : null;
     return {
-      via: str(j.via, 80), alias: str(j.alias, 80), collection: col && col.keys.length ? col : null, brand: br && br.keys.length ? br : null, titles: keysOf(j.titles),
+      via: str(j.via, 80), alias: str(j.alias, 80), partial: j.partial === true, collection: col && col.keys.length ? col : null, brand: br && br.keys.length ? br : null, titles: keysOf(j.titles),
       persons: (Array.isArray(j.persons) ? j.persons : []).slice(0, 3).map(function (p) {
         return p && str(p.name, 80) ? { name: str(p.name, 80), photo: RE_IMG.test(p.photo || "") ? p.photo : "", dept: str(p.dept, 20), keys: keysOf(p.keys) } : null;
       }).filter(function (p) { return p && p.keys.length; })
@@ -81,7 +82,9 @@
         .then(function (j) {
           var res = safeRes(j); if (!res) throw new Error("shape");
           cache[key] = res;
-          if (HEB.test(key) && empty(res)) miss = { q: key, t: Date.now() }; // חיפוש בעברית שלא מצא: אולי עוד רגע ימצאו באנגלית (לימוד כינוי)
+          if (!empty(res)) { if (HEB.test(key)) miss = null; }
+          else if (HEB.test(key) && TVG.tab === "nf") miss = { q: key, t: Date.now() }; // חיפוש בעברית בלשונית סטרימינג שלא מצא: אולי עוד רגע ימצאו באנגלית (לימוד כינוי). לא בחיפוש הראשי (שמות ערוצים/קבוצות)
+          if (res.partial) res.exp = Date.now() + 60000; // תשובה חלקית (כשל בשרת): ננסה שוב בעוד דקה, לא לכל הסשן
           if (my === seq) S.state = "ok";
           done(key);
         })
@@ -184,6 +187,7 @@
   function remote(localKeys) {
     var q = TVG.q.trim(), key = q.toLowerCase();
     if (q.length < MINLEN) return { html: "", any: false };
+    if (cache[key] && cache[key].exp && Date.now() > cache[key].exp) { delete cache[key]; if (S.key === key) S.key = ""; } // תשובה חלקית שפג תוקפה: שוב לשרת
     var r = cache[key];
     if (!r) {
       if (S.key !== key) { S.key = key; S.state = "loading"; schedule(key); }
@@ -209,7 +213,7 @@
   }
 
   function viaHtml(r, q) {
-    if (r.alias) return '<p class="nfvia">תוצאות עבור <bdi dir="ltr">' + esc(r.alias) + '</bdi> <button type="button" class="linkb" data-aliasdel="' + esc(q) + '">לא נכון?</button></p>';
+    if (r.alias) return '<p class="nfvia">תוצאות עבור <bdi dir="ltr">' + esc(r.alias) + '</bdi> <button type="button" class="linkb" data-aliasdel="' + esc(q) + '" data-aliast="' + esc(r.alias) + '">לא נכון?</button></p>';
     if (r.via === "wikidata") return ""; // שם עברי מוויקינתונים: התוצאה עצמה מוצגת בעברית, אין מה להסביר
     return r.via ? '<p class="nfvia">תוצאות עבור <bdi dir="ltr">' + esc(r.via) + "</bdi></p>" : "";
   }
@@ -218,18 +222,18 @@
   function globalPart() {
     var q = TVG.q.trim(), key = q.toLowerCase();
     if (q.length < MINLEN) return { html: "", state: "empty" };
+    if (cache[key] && cache[key].exp && Date.now() > cache[key].exp) { delete cache[key]; if (S.key === key) S.key = ""; }
     var r = cache[key];
     if (!r) {
       if (S.key !== key) { S.key = key; S.state = "loading"; schedule(key); }
-      if (S.state === "err" || S.state === "rate") return { html: "", state: "err" };
+      if (S.state === "err" || S.state === "rate") return { state: "err", html: '<section class="nfsec nfrs gst"><h2 class="sech">🎬 בסטרימינג</h2><p class="none">' + (S.state === "rate" ? "יותר מדי חיפושים. רגע ונסו שוב." : "החיפוש בסטרימינג לא זמין כרגע.") + ' <button type="button" class="linkb" data-nfretry>נסו שוב</button></p></section>' };
       return { state: "loading", html: '<section class="nfsec nfrs gst"><h2 class="sech">🎬 בסטרימינג</h2><div class="nfload" role="status"><i class="nfsp" aria-hidden="true"></i>מחפשים בנטפליקס, בדיסני+ ובשאר השירותים…</div></section>' };
     }
     var ks = [], seen = {};
     (r.collection ? r.collection.keys : []).concat(r.titles, r.brand ? r.brand.keys : []).forEach(function (k) { var x = TVG.nfX[k]; if (!seen[k] && x && (x.nf || x.ds || (x.others && x.others.length))) { seen[k] = 1; ks.push(k); } }); // רק מה שזמין בשירות כלשהו (שידורים בטלוויזיה כבר למעלה)
-    if (!ks.length) return { html: "", state: "empty" };
-    var more = ks.length > GMAX ? '<button type="button" class="ghost sm gsmore" data-gsmore>עוד ' + (ks.length - GMAX) + " בלשונית סטרימינג ›</button>" : "";
+    if (!ks.length) return { html: "", state: r.partial ? "err" : "empty" }; // חלקית: לא קובעים "לא מצאנו"
     return { state: "ok", html: '<section class="nfsec nfrs gst"><h2 class="sech">🎬 בסטרימינג</h2>' + viaHtml(r, q) +
-      '<div class="nfxl">' + ks.slice(0, GMAX).map(function (k) { return row(TVG.nfX[k]); }).join("") + "</div>" + more + "</section>" };
+      '<div class="nfxl">' + ks.slice(0, GMAX).map(function (k) { return row(TVG.nfX[k]); }).join("") + "</div></section>" };
   }
 
   // ---- פריט בלי פרטים (נפתח מהודעה/מרשימת ההתראות): משלימים מהחיפוש ----
@@ -245,7 +249,6 @@
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t.closest) return;
     if (t.closest("[data-nfretry]")) { S.key = ""; S.state = "idle"; TVG.render(); return; }
-    if (t.closest("[data-gsmore]") && TVG.NF) { var gq = TVG.q; TVG.prevTab = TVG.tab; TVG.tab = "nf"; TVG.store("tvg.tab", "nf"); TVG.q = gq; TVG.render(); window.scrollTo(0, 0); return; } // אותה שאילתה בלשונית סטרימינג
     var ab = t.closest("[data-nfair]");
     if (ab) { // "📺 משודר בערוץ…": פותח את השידור בחלון התזכורת (כמו ⏰ בלוח). שתי הקשות לתזכורת
       var rr = TVG.findProg(ab.getAttribute("data-nfair"));

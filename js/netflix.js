@@ -337,7 +337,7 @@
   }
   function closeNf() {
     if (!$("#nfsheet") || $("#nfsheet").hidden) return;
-    $("#nfsheet").hidden = true; TVG.nfOpen = null; prefSvc = null;
+    $("#nfsheet").hidden = true; TVG.nfOpen = null; prefSvc = null; TVG.aliasAsk = null; // שאלת "זו הסדרה שחיפשת…?" רק בפתיחה הראשונה
     scrimOff();
   }
   // הרקע הכהה נעלם רק כשאין אף חלון פתוח מתחתיו (רשימת 'עוד' יכולה להיות פתוחה מתחת לדף תוכן)

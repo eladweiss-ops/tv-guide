@@ -38,7 +38,14 @@
     sw = { sx: t.clientX, sy: t.clientY, dx: 0, x: 0, lock: null, card: cd, el: held ? held.el : null, base: held ? held.x : 0, ox: 0, s: [{ t: performance.now(), p: t.clientX }], hint: "" };
   }, { passive: true });
 
-  document.addEventListener("touchmove", function (e) {
+  // מאזין לא-פסיבי על המסמך מכריח את הדפדפן לחכות ל-JS לפני כל צעד גלילה (גם אופקית בנטפליקס) – לכן הוא מחובר רק בלשוניות
+  // שיש בהן החלקה בין ימים (render.js קורא ל-TVG.swipeArm). נקבע בין מגעים, ולכן חל מהמגע הבא
+  var armed = false;
+  TVG.swipeArm = function (on) {
+    if (on === armed) return; armed = on;
+    if (on) document.addEventListener("touchmove", onMove, { passive: false }); else document.removeEventListener("touchmove", onMove, { passive: false });
+  };
+  function onMove(e) {
     if (!sw) return;
     var t = e.touches[0], dx = t.clientX - sw.sx, dy = t.clientY - sw.sy;
     if (!sw.lock && (Math.abs(dx) > LOCK || Math.abs(dy) > LOCK)) {
@@ -54,7 +61,7 @@
     sw.x = x; paint(sw.el, x, !ok);
     var days = TVG.allDays(), n = days.indexOf(TVG.day) + dir, txt = Math.abs(raw) > 40 ? (ok ? (dir > 0 ? "היום הבא: " : "היום הקודם: ") + TVG.dayLabel(days[n]) : "אין עוד ימים") : "";
     if (txt && txt !== sw.hint) TVG.pill(txt); sw.hint = txt;
-  }, { passive: false });
+  }
 
   function swEnd() {
     if (!sw) return;

@@ -71,7 +71,11 @@
     var note = x.msg ? '<div class="shmsg">💬 <bdi dir="auto">' + esc(x.msg) + "</bdi></div>" : "";
     var cta = '<div class="shl2">' + (x.nf ? CTA_NF : CTA) + '</div><div class="shl3" dir="ltr">' + esc(x.link) + "</div>";
     if (mode === "card") return '<div class="shbub" dir="rtl">' + note + '<div class="shpic' + (imgUrl ? "" : " ld") + '">' + (imgUrl ? '<img alt="תצוגה מקדימה של הכרטיס" src="' + imgUrl + '">' : "<span>מכינים את הכרטיס…</span>") + "</div>" + cta + "</div>";
-    if (x.nf) strip = '<div class="shlnk"><img src="icon-192.png" alt=""><div><b>זפזופ 📺</b><span>פרטים, ציונים ו־▶ פתיחה ב' + esc(x.svc) + '</span><i dir="ltr">eladweiss-ops.github.io</i></div></div>';
+    if (x.nf) { // כמו התצוגה המקדימה שוואטסאפ יבנה מהקישור: תמונת התוכן (רחבה מעל, או פוסטר קטן), שם, תיאור ודומיין הקישור
+      var host = (String(x.link).match(/^https?:\/\/([^\/?#]+)/) || [])[1] || "", txt = '<div><b><bdi dir="auto">' + esc(x.title) + "</bdi></b><span>פרטים, ציונים ו־▶ פתיחה ב" + esc(x.svc) + '</span><i dir="ltr">' + esc(host) + "</i></div>";
+      strip = x.wide ? '<div class="shlnk big"><img class="shlimg" src="' + esc(x.wide) + '" alt="">' + txt + "</div>"
+        : '<div class="shlnk' + (x.poster ? " pst" : "") + '"><img src="' + esc(x.poster || "icon-192.png") + '" alt="">' + txt + "</div>";
+    }
     return '<div class="shbub" dir="rtl">' + note + strip + '<div class="shl1">' + x.emoji + " <b><bdi dir=\"auto\">" + esc(x.title) + "</bdi></b></div>" +
       '<div class="shl2">' + (x.nf ? esc(x.day) : esc(x.day) + " · " + x.time + " · <bdi dir=\"rtl\">" + esc(x.ch) + "</bdi>" + (x.live ? " · ישיר" : "")) + "</div>" +
       (x.syn ? '<div class="shsyn">' + esc(x.syn) + "</div>" : "") + '<div class="shgap"></div>' + cta + "</div>";
@@ -161,15 +165,39 @@
   }
 
   // ---- החלון התחתון ----
-  var MSG_FIELD = '<label class="shmsgf"><span>מילה אישית <i>(לא חובה)</i></span><textarea id="shMsg" rows="2" maxlength="' + MSG_MAX + '" placeholder="למשל: זו הסדרה שסיפרתי לך עליה בצהריים" dir="auto"></textarea></label>';
+  // מילה אישית: צ׳יפים של משפטים מוכנים (הקשה ממלאת את התיבה, ואפשר לערוך), ומתחתם התיבה. dir=rtl: גם ההנחיה מיושרת לימין
+  function msgField(sugs) {
+    S.sug = sugs;
+    return '<div class="shmsgf"><label for="shMsg">מילה אישית <i>(לא חובה)</i></label>' +
+      '<div class="chips shsug" role="group" aria-label="משפטים מוכנים">' + sugs.map(function (s, i) { return '<button type="button" class="chip" data-shsug="' + i + '" aria-pressed="false">' + esc(s) + "</button>"; }).join("") + "</div>" +
+      '<textarea id="shMsg" rows="2" maxlength="' + MSG_MAX + '" placeholder="או לכתוב משהו משלך" dir="rtl"></textarea></div>';
+  }
+  function sugTv(p) { // לשון ניטרלית; "הערב"/"מחר"/היום בשבוע לפי מועד השידור
+    var d = p.s, now = new Date(), tm = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), when;
+    if (dstr(d) === dstr(now)) when = d.getHours() >= 17 ? " הערב" : " היום";
+    else if (dstr(d) === dstr(tm)) when = " מחר";
+    else when = " ביום " + TVG.DAYS[d.getDay()];
+    return ["רואים ביחד? 🍿", "שלא יעבור לך" + when, "זה בדיוק בשבילך"];
+  }
+  function sugNf(x) {
+    return ["חובה לראות 🔥", "רואים ביחד? 🍿", x.type === "tv" ? "זו הסדרה שסיפרתי לך עליה" : "זה הסרט שסיפרתי לך עליו", "חשבתי עליך כשראיתי את זה"]; // שני הקצרים ראשונים: נכנסים בשורה אחת ב-375
+  }
+  function syncSug() { // הצ׳יפ מסומן כל עוד התיבה מכילה בדיוק את המשפט שלו
+    [].forEach.call(document.querySelectorAll("[data-shsug]"), function (b) { b.setAttribute("aria-pressed", String(!!S.msg && S.sug[+b.getAttribute("data-shsug")] === S.msg)); });
+  }
+  function pickSug(i) {
+    var s = S.sug && S.sug[i], ta = $("#shMsg"); if (!s || !ta) return;
+    ta.value = s; S.msg = cleanMsg(s); syncSug(); paintPrev();
+    try { ta.focus(); ta.setSelectionRange(s.length, s.length); } catch (e) {}
+  }
   function openShare(r) {
     if (S && S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
     S = { id: r.id, p: r.p, mode: "text", blob: null, url: null, msg: "" };
     TVG.rem = null; TVG.LP = null;
     $("#rem").classList.remove("over");
-    $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
+    $("#remBody").innerHTML = '<h2>שיתוף</h2>' + msgField(sugTv(r.p)) + '<p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
       '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div><p class="shnote" id="shNote" hidden>הקישור מופיע גם בתמונה</p>' +
-      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button>';
+      '<div class="folbar shbar"><button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
     // היסטוריה: #rem רשום ב-nav.js כשכבה. אם החלון כבר פתוח (שיתוף מתוך חלון תזכורת) לא משתנה hidden, ולכן אין רשומה כפולה
@@ -181,17 +209,19 @@
     S = { nf: { x: x, k: k }, mode: "text", blob: null, url: null, msg: "" };
     TVG.rem = null; TVG.LP = null;
     $("#rem").classList.add("over"); // מעל דף התוכן (#nfsheet, אותה שכבה)
-    $("#remBody").innerHTML = '<h2>💌 המלצה</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
-      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button>';
+    $("#remBody").innerHTML = '<h2>💌 המלצה</h2>' + msgField(sugNf(x)) + '<p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
+      '<div class="folbar shbar"><button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
   function inList(k, svc) { var L = svc === "דיסני+" ? TVG.DS : TVG.NF; return !!(L && L.items && L.items[k]); }
+  function tmdbImg(u) { return /^https:\/\/image\.tmdb\.org\/t\/p\/[a-z0-9]+\/[\w-]+\.(jpg|jpeg|png|webp)$/i.test(u || "") ? u : ""; }
   function nfParts(x, k) {
     var svc = TVG.nfSvc && TVG.nfSvc(x) === "disney" ? "דיסני+" : "נטפליקס", d = String(x.overview || "").replace(/\s+/g, " ").trim();
     if (d.length > 140) { d = d.slice(0, 140); d = d.slice(0, Math.max(d.lastIndexOf(" "), 100)) + "…"; }
     return {
       nf: true, svc: svc, emoji: x.type === "tv" ? "📺" : "🎬",
+      wide: tmdbImg(x.backdrop), poster: tmdbImg(x.poster), // לתצוגה המקדימה בלבד (כמו שהשרת יציג בוואטסאפ)
       title: String(x.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: [x.type === "tv" ? "סדרה" : "סרט", x.year ? String(x.year) : "", svc].filter(Boolean).join(" · "),
       syn: d, link: APP + "?nf=" + k + (svc === "דיסני+" ? "&s=d" : "") + (inList(k, svc) ? "" : "&t=" + encodeURIComponent(String(x.title || "").slice(0, 60))) // s=d: דיסני+ (טוען את disney.json לפני הפתיחה); t= רק לתוכן מחוץ לרשימות (נפתח מהשם)
@@ -254,14 +284,18 @@
     var t = e.target; if (!t.closest) return; var b;
     if ((b = t.closest("[data-share]"))) { e.stopPropagation(); var r = TVG.findProg(b.getAttribute("data-share")); if (r) openShare(r); return; }
     if (!S || !t.closest("#rem")) return;
+    if ((b = t.closest("[data-shsug]"))) { e.stopPropagation(); pickSug(+b.getAttribute("data-shsug")); return; }
     if ((b = t.closest("[data-shmode]"))) { e.stopPropagation(); S.mode = b.getAttribute("data-shmode"); syncChips(); paintPrev(); return; }
     if (t.closest("[data-shwa]")) { e.stopPropagation(); send(); return; }
     if (t.closest("[data-shcopy]")) { e.stopPropagation(); copyLink(); return; }
   }, true);
 
+  // תמונת תצוגה מקדימה שלא נטענה: מסתירים אותה (בלי סמל תמונה שבורה)
+  document.addEventListener("error", function (e) { var t = e.target; if (t && t.classList && t.classList.contains("shlimg")) t.remove(); }, true);
+
   document.addEventListener("input", function (e) {
     if (!S || !e.target || e.target.id !== "shMsg") return;
-    S.msg = cleanMsg(e.target.value); paintPrev();
+    S.msg = cleanMsg(e.target.value); syncSug(); paintPrev();
   });
 
   // קישור עמוק ?p=: דף הנחיתה ב-landing.js (TVG.openShared)

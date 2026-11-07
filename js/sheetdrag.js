@@ -102,13 +102,15 @@
   }, true);
 
   // מונע מהדפדפן להתחיל גלילה/גומי שלו בגרירה ששייכת לחלון (חייב להיות non-passive; ההכרעה לפני הסף כדי שהדפדפן לא יקדים אותנו)
-  document.addEventListener("touchmove", function (e) {
+  // על כל חלון בנפרד (לא על המסמך): מאזין לא-פסיבי על המסמך האט כל גלילה באפליקציה, גם מחוץ לחלונות
+  function onSheetMove(e) {
     if (!d || !d.touch || !e.cancelable) return;
     if (d.active) { e.preventDefault(); return; }
     var t = e.touches[0]; if (!t) return;
     var dx = t.clientX - d.x0, dy = t.clientY - d.y0;
     if (Math.abs(dy) > Math.abs(dx) && (dy > 0 ? d.claim : d.claimUp)) e.preventDefault();
-  }, { passive: false, capture: true });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".sheet"), function (el) { el.addEventListener("touchmove", onSheetMove, { passive: false, capture: true }); });
 
   function release(v, cancel) { // v: מהירות בפיקסלים/שנייה (חיובי = מטה)
     var el = d.el, y = cur && cur.el === el ? cur.y : 0, H = el.offsetHeight || 1, grab = d.grab, was = an && an.el === el ? an : null;

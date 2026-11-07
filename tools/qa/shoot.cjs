@@ -609,7 +609,7 @@ function dsFixtureData() {
     await nfsStep("nfs-avengers", async () => {
       nfQueries.length = 0; await nfSearch("הנוקמים");
       const txt = await page.textContent("#main");
-      for (const s of ["סדרת סרטים", "הנוקמים - אוסף", "סרטים וסדרות", "אנשים", "▶בנטפליקס", "לא זמין כרגע", "משודר בערוץ", "קשת"]) A(txt.indexOf(s) >= 0, "missing text: " + s);
+      for (const s of ["סדרת סרטים", "הנוקמים - אוסף", "סרטים וסדרות", "אנשים", "▶בנטפליקס", "ב־Prime Video", "משודר בערוץ", "קשת"]) A(txt.indexOf(s) >= 0, "missing text: " + s); // זמין רק בשירות אחר: "ב־Prime Video" (לא "לא זמין כרגע")
       A(/משודר בערוץ קשת[^·]*· [^\d]*\d{1,2}:\d{2}/.test(txt), "airing badge (Keshet): " + txt.slice(0, 400)); A(/משודר בערוץ כאן 11 · [^\d]*\d{1,2}:\d{2}/.test(txt), "airing badge (Kan)"); /* שעות התוכניות משתנות עם הלוח: בודקים רק את הצורה */
       A(nfQueries.length === 1 && nfQueries[0] === "הנוקמים", "one debounced query: " + JSON.stringify(nfQueries));
       A(await page.evaluate(() => [].map.call(document.querySelectorAll(".nfxn"), (e) => e.textContent).join() === "1,2,3,4"), "collection numbered in order");

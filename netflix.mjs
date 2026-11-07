@@ -16,11 +16,14 @@
 //   "hero": "m603",                       // מפתח פריט לכרטיס העליון: מבין הפופולריים עם backdrop ומספיק הצבעות,
 //                                         // הכי גבוה לפי IMDb, ואם אין אז לפי ציון TMDB
 //   "rows": {                             // שורות, כל אחת רשימת מפתחות לפי הסדר (רק פריטים עם poster)
+//     "top10":   [...],                   // נטפליקס בלבד: הטופ 10 הרשמי של נטפליקס ישראל (Tudum, שבועי), סדרות וסרטים לסירוגין לפי הדירוג.
+//                                         // לא נכתבת כשהעמוד לא נגיש או שהותאמו פחות מ-5 כותרים
 //     "popular": ["m603", "t1396"],       // הכי נצפים
 //     "recent":  [...],                   // יצא לאחרונה (60 הימים האחרונים), לפי date יורד. לא "חדש בנטפליקס"
 //     "top":     [...],                   // הכי מדורגים (עם מינימום הצבעות)
 //     // שורות נוספות (עד 24 פריטים כל אחת, פריט מופיע בעד 2 שורות; שורה עם פחות מ-4 לא נכתבת):
-//     "israeli", "week", "series", "movies", "comedy", "crime", "docu", "family"
+//     "israeli", "week", "series", "movies", "comedy", "crime", "docu", "sportdoc", "family"
+//     // week = חדש בשירות: מה שהופיע לראשונה בקטלוג ב-30 הימים האחרונים (netflix-seen.json / disney-seen.json) + מה שיצא ב-30 הימים האחרונים
 //   },
 //   "rowMeta": { "israeli": { "title": "🇮🇱 ישראלי בנטפליקס" }, ... },  // כותרות השורות; הלקוח מצייר לפיהן. לקוח ישן מתעלם משורות לא מוכרות
 //   "items": {                            // מפתח = "m"|"t" + מזהה TMDB; כל פריט פעם אחת
@@ -34,6 +37,9 @@
 //       "runtime": 136,                   // דקות (סרט)  |  "seasons": 5 (סדרה)
 //       "imdb_id": "tt0133093",
 //       "link": "https://www.netflix.com/search?q=..",  // חיפוש בשירות לפי orig (אם שונה מהעברית) אחרת title. בדיסני+: https://www.disneyplus.com/he-il/search?q=..
+//                                         // כשידוע מזהה נטפליקס (מהטופ 10, נשמר ב-netflix-seen.json): https://www.netflix.com/title/<nfid>
+//       "nfid": "81944880",               // אופציונלי: מזהה הכותר בנטפליקס
+//       // title: עברית מ-TMDB; אם אין – תווית עברית מוויקינתונים לפי מזהה TMDB, ואחרי הכול nf-he.json (תיקונים ידניים, גובר). האנגלי נשמר ב-orig
 //       "trailer": "vKQi3bBA1y8",         // מפתח YouTube, אם יש
 //       "vote": 8.2, "vote_count": 25000, // TMDB
 //       "ratings": { "imdb": 8.7, "votes": 2000000, "rt": 83, "mc": 73 }  // רק שדות קיימים; imdb רק עם 50+ הצבעות
@@ -150,19 +156,26 @@ async function list(tmdb, type, extra, { pages = 1, limit = ROW_LIMIT, d = disc 
 // ---------- שורות חדשות ----------
 // כותרות השורות (הלקוח מצייר לפיהן, לכן כאן המקום היחיד לשנות ניסוח)
 export const ROW_META = {
+  top10: { title: "🔥 טופ 10 בישראל" }, // הרשימה הרשמית של נטפליקס (שבועית), ראו top10
   popular: { title: "הכי נצפים" },
   recent: { title: "יצא לאחרונה" },
   top: { title: "הכי מדורגים" },
   israeli: { title: "🇮🇱 ישראלי בנטפליקס" },
-  week: { title: "🆕 יצא החודש" }, // TMDB לא יודע מתי עלה לנטפליקס ישראל; מקרבים לפי תאריך יציאה ב-30 הימים האחרונים
+  week: { title: "✨ חדש בנטפליקס" }, // מה שהופיע בקטלוג נטפליקס ישראל ב-30 הימים האחרונים (netflix-seen.json) + מה שיצא ב-30 הימים האחרונים
   series: { title: "📺 סדרות" },
   movies: { title: "🎬 סרטים" },
   comedy: { title: "😂 קומדיה" },
   crime: { title: "🔪 מתח ופשע" },
   docu: { title: "🎙 דוקו" },
+  sportdoc: { title: "⚽ דוקו ספורט" },
   family: { title: "👨‍👩‍👧 לכל המשפחה" },
 };
-export const NEW_ORDER = ["israeli", "week", "series", "movies", "comedy", "crime", "docu", "family"];
+// סדר ההצבה (עד 2 שורות לפריט: שורה מוקדמת כאן קודמת). סדר התצוגה נקבע בלקוח (ORDER ב-js/netflix.js)
+export const NEW_ORDER = ["israeli", "week", "series", "movies", "comedy", "crime", "docu", "sportdoc", "family"];
+// מילות מפתח של TMDB לספורט (נבדקו באתר TMDB 8.11.2026): sports documentary, sports, sport, football (soccer), american football,
+// basketball, boxing, formula one (f1), motor sport. תמיד יחד עם ז'אנר 99 (דוקו), כך שמקבלים רק דוקו על ספורט.
+// "דוקו" הרגיל מחריג אותן (without_keywords), כדי ששתי השורות לא יציגו את אותם פריטים.
+export const SPORT_KW = "159290|6075|333328|13042|579|6496|209476|233981|9571";
 
 // הגדרות השאילתות: לכל שורה רשימת [סוג, פרמטרים]. שאילתות מאותו סוג מאוחדות (או).
 // ב-TMDB פסיק = וגם, קו אנכי = או. בז'אנרים משתמשים ב-או (מתח או פשע), אחרת מקבלים רק את החיתוך הצר.
@@ -183,7 +196,8 @@ export function newRowSpecs(now = Date.now()) {
     movies: [["movie", popSort]],
     comedy: genre("35", "35"),
     crime: genre("80|53", "80|9648"),
-    docu: genre("99", "99"),
+    docu: [["movie", { ...popSort, with_genres: "99", without_keywords: SPORT_KW }], ["tv", { ...popSort, with_genres: "99", without_keywords: SPORT_KW }]],
+    sportdoc: [["movie", { ...popSort, with_genres: "99", with_keywords: SPORT_KW }], ["tv", { ...popSort, with_genres: "99", with_keywords: SPORT_KW }]],
     family: genre("10751|16", "10751|10762"),
   };
 }
@@ -205,7 +219,7 @@ export function place(cands, limit, counts) {
 // שורות דיסני+ (הכי נצפים והכי מדורגים הן שורות הבסיס). with_companies: 420 מארוול סטודיוס, 1 לוקאספילם, 3 פיקסאר
 export const DISNEY_META = {
   popular: { title: "🔥 הכי נצפים" },
-  week: { title: "🆕 יצא החודש" },
+  week: { title: "✨ יצא החודש" },
   series: { title: "📺 סדרות" },
   movies: { title: "🎬 סרטים" },
   kids: { title: "🧸 ילדים ומשפחה" },
@@ -237,11 +251,13 @@ export function disneyRowSpecs(now = Date.now()) {
 export const SERVICES = {
   netflix: {
     id: "netflix", file: "netflix.json", providerId: NETFLIX, resolveName: null, linkBase: "https://www.netflix.com/search?q=",
-    base: ["popular", "recent", "top"], order: NEW_ORDER, meta: ROW_META, specs: newRowSpecs, priority: ["popular", "top", "israeli", "recent"],
+    base: ["top10", "popular", "recent", "top"], optional: ["top10"], order: NEW_ORDER, meta: ROW_META, specs: newRowSpecs, priority: ["top10", "popular", "top", "israeli", "week", "recent"],
+    seenFile: "netflix-seen.json", top10: true, titleBase: "https://www.netflix.com/title/",
   },
   disney: {
     id: "disney", file: "disney.json", providerId: DISNEY, resolveName: /^disney\s*(plus|\+)/i, fallbackRegion: "GB", linkBase: "https://www.disneyplus.com/he-il/search?q=",
     base: ["popular", "top"], order: DISNEY_ORDER, meta: DISNEY_META, specs: disneyRowSpecs, priority: ["popular", "top", "week"],
+    seenFile: "disney-seen.json",
   },
 };
 
@@ -396,6 +412,231 @@ export async function fillRatings(ids, cache, omdbKey, { cap = OMDB_CAP, now = D
   return used;
 }
 
+// ---------- טופ 10 הרשמי של נטפליקס ישראל (שבועי) ----------
+// העמודים של Tudum מוטמעים עם נתוני GraphQL: לכל פריט "PulseTop10ItemEntity:top10-<רשימה>-<videoId>" עם weeklyRank,
+// ו-"top10Video" עם השם המלא ("Lupin: Part 4"), releaseYear, parentShow (שם הסדרה), ו-displayVideo עם מזהה הסדרה בנטפליקס
+// (parentShow.videoId; לעונה עצמה יש מזהה אחר) ו-availabilityStartTime (מתי עלה לנטפליקס). כל פריט מופיע פעמיים (כרטיסים + טבלה).
+// כשל (403/מבנה שהשתנה/פחות מ-TOP10_MIN התאמות) = אין שורה, בשקט.
+export const TOP10_URLS = { tv: "https://www.netflix.com/tudum/top10/israel/tv", movie: "https://www.netflix.com/tudum/top10/israel" };
+export const TOP10_MIN = 5;
+export const TOP10_MAX_AGE_DAYS = 21; // רשימה של שבוע ישן מזה (העמוד לא התעדכן) לא מוצגת
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+export const NF_TITLE = "https://www.netflix.com/title/";
+const unJs = (s) => String(s).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\(.)/g, "$1");
+// "Lupin: Part 4" -> "Lupin", "A Couple of Lies: Limited Series" -> "A Couple of Lies"
+export const stripSeason = (t) =>
+  String(t || "").replace(/:\s*(Season|Part|Volume|Vol\.|Chapter|Book|Series)\s*\d+\s*$/i, "").replace(/:\s*(Limited Series|Miniseries)\s*$/i, "").trim();
+
+export function parseTop10(html, now = Date.now()) {
+  const h = String(html || "");
+  if (!/"(country|countryId)":"IL"/.test(h)) return []; // לא העמוד של ישראל (הפניה גאוגרפית?)
+  const rank = new Map();
+  for (const m of h.matchAll(/"PulseTop10ItemEntity:top10-[A-Za-z0-9]+-(\d+)":\{"__typename":"PulseTop10ItemEntity"[^]{0,400}?"weekEndDate":"(\d{4}-\d\d-\d\d)","category":"(\w+)","weeklyRank":(\d+)/g)) {
+    if (!rank.has(m[1])) rank.set(m[1], { rank: +m[4], week: m[2] });
+  }
+  const vids = [...h.matchAll(/"top10Video":\{"__typename":"Top10PulseVideo","title":"((?:[^"\\]|\\.)*)","videoId":(\d+)/g)];
+  const out = [], seen = new Set();
+  vids.forEach((m, i) => {
+    const vid = m[2], r = rank.get(vid);
+    if (!r || seen.has(vid)) return;
+    seen.add(vid);
+    if (now - Date.parse(r.week) > TOP10_MAX_AGE_DAYS * 86400000) return;
+    const end = i + 1 < vids.length ? vids[i + 1].index : m.index + 6000;
+    const w = h.slice(m.index, Math.min(end, m.index + 6000));
+    const full = unJs(m[1]);
+    const ps = w.match(/"parentShow":\{"__typename":"Top10PulseVideo","title":"((?:[^"\\]|\\.)*)"/);
+    const show = w.match(/"parentShow":\{"__typename":"Show","unifiedEntityId":"Video:(\d+)"/);
+    const yr = w.match(/"releaseYear":(\d{4})/);
+    const av = w.match(/"availabilityStartTime":"(\d{4}-\d\d-\d\d)T/);
+    const isShow = !!ps || /"__typename":"Season"/.test(w);
+    out.push({
+      rank: r.rank, full, title: ps ? unJs(ps[1]) : stripSeason(full), year: yr ? +yr[1] : 0,
+      nfid: isShow ? (show ? show[1] : "") : vid, avail: av ? av[1] : "",
+    });
+  });
+  out.sort((a, b) => a.rank - b.rank);
+  // אותה סדרה בכמה עונות/חלקים (Lupin 1, 3, 4): פעם אחת, בדירוג הגבוה
+  const once = new Set();
+  return out.filter((e) => { const k = e.nfid || e.title.toLowerCase(); if (once.has(k)) return false; once.add(k); return true; });
+}
+
+export async function fetchTop10(type) {
+  try {
+    const res = await fetch(TOP10_URLS[type], { headers: { "user-agent": BROWSER_UA, "accept-language": "en-US,en;q=0.9", accept: "text/html" }, signal: AbortSignal.timeout(20000) });
+    if (!res || !res.ok) { console.log("top10 " + type + ": HTTP " + (res && res.status)); return []; }
+    return parseTop10(await res.text());
+  } catch (e) {
+    console.log("top10 " + type + ": " + e.message);
+    return [];
+  }
+}
+
+export const normName = (s) =>
+  String(s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9֐-׿]+/g, " ").trim();
+
+// מחפש ב-TMDB (שם באנגלית). עדיפות: שם זהה (אחרי נרמול), נמצא בקטלוג נטפליקס ישראל (catalog), שנה קרובה, פופולריות.
+// בלי שם זהה מתקבל רק פריט מהקטלוג מבין 3 התוצאות הראשונות
+export function pickMatch(results, e, type, catalog) {
+  let best = null, bs = -1;
+  (results || []).slice(0, 10).forEach((r, i) => {
+    if (!r || !Number.isInteger(r.id)) return;
+    const exact = normName(r.title || r.name) === normName(e.title) || normName(r.original_title || r.original_name) === normName(e.title);
+    const inCat = !!(catalog && catalog.has(key(type, r.id)));
+    if (!exact && !(inCat && i < 3)) return;
+    const yr = +String(r.release_date || r.first_air_date || "").slice(0, 4);
+    let s = (exact ? 100 : 0) + (inCat ? 60 : 0) + Math.min(10, Math.log10(1 + (r.popularity || 0)) * 3);
+    if (e.year && yr) s += type === "movie" ? (Math.abs(yr - e.year) <= 1 ? 30 : 0) : yr <= e.year ? 10 : -20;
+    if (s > bs) { bs = s; best = r; }
+  });
+  return best;
+}
+
+async function matchTop10(tmdb, entries, type, catalog) {
+  const got = await pool(entries.map((e) => async () => {
+    try {
+      const j = await tmdb("/search/" + type, { query: e.title, language: "en-US", include_adult: "false" });
+      const r = pickMatch(j.results, e, type, catalog);
+      return r ? { type, id: r.id, pop: r.popularity || 0, rank: e.rank, nfid: e.nfid, avail: e.avail, date: r.release_date || r.first_air_date || "" } : null;
+    } catch (e2) { return null; }
+  }), 4);
+  const once = new Set();
+  return got.filter((r) => r && !once.has(r.id) && once.add(r.id));
+}
+
+// ---------- "חדש בנטפליקס": תמונת מצב של הקטלוג (netflix-seen.json) ----------
+// TMDB לא אומר מתי כותר עלה לנטפליקס ישראל. לכן כל לילה סורקים את כל הקטלוג (discover לפי שם, מיון יציב בין עמודים)
+// ושומרים מתי ראינו כל מפתח לראשונה. פריט שהופיע לראשונה ב-30 הימים האחרונים = חדש בנטפליקס.
+// מבנה: { v:1, region, seed:"YYYY-MM-DD", count, nf:{ מפתח: מזהה נטפליקס }, k:{ מפתח: [ראשון, אחרון] } }
+//   ראשון "" = היה כבר בתמונה הראשונה (seed), לא ידוע מתי עלה. אחרון מתעדכן פעם בשבוע (פחות שינויים בקומיט).
+//   בימים הראשונים אחרי seed (SEEN_GRACE_DAYS) פריט "חדש" לא נחשב, כי סריקה ראשונה יכולה לפספס מעט פריטים.
+//   סריקה חלקית (עמוד שנכשל, חריגת זמן, או ירידה של יותר מ-30% בכמות) לא מוסיפה פריטים חדשים.
+//   מפתח שלא נראה 60 יום נמחק (אם יחזור, ייחשב חדש: "חזר לנטפליקס").
+export const SEEN_NEW_DAYS = 30, SEEN_PRUNE_DAYS = 60, SEEN_GRACE_DAYS = 3, SEEN_TOUCH_DAYS = 7;
+export const CRAWL_MAX_PAGES = 300, CRAWL_BUDGET_MS = 150000;
+const dDays = (a, b) => (Date.parse(b) - Date.parse(a)) / 86400000;
+const addDays = (a, n) => new Date(Date.parse(a) + n * 86400000).toISOString().slice(0, 10);
+
+async function crawlType(tmdb, type, d, { maxPages = CRAWL_MAX_PAGES, deadline = Date.now() + CRAWL_BUDGET_MS } = {}) {
+  const sort = { sort_by: type === "movie" ? "original_title.asc" : "original_name.asc" };
+  const out = new Map();
+  const add = (j) => { for (const r of (j && j.results) || []) if (r && Number.isInteger(r.id)) out.set(key(type, r.id), { type, id: r.id, pop: r.popularity || 0, date: r.release_date || r.first_air_date || "" }); };
+  let p1;
+  try { p1 = await tmdb("/discover/" + type, { ...d, ...sort }); } catch (e) { console.error("סריקת קטלוג " + type + ": " + e.message); return { map: out, ok: false }; }
+  add(p1);
+  const pages = Math.max(1, Number(p1.total_pages) || 1);
+  let bad = pages > Math.min(maxPages, 500) ? 1 : 0; // יותר עמודים מהתקרה: הסריקה לא שלמה
+  await pool(Array.from({ length: Math.min(pages, maxPages, 500) - 1 }, (_, i) => async () => {
+    if (Date.now() > deadline) { bad++; return; }
+    try { add(await tmdb("/discover/" + type, { ...d, ...sort, page: String(i + 2) })); } catch (e) { bad++; }
+  }));
+  return { map: out, ok: bad === 0, pages };
+}
+
+export async function crawlCatalog(tmdb, d, opts = {}) {
+  const deadline = Date.now() + (opts.budgetMs ?? CRAWL_BUDGET_MS);
+  const [m, t] = await Promise.all(["movie", "tv"].map((type) => crawlType(tmdb, type, d, { ...opts, deadline })));
+  const map = new Map([...m.map, ...t.map]);
+  return { map, ok: m.ok && t.ok && m.map.size > 0 && t.map.size > 0, pages: { movie: m.pages || 0, tv: t.pages || 0 } };
+}
+
+// מעדכן את תמונת המצב (מחזיר אובייקט חדש). crawl: { map, ok }. today: "YYYY-MM-DD"
+export function updateSeen(prev, crawl, { today, region = "" }) {
+  const valid = prev && typeof prev === "object" && prev.v === 1 && prev.k && typeof prev.k === "object" && !Array.isArray(prev.k);
+  const nf = valid && prev.nf && typeof prev.nf === "object" ? { ...prev.nf } : {};
+  let s = valid && (prev.region || "") === (region || "") && prev.seed ? { ...prev, k: { ...prev.k }, nf } : null;
+  const seeding = !s;
+  if (seeding) {
+    if (!crawl.ok) return { v: 1, region, seed: "", count: 0, nf, k: {} }; // seed רק מסריקה שלמה
+    s = { v: 1, region, seed: today, count: 0, nf, k: {} };
+  }
+  const healthy = crawl.ok && (!s.count || crawl.map.size >= s.count * 0.7);
+  for (const k of crawl.map.keys()) {
+    const e = s.k[k];
+    if (Array.isArray(e)) { if (!(dDays(e[1], today) < SEEN_TOUCH_DAYS)) s.k[k] = [e[0], today]; }
+    else if (seeding) s.k[k] = ["", today];
+    else if (healthy) s.k[k] = [today, today];
+  }
+  for (const k of Object.keys(s.k)) {
+    const e = s.k[k];
+    if (!Array.isArray(e) || !(dDays(e[1], today) <= SEEN_PRUNE_DAYS)) delete s.k[k];
+  }
+  if (healthy) s.count = crawl.map.size;
+  return s;
+}
+
+// מפתח -> תאריך הופעה ראשונה, לפריטים שהופיעו ב-30 הימים האחרונים (לא ב-seed ולא בימי החסד שאחריו)
+export function arrivals(s, today) {
+  const out = new Map();
+  if (!s || !s.seed || !s.k) return out;
+  const from = addDays(s.seed, SEEN_GRACE_DAYS);
+  for (const [k, e] of Object.entries(s.k)) if (Array.isArray(e) && e[0] && e[0] >= from && dDays(e[0], today) <= SEEN_NEW_DAYS) out.set(k, e[0]);
+  return out;
+}
+
+// קובץ קריא בדיפים: שורה לכל מפתח, ממוין
+export function seenText(s) {
+  const ks = Object.keys(s.k).sort();
+  const nf = Object.keys(s.nf || {}).sort();
+  return "{\"v\":1,\"region\":" + JSON.stringify(s.region || "") + ",\"seed\":" + JSON.stringify(s.seed || "") + ",\"count\":" + (s.count || 0) +
+    ",\n\"nf\":{" + nf.map((k) => "\n" + JSON.stringify(k) + ":" + JSON.stringify(String(s.nf[k]))).join(",") + "},\n\"k\":{" +
+    ks.map((k) => "\n" + JSON.stringify(k) + ":" + JSON.stringify(s.k[k])).join(",") + "}}\n";
+}
+
+// ---------- שמות בעברית: ויקינתונים לפי מזהה TMDB (P4983 סדרה, P4947 סרט), ואז nf-he.json ----------
+export const WIKI_SPARQL = "https://query.wikidata.org/sparql";
+export const WIKI_UA = "tv-guide/1.0 (https://eladweiss-ops.github.io/tv-guide/; personal TV guide)"; // מדיניות ויקימדיה: UA עם דרך יצירת קשר
+export const WIKI_BUDGET_MS = 15000;
+export const cleanHe = (l) => String(l || "").replace(/\s*\([^)]*\)\s*$/, "").trim(); // "מוריד הגשם (סדרת טלוויזיה)" -> "מוריד הגשם"
+
+export async function wikidataHe(keys, { budgetMs = WIKI_BUDGET_MS } = {}) {
+  const out = {};
+  const deadline = Date.now() + budgetMs;
+  for (let i = 0; i < keys.length; i += 150) {
+    const part = keys.slice(i, i + 150);
+    const tv = part.filter((k) => k[0] === "t").map((k) => JSON.stringify(k.slice(1))), mv = part.filter((k) => k[0] === "m").map((k) => JSON.stringify(k.slice(1)));
+    const u = [];
+    if (tv.length) u.push(`{ VALUES ?tv { ${tv.join(" ")} } ?s wdt:P4983 ?tv . }`);
+    if (mv.length) u.push(`{ VALUES ?mv { ${mv.join(" ")} } ?s wdt:P4947 ?mv . }`);
+    if (!u.length) continue;
+    const q = `SELECT ?tv ?mv ?l WHERE { ${u.join(" UNION ")} ?s rdfs:label ?l . FILTER(LANG(?l) = "he") }`;
+    const left = deadline - Date.now();
+    if (left <= 0) break;
+    const res = await fetch(WIKI_SPARQL, {
+      method: "POST", body: new URLSearchParams({ query: q }).toString(), signal: AbortSignal.timeout(left),
+      headers: { "user-agent": WIKI_UA, accept: "application/sparql-results+json", "content-type": "application/x-www-form-urlencoded" },
+    });
+    if (!res || !res.ok) throw new Error("wikidata " + (res && res.status));
+    const j = await res.json();
+    for (const b of (j && j.results && j.results.bindings) || []) {
+      const k = b.tv ? "t" + b.tv.value : b.mv ? "m" + b.mv.value : "";
+      const l = cleanHe(b.l && b.l.value);
+      if (k && !out[k] && hasHeb(l) && l.length <= 80) out[k] = l;
+    }
+  }
+  return out;
+}
+
+// מחליף שם לא-עברי בשם עברי. האנגלי נשמר ב-orig (שם מוצג קטן + חיפוש), וקישור חיפוש נבנה מחדש לפי האנגלי
+export function applyHe(it, he, linkBase) {
+  if (!it || !hasHeb(he) || it.title === he) return;
+  if (!hasHeb(it.title)) it.orig = it.title;
+  it.title = he;
+  if (linkBase && String(it.link || "").startsWith(linkBase)) it.link = linkBase + encodeURIComponent(it.orig || he);
+}
+
+export async function hebrewTitles(items, { overrides = {}, linkBase, budgetMs } = {}) {
+  const need = Object.keys(items).filter((k) => items[k] && !hasHeb(items[k].title));
+  let n = 0, o = 0;
+  if (need.length) {
+    try {
+      const he = await wikidataHe(need, { budgetMs });
+      for (const k of need) if (he[k]) { applyHe(items[k], he[k], linkBase); n++; }
+    } catch (e) { console.log("ויקינתונים: " + e.message + " (בלי שינוי)"); }
+  }
+  for (const [k, t] of Object.entries(overrides || {})) if (items[k] && typeof t === "string" && hasHeb(t)) { applyHe(items[k], t.trim(), linkBase); o++; }
+  return { need: need.length, wiki: n, overrides: o };
+}
+
 // ---------- הרכבה ----------
 export function pickHero(rowIds, items) {
   const score = (it) => (it.ratings && it.ratings.imdb) || it.vote || 0;
@@ -455,12 +696,55 @@ async function buildService(svc, ctx) {
   const [pm, pt, tm, tt, nm, nt] = await pool(specs.map(([t, e]) => () => list(tmdb, t, e, { d: dd })));
   const refs = { popular: mergeRow(pm, pt, byPop), top: [...tm, ...tt] };
   if (withRecent) refs.recent = mergeRow(nm, nt, byPop);
+
+  // קטלוג מלא -> תמונת מצב -> מה חדש בשירות. כשל = בלי "חדש" (רק לפי תאריך יציאה), אף פעם לא מפיל
+  const today = new Date(ctx.now ?? Date.now()).toISOString().slice(0, 10);
+  let seen = null, arr = new Map(), catalog = new Map();
+  if (svc.seenFile && ctx.seen !== false) {
+    try {
+      const crawl = await crawlCatalog(tmdb, dd, ctx.crawl || {});
+      catalog = crawl.map;
+      let prev = null;
+      try { prev = JSON.parse(await readFile(dir + "/" + svc.seenFile, "utf8")); } catch (e) {}
+      seen = updateSeen(prev, crawl, { today, region });
+      arr = arrivals(seen, today);
+      console.log(`${svc.id}: קטלוג ${catalog.size} (עמודים ${crawl.pages.movie}/${crawl.pages.tv}${crawl.ok ? "" : ", חלקי"}), seed=${seen.seed || "-"}, חדשים=${arr.size}`);
+    } catch (e) { console.error("תמונת מצב " + svc.id + ": " + e.message); }
+  }
+  // טופ 10 הרשמי (נטפליקס בלבד): סדרות וסרטים לסירוגין, לפי הדירוג
+  const nfids = new Map();
+  refs.top10 = [];
+  if (svc.top10 && ctx.top10 !== false) {
+    try {
+      const [etv, emv] = await Promise.all([fetchTop10("tv"), fetchTop10("movie")]);
+      const [mtv, mmv] = await Promise.all([matchTop10(tmdb, etv, "tv", catalog), matchTop10(tmdb, emv, "movie", catalog)]);
+      const all = mergeRow(mtv, mmv, (a, b) => a.rank - b.rank, 20);
+      for (const r of all) {
+        const k = key(r.type, r.id);
+        if (/^\d{3,12}$/.test(r.nfid || "")) nfids.set(k, r.nfid);
+        // מתי עלה לנטפליקס (מהעמוד עצמו): מדויק יותר מתמונת המצב
+        if (r.avail && dDays(r.avail, today) <= SEEN_NEW_DAYS && dDays(r.avail, today) >= -1 && !(arr.get(k) && arr.get(k) < r.avail)) arr.set(k, r.avail);
+      }
+      refs.top10 = all.length >= TOP10_MIN ? all : [];
+      console.log(`${svc.id}: טופ 10 – ${etv.length} סדרות, ${emv.length} סרטים, הותאמו ${all.length}${refs.top10.length ? "" : " (מעט מדי, בלי שורה)"}`);
+    } catch (e) { console.error("טופ 10: " + e.message); refs.top10 = []; }
+  }
   // שורות חדשות: מועמדים לכל שורה, ואז הצבה לפי סדר קבוע עם מגבלת "עד 2 שורות לפריט".
   // 'הכי מדורגים' עוד לא סופי (ממתין לציוני OMDb), לכן אכיפה סופית נעשית בסוף (enforceMax)
   const specsNew = svc.specs();
   const cands = await pool(svc.order.map((name) => () => newRowCands(tmdb, specsNew[name], dd).catch((e) => { console.error("שורה " + name + ": " + e.message); return []; })));
+  // "חדש": קודם מה שהופיע בשירות לאחרונה (לפי פופולריות, סרטים וסדרות לסירוגין), ואז השלמה ממה שיצא לאחרונה.
+  // התצוגה בסוף: מהחדש לישן (תאריך הגעה, או תאריך יציאה כשלא ידוע)
+  const wi = svc.order.indexOf("week");
+  if (wi >= 0 && arr.size) {
+    const got = [];
+    for (const [k] of arr) { const c = catalog.get(k) || refs.top10.find((r) => key(r.type, r.id) === k); if (c) got.push(c); }
+    const first = mergeRow(got.filter((r) => r.type === "movie"), got.filter((r) => r.type === "tv"), byPop, NEW_LIMIT * 2);
+    const have = new Set(first.map((r) => key(r.type, r.id)));
+    cands[wi] = [...first, ...cands[wi].filter((r) => !have.has(key(r.type, r.id)))];
+  }
   const counts = new Map();
-  for (const r of [...refs.popular, ...(refs.recent || [])]) counts.set(key(r.type, r.id), 1);
+  for (const r of [...refs.top10, ...refs.popular, ...(refs.recent || [])]) counts.set(key(r.type, r.id), (counts.get(key(r.type, r.id)) || 0) + 1);
   svc.order.forEach((name, i) => { refs[name] = place(cands[i], NEW_LIMIT, counts); });
   const uniq = new Map();
   for (const r of Object.values(refs).flat()) uniq.set(key(r.type, r.id), r);
@@ -479,9 +763,24 @@ async function buildService(svc, ctx) {
 
   const rows = {};
   for (const [name, arr] of Object.entries(refs)) rows[name] = arr.map((r) => key(r.type, r.id)).filter((k) => items[k]);
+  // מזהה נטפליקס: מהטופ 10 של היום, או ממה שנשמר בעבר. קישור ישיר לכותר במקום חיפוש
+  if (svc.titleBase) {
+    const keep = (seen && seen.nf) || {};
+    for (const [k, id] of nfids) keep[k] = id;
+    for (const k of Object.keys(items)) if (keep[k]) { items[k].nfid = String(keep[k]); items[k].link = svc.titleBase + keep[k]; }
+  }
+  // שמות בעברית לפריטים שאין להם (ויקינתונים), ואז תיקונים ידניים (nf-he.json) אחרונים
+  if (ctx.hebrew !== false) {
+    let overrides = {};
+    try { const o = JSON.parse(await readFile(dir + "/nf-he.json", "utf8")); if (o && typeof o === "object" && !Array.isArray(o)) overrides = o; } catch (e) {}
+    const h = await hebrewTitles(items, { overrides, linkBase: svc.linkBase }).catch(() => null);
+    if (h) console.log(`${svc.id}: שמות בעברית – חסרו ${h.need}, מוויקינתונים ${h.wiki}, ידני ${h.overrides}`);
+  }
+
   const byDate = (a, b) => (items[b].date || "").localeCompare(items[a].date || "");
   if (rows.recent) rows.recent.sort(byDate);
-  if (rows.week) rows.week.sort(byDate);
+  const eff = (k) => arr.get(k) || items[k].date || ""; // תאריך הגעה לשירות, ואם לא ידוע אז תאריך יציאה
+  if (rows.week) rows.week.sort((a, b) => eff(b).localeCompare(eff(a)));
 
   const types = new Set(rows.popular.map((k) => items[k].type));
   if (rows.popular.length < MIN_POPULAR || !types.has("movie") || !types.has("tv")) {
@@ -521,6 +820,10 @@ async function buildService(svc, ctx) {
   const out = { v: SCHEMA, updated: new Date().toISOString(), hero, rows: outRows, rowMeta, items: outItems };
   if (region) out.region = region; // הקטלוג של אזור אחר (לא ישראל)
   await writeFile(dir + "/" + svc.file, JSON.stringify(out));
+  if (seen) {
+    for (const k of nfids.keys()) seen.nf[k] = nfids.get(k);
+    try { await writeFile(dir + "/" + svc.seenFile, seenText(seen)); } catch (e) { console.error(svc.seenFile + ": " + e.message); }
+  }
   console.log(`${svc.file}: ${Object.keys(outItems).length} פריטים; ` + Object.keys(outRows).map((n) => `${n}=${outRows[n].length}`).join(" "));
   return out;
 }
@@ -578,6 +881,7 @@ export function finalize(rowsIn, itemsIn, svc = SERVICES.netflix) {
   const outRows = {}, rowMeta = {};
   for (const n of [...base, ...order]) {
     if (!base.includes(n) && rows[n].length < MIN_ROW) continue;
+    if ((svc.optional || []).includes(n) && !rows[n].length) continue;
     outRows[n] = rows[n]; rowMeta[n] = svc.meta[n];
   }
   const used = new Set(Object.values(outRows).flat());

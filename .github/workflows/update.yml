@@ -59,9 +59,9 @@ jobs:
       - name: Fill missing summaries from summary memory (same channel, same title, same summary on 2+ days)
         continue-on-error: true
         run: node desc_memory.mjs
-      - name: Fetch Netflix list from TMDB (+ ratings from OMDb)
+      - name: Fetch Netflix list from TMDB (+ ratings from OMDb, top 10 from Netflix, Hebrew titles from Wikidata)
         continue-on-error: true
-        timeout-minutes: 8
+        timeout-minutes: 12
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
@@ -78,6 +78,8 @@ jobs:
           if [ -f desc-memory.json ]; then git add desc-memory.json; fi
           if [ -f netflix.json ]; then git add netflix.json; fi
           if [ -f disney.json ]; then git add disney.json; fi
+          if [ -f netflix-seen.json ]; then git add netflix-seen.json; fi
+          if [ -f disney-seen.json ]; then git add disney-seen.json; fi
           if [ -f ratings-cache.json ]; then git add ratings-cache.json; fi
           if git diff --cached --quiet; then
             echo "No changes"

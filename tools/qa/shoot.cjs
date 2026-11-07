@@ -93,7 +93,10 @@ function nfFixtureData() {
   const mix = (n, off) => { const a = take(mk, n / 2, off), b = take(tk, n / 2, off); return a.flatMap((k, i) => [k, b[i]]).filter(Boolean); };
   j.rows.israeli = mix(24, 3); j.rows.week = mix(24, 9); j.rows.series = take(tk, 24, 5); j.rows.movies = take(mk, 24, 2);
   j.rows.comedy = mix(24, 14); j.rows.crime = mix(24, 20); j.rows.docu = mix(10, 1); j.rows.family = mix(24, 7);
-  j.rowMeta = { popular: { title: "הכי נצפים" }, recent: { title: "יצא לאחרונה" }, top: { title: "הכי מדורגים" }, israeli: { title: "🇮🇱 ישראלי בנטפליקס" }, week: { title: "🆕 יצא החודש" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, comedy: { title: "😂 קומדיה" }, crime: { title: "🔪 מתח ופשע" }, docu: { title: "🎙 דוקו" }, family: { title: "👨‍👩‍👧 לכל המשפחה" } };
+  // טופ 10 בישראל: 16 פריטים עם מזהה נטפליקס (קישור ישיר /title/), ודוקו ספורט
+  j.rows.top10 = mix(16, 17); j.rows.top10.forEach((k, i) => { j.items[k].nfid = String(81944880 + i); j.items[k].link = "https://www.netflix.com/title/" + (81944880 + i); });
+  j.rows.sportdoc = mix(8, 5);
+  j.rowMeta = { popular: { title: "הכי נצפים" }, recent: { title: "יצא לאחרונה" }, top: { title: "הכי מדורגים" }, israeli: { title: "🇮🇱 ישראלי בנטפליקס" }, week: { title: "✨ חדש בנטפליקס" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, comedy: { title: "😂 קומדיה" }, crime: { title: "🔪 מתח ופשע" }, docu: { title: "🎙 דוקו" }, sportdoc: { title: "⚽ דוקו ספורט" }, top10: { title: "🔥 טופ 10 בישראל" }, family: { title: "👨‍👩‍👧 לכל המשפחה" } };
   Object.keys(j.items).forEach((k) => { if (k !== "x_edge") j.items[k].poster = "https://image.tmdb.org/t/p/w342/fx_" + k + ".jpg"; });
   return j;
 }
@@ -112,7 +115,7 @@ function dsFixtureData() {
   }
   const ks = Object.keys(items), pick = (n, off) => Array.from({ length: n }, (_, i) => ks[(i + off) % ks.length]);
   const rows = { popular: pick(20, 0), week: pick(12, 8), series: ks.filter((k) => k[0] === "t").slice(0, 14), movies: ks.filter((k) => k[0] === "m").slice(0, 16), kids: pick(12, 20), marvel: pick(10, 30), starwars: pick(8, 40), pixar: pick(8, 50), top: pick(12, 55) };
-  const rowMeta = { popular: { title: "🔥 הכי נצפים" }, week: { title: "🆕 יצא החודש" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, kids: { title: "🧸 ילדים ומשפחה" }, marvel: { title: "🦸 מארוול" }, starwars: { title: "⭐ מלחמת הכוכבים" }, pixar: { title: "🎈 פיקסאר" }, top: { title: "🏆 הכי מדורגים" } };
+  const rowMeta = { popular: { title: "🔥 הכי נצפים" }, week: { title: "✨ יצא החודש" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, kids: { title: "🧸 ילדים ומשפחה" }, marvel: { title: "🦸 מארוול" }, starwars: { title: "⭐ מלחמת הכוכבים" }, pixar: { title: "🎈 פיקסאר" }, top: { title: "🏆 הכי מדורגים" } };
   return { v: 2, updated: "2026-10-31T01:00:00.000Z", hero: key(0), rows, rowMeta, items, region: "GB" };
 }
 
@@ -412,11 +415,11 @@ function dsFixtureData() {
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await page.waitForTimeout(700);
       dsChk(await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length) === 0, "all rows built after scroll");
       dsChk(await page.evaluate(() => document.querySelectorAll("#main .nfmore").length) === 9, "a 'more' chip on every row");
-      const tx = await page.textContent("#main"); ["🔥 הכי נצפים", "🆕 יצא החודש", "📺 סדרות", "🎬 סרטים", "🧸 ילדים ומשפחה", "🦸 מארוול", "⭐ מלחמת הכוכבים", "🎈 פיקסאר", "🏆 הכי מדורגים"].forEach((t) => dsChk(tx.indexOf(t) >= 0, "title " + t));
+      const tx = await page.textContent("#main"); ["🔥 הכי נצפים", "✨ יצא החודש", "📺 סדרות", "🎬 סרטים", "🧸 ילדים ומשפחה", "🦸 מארוול", "⭐ מלחמת הכוכבים", "🎈 פיקסאר", "🏆 הכי מדורגים"].forEach((t) => dsChk(tx.indexOf(t) >= 0, "title " + t));
       dsChk(tx.indexOf("ישראלי בנטפליקס") < 0, "no Netflix rows leaked into Disney");
       await snap("51_ds_bottom");
       await page.evaluate(() => window.scrollTo(0, 0)); await page.click('[data-nfsvc="netflix"]'); await page.waitForTimeout(700);
-      dsChk((await dsNames()).join() === "popular,israeli,week,recent,series,movies,top,comedy,crime,docu,family", "netflix rows unchanged " + (await dsNames()).join());
+      dsChk((await dsNames()).join() === "top10,popular,israeli,week,recent,series,movies,docu,sportdoc,top,comedy,crime,family", "netflix rows unchanged " + (await dsNames()).join());
       await page.click('[data-nfsvc="disney"]'); await page.waitForTimeout(900); await page.click('[data-tab="dial"]'); await page.waitForTimeout(400); await page.click('[data-tab="nf"]'); await page.waitForTimeout(700);
       dsChk(await page.evaluate(() => document.querySelector('[data-nfsvc="netflix"]').getAttribute("aria-pressed") === "true"), "re-entering the tab opens on Netflix");
     });
@@ -491,18 +494,24 @@ function dsFixtureData() {
     await step("nf-rows-all", async () => { // כל 11 השורות לפי הסדר, בנייה עצלה מתחת לקפל
       await nfClean(0);
       const names = () => page.evaluate(() => Array.prototype.map.call(document.querySelectorAll("#main [data-nfrow]"), (s) => s.getAttribute("data-nfrow")));
-      nfChk((await names()).join() === "popular,israeli,week,recent,series,movies,top,comedy,crime,docu,family", "rows order " + (await names()).join());
+      nfChk((await names()).join() === "top10,popular,israeli,week,recent,series,movies,docu,sportdoc,top,comedy,crime,family", "rows order " + (await names()).join());
       const lazy0 = await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length);
       nfChk(lazy0 >= 6, "rows below the fold are not built yet (" + lazy0 + ")");
-      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfhero").length === 1 && document.querySelector("#main .nfhero").nextElementSibling.getAttribute("data-nfrow") === "popular"), "hero then popular");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfhero").length === 1 && document.querySelector("#main .nfhero").nextElementSibling.getAttribute("data-nfrow") === "top10"), "hero then top10");
       await snap("20_nf_rows_top");
       await page.evaluate(() => window.scrollTo(0, 1000)); await page.waitForTimeout(800); await snap("20_nf_rows_mid");
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await page.waitForTimeout(700);
       nfChk(await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length) === 0, "all rows built after scrolling");
-      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfmore").length) === 11, "a 'more' chip on every row");
+      nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfmore").length) === 13, "a 'more' chip on every row");
       nfChk(await page.evaluate(() => document.querySelectorAll('#main [data-nfrow="docu"] .nfc').length) === 10, "docu row has 10 cards");
-      const tx = await page.textContent("#main"); ["🇮🇱 ישראלי בנטפליקס", "🆕 יצא החודש", "📺 סדרות", "🎬 סרטים", "😂 קומדיה", "🔪 מתח ופשע", "🎙 דוקו", "👨‍👩‍👧 לכל המשפחה"].forEach((t) => nfChk(tx.indexOf(t) >= 0, "title " + t));
+      const tx = await page.textContent("#main"); ["🔥 טופ 10 בישראל", "🇮🇱 ישראלי בנטפליקס", "✨ חדש בנטפליקס", "📺 סדרות", "🎬 סרטים", "😂 קומדיה", "🔪 מתח ופשע", "🎙 דוקו", "⚽ דוקו ספורט", "👨‍👩‍👧 לכל המשפחה"].forEach((t) => nfChk(tx.indexOf(t) >= 0, "title " + t));
       await snap("20_nf_rows_bottom");
+      // טופ 10: קישור ישיר לכותר בנטפליקס (nfid), לא חיפוש
+      await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+      await page.click('#main [data-nfrow="top10"] .nfc'); await page.waitForTimeout(700);
+      nfChk(await page.evaluate(() => { const a = document.querySelector("#nfsBar .nfgo"); return !!a && /^https:\/\/www\.netflix\.com\/title\/\d+$/.test(a.href); }), "top10 item: direct Netflix title link");
+      await snap("20_nf_top10_page");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(400);
       await page.evaluate(() => { const r = document.querySelector('[data-nfrow="family"] .nfrow'); r.scrollLeft = -2000; }); await page.waitForTimeout(500); await snap("20_nf_row_end_chip");
     });
     await step("nf-more-list", async () => { // 'עוד ›' -> רשימה מלאה; כרטיס פותח דף מעליה; Escape/חזרה סוגרים שכבה אחת בכל פעם

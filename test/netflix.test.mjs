@@ -275,7 +275,7 @@ test("run: שורות חדשות נשלפות עם פרמטרי נטפליקס �
   const log = [];
   globalThis.fetch = richMock(log);
   const out = await run({ tmdbKey: "k", omdbKey: "", dir });
-  assert.equal(log.length, 6 + 2 * (4 + 2 + 1 + 1 + 8));
+  assert.equal(log.length, 6 + 2 + 2 * (4 + 2 + 1 + 1 + 10)); // בסיס + סריקת קטלוג (עמוד אחד לכל סוג במוק) + שורות חדשות
   for (const c of log) {
     assert.equal(c.q.watch_region, "IL"); assert.equal(c.q.with_watch_providers, "8");
     assert.equal(c.q.language, "he-IL"); assert.equal(c.q.include_adult, "false");

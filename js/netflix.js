@@ -23,8 +23,9 @@
   TVG.openNfList = openNfList;
   TVG.closeNfList = closeNfList;
 
-  // סדר השורות במסך (שורה שלא בנתונים נדלגת; שורה לא מוכרת עם כותרת ב-rowMeta באה בסוף). 'recent' ליד 'week' כי הן קרובות
-  var ORDER = ["popular", "israeli", "week", "recent", "series", "movies", "top", "comedy", "crime", "docu", "family"];
+  // סדר השורות במסך (שורה שלא בנתונים נדלגת; שורה לא מוכרת עם כותרת ב-rowMeta באה בסוף). 'recent' ליד 'week' כי הן קרובות.
+  // top10 (הרשימה הרשמית של נטפליקס ישראל) ראשונה; דוקו ודוקו ספורט מיד אחרי סדרות/סרטים (שורות כלליות) ולפני שורות הז'אנר
+  var ORDER = ["top10", "popular", "israeli", "week", "recent", "series", "movies", "docu", "sportdoc", "top", "comedy", "crime", "family"];
   var ORDER_DS = ["popular", "week", "series", "movies", "kids", "marvel", "starwars", "pixar", "top"];
   var TITLES = { popular: "הכי נצפים", recent: "יצא לאחרונה", top: "הכי מדורגים" }; // ברירת מחדל כשאין rowMeta (נתונים ישנים)
   var FAV_TITLE = "⭐ השמורים שלי", FAV_MAX = 200, FAV_ROW = 16, LAZY_FIRST = 3;

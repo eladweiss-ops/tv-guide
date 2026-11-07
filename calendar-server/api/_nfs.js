@@ -162,6 +162,33 @@ export async function searchNf(q0, d = {}) {
   const used = new Set([...(collection ? collection.keys : []), ...(brand ? brand.keys : []), ...titles, ...outPersons.flatMap((p) => p.keys)]);
   order.forEach((k) => { if (used.has(k)) out.items[k] = items[k]; });
   if (partial) out.partial = true;
+  // שם בעברית שלא נמצא: קודם ויקינתונים (תווית/כינוי בעברית → מזהה TMDB), ורק אחר כך תעתיק
+  if (!d.noTr && !out.collection && !out.brand && !out.titles.length && !out.persons.length && /[א-ת]/.test(q)) {
+    const wk = await wikiKeys(q, d);
+    if (wk.failed) { out.partial = true; partial = true; } // ויקינתונים לא זמין: לא נשמר 12 שעות כ"אין תוצאות", מנסים שוב אחרי 5 דקות
+    if (wk.hits.length) {
+      const got = await Promise.all(wk.hits.map((h) => Promise.all([
+        sf(tget("/" + (h.type === "tv" ? "tv" : "movie") + "/" + h.id, { language: "he-IL" }, d)),
+        sf(tget("/" + (h.type === "tv" ? "tv" : "movie") + "/" + h.id, { language: "en-US" }, d)),
+      ])));
+      const fresh = [];
+      got.forEach(([he, en], i) => {
+        const h = wk.hits[i], base = he || en;
+        if (!base || base.id !== h.id) return;
+        const o = add(base, en, h.type); if (!o) return;
+        // TMDB בלי שם בעברית: מציגים את השם מוויקינתונים, והשם המקורי נשאר ב-orig (וממנו הקישור לנטפליקס)
+        if (!/[א-ת]/.test(o.title) && h.label) { if (!o.orig) o.orig = o.title; o.title = h.label.slice(0, 120); }
+        if (out.titles.indexOf(o.k) < 0) { out.titles.push(o.k); fresh.push(o); }
+      });
+      if (partial) out.partial = true;
+      if (fresh.length) {
+        await availAll(fresh, d, d.provCache, () => { out.partial = true; });
+        fresh.forEach((o) => { out.items[o.k] = o; });
+        out.via = "wikidata";
+        return out;
+      }
+    }
+  }
   // שם בעברית שלא נמצא (TMDB לא תמיד מכיר את השם של נטפליקס ישראל): מנסים תעתיק לאנגלית ("אל מאיו" → "el mayo")
   if (!d.noTr && !out.collection && !out.brand && !out.titles.length && !out.persons.length && /[א-ת]/.test(q)) {
     for (const tq of translitCands(q)) {
@@ -171,6 +198,57 @@ export async function searchNf(q0, d = {}) {
     }
   }
   return out;
+}
+
+// ---- ויקינתונים: שם בעברית → מזהה TMDB (P4983 סדרה, P4947 סרט) ----
+// מחזיר {hits:[{type,id,label}], failed}. מתקבלת רק ישות שהתווית/כינוי שלה בעברית זהה לשאילתה (אחרי norm), או מתחיל בה כשאין זהה.
+export const WIKI_API = "https://www.wikidata.org/w/api.php";
+export const WIKI_MAX = 3;
+const WIKI_UA = "tv-guide-cal/1.0 (personal TV guide)";
+async function wget(params, d) {
+  const u = new URL(WIKI_API);
+  for (const [k, v] of Object.entries({ ...params, format: "json" })) u.searchParams.set(k, String(v));
+  const r = await (d.fetch || fetch)(u.toString(), { headers: { "user-agent": WIKI_UA, accept: "application/json" }, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+  if (!r.ok) { const e = new Error("wikidata " + r.status); e.status = r.status; throw e; }
+  return await r.json();
+}
+const claimIds = (cl, p) => (Array.isArray(cl && cl[p]) ? cl[p] : [])
+  .map((c) => c && c.mainsnak && c.mainsnak.datavalue && c.mainsnak.datavalue.value)
+  .filter((v) => typeof v === "string" && /^[0-9]{1,9}$/.test(v)).map(Number);
+export async function wikiKeys(q, d = {}) {
+  const nq = norm(q);
+  if (nq.length < 2) return { hits: [], failed: false };
+  try {
+    const s = await wget({ action: "wbsearchentities", search: q, language: "he", uselang: "he", type: "item", limit: 5 }, d);
+    const res = (s && Array.isArray(s.search) ? s.search : []).filter((r) => r && typeof r.id === "string" && /^Q[0-9]{1,12}$/.test(r.id));
+    if (!res.length) return { hits: [], failed: false };
+    const g = await wget({ action: "wbgetentities", ids: res.map((r) => r.id).join("|"), props: "claims|labels|aliases", languages: "en|he" }, d);
+    const ents = (g && g.entities) || {};
+    const cands = [];
+    res.forEach((r, i) => {
+      const e = ents[r.id]; if (!e || !e.claims) return;
+      const he = e.labels && e.labels.he && typeof e.labels.he.value === "string" ? e.labels.he.value : "";
+      const names = [he, ...((e.aliases && Array.isArray(e.aliases.he)) ? e.aliases.he.map((a) => a && a.value) : [])];
+      if (r.match && r.match.language === "he" && typeof r.match.text === "string") names.push(r.match.text);
+      const ok = names.filter((x) => typeof x === "string" && x);
+      const hit = ok.find((x) => norm(x) === nq) || ok.find((x) => norm(x).startsWith(nq));
+      if (!hit) return;
+      const rank = norm(hit) === nq ? 0 : 1;
+      const label = hit.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+      claimIds(e.claims, "P4983").forEach((id) => cands.push({ rank, i, type: "tv", id, label }));
+      claimIds(e.claims, "P4947").forEach((id) => cands.push({ rank, i, type: "movie", id, label }));
+    });
+    const best = cands.length ? Math.min(...cands.map((c) => c.rank)) : 0; // יש זהה: רק זהים
+    const seen = {}, hits = [];
+    cands.filter((c) => c.rank === best).sort((a, b) => a.i - b.i).forEach((c) => {
+      const k = c.type + c.id; if (seen[k] || hits.length >= WIKI_MAX) return; seen[k] = 1;
+      hits.push({ type: c.type, id: c.id, label: c.label });
+    });
+    return { hits, failed: false };
+  } catch (e) {
+    console.error("nf-search wikidata", e && e.message);
+    return { hits: [], failed: true };
+  }
 }
 
 // תעתיק עברית → אנגלית, גס בכוונה: שתי הצעות לכל היותר (כל השאילתה, ושתי המילים האחרונות כשיש יותר משתיים)

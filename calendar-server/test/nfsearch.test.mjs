@@ -263,3 +263,93 @@ test("POST /api/nf-search: קצב 5 בשעה ל-IP", async () => {
   for (let i = 0; i < 6; i++) { last = mockRes(); await nfh(req(i), last); }
   assert.equal(last.code, 429);
 });
+
+// ---- ויקינתונים: שם בעברית שאין ב-TMDB ----
+// fetch מדומה: www.wikidata.org לפי action, כל השאר ל-TMDB המדומה
+function wiki(tm, { search = [], entities = {}, down = false } = {}) {
+  const wcalls = [];
+  const fx = async (url, init) => {
+    const u = new URL(url);
+    if (u.hostname === "www.wikidata.org") {
+      wcalls.push({ q: u.searchParams, init });
+      if (down) throw new Error("network");
+      const a = u.searchParams.get("action");
+      if (a === "wbsearchentities") return jr({ search });
+      if (a === "wbgetentities") { const out = {}; u.searchParams.get("ids").split("|").forEach((id) => { if (entities[id]) out[id] = entities[id]; }); return jr({ entities: out }); }
+      return jr({}, 400);
+    }
+    return tm(url, init);
+  };
+  fx.wcalls = wcalls; fx.calls = tm.calls; return fx;
+}
+const claim = (v) => [{ mainsnak: { datavalue: { value: String(v) } } }];
+const ent = (he, cl, aliases = []) => ({ labels: { he: { value: he } }, aliases: { he: aliases.map((value) => ({ value })) }, claims: cl });
+const heb = /[֐-׿]/;
+
+test("ויקינתונים: תווית עברית זהה → מזהה TMDB של סדרה, השם בעברית בכותרת, via=wikidata", async () => {
+  const tm = tmdb({
+    "/tv/336240": (u) => ({ id: 336240, name: "A Couple of Lies", original_name: "Bytet", first_air_date: "2026-10-30", overview: u.searchParams.get("language") === "en-US" ? "Two couples swap homes" : "", poster_path: "/abcde12345.jpg" }),
+    "/tv/336240/watch/providers": { results: { IL: { flatrate: [{ provider_id: 8, provider_name: "Netflix" }] } } },
+  });
+  const fx = wiki(tm, {
+    search: [{ id: "Q1", label: "חילופי בתים", match: { type: "label", language: "he", text: "חילופי בתים" } }, { id: "Q2", label: "חילופי בתים בצרפת" }],
+    entities: { Q1: ent("חילופי בתים", { P4983: claim(336240) }), Q2: ent("חילופי בתים בצרפת", { P4947: claim(77) }) },
+  });
+  const out = await searchNf("חילופי בתים", { fetch: fx });
+  assert.equal(out.via, "wikidata");
+  assert.deepEqual(out.titles, ["t336240"], "רק הזהה, לא זה שמתחיל בשאילתה");
+  const it = out.items.t336240;
+  assert.equal(it.title, "חילופי בתים");
+  assert.equal(it.orig, "Bytet");
+  assert.equal(it.overview, "Two couples swap homes");
+  assert.equal(it.nf, true);
+  assert.equal(it.link, "https://www.netflix.com/search?q=Bytet");
+  assert.equal(out.partial, undefined);
+  const s = fx.wcalls[0].q;
+  assert.equal(s.get("action"), "wbsearchentities"); assert.equal(s.get("language"), "he"); assert.equal(s.get("search"), "חילופי בתים");
+  assert.match(fx.wcalls[0].init.headers["user-agent"], /tv-guide-cal/);
+  assert.equal(fx.wcalls[1].q.get("ids"), "Q1|Q2");
+  assert.ok(!fx.calls.some((c) => c.path === "/movie/77"), "לא נטען פריט שלא התקבל");
+});
+
+test("ויקינתונים: בלי זהה מתקבל כינוי שמתחיל בשאילתה (סרט P4947); תווית שלא תואמת נדחית", async () => {
+  const tm = tmdb({ "/movie/550": { id: 550, title: "Fight Club", original_title: "Fight Club", release_date: "1999-10-15" } });
+  const fx = wiki(tm, {
+    search: [{ id: "Q9", label: "משהו אחר" }, { id: "Q8", label: "x" }],
+    entities: { Q9: ent("משהו אחר לגמרי", { P4947: claim(999) }), Q8: ent("Fight Club", { P4947: claim(550) }, ["מועדון קרב: הסרט"]) },
+  });
+  const out = await searchNf("מועדון קרב", { fetch: fx });
+  assert.deepEqual(out.titles, ["m550"]);
+  assert.equal(out.items.m550.title, "מועדון קרב: הסרט");
+  assert.equal(out.items.m550.orig, "Fight Club");
+  assert.ok(!fx.calls.some((c) => c.path === "/movie/999"));
+  // רק לא תואמים: אין תוצאה מוויקינתונים, והתעתיק עדיין מנסה אחריו
+  const fx2 = wiki(tmdb(), { search: [{ id: "Q9", label: "משהו" }], entities: { Q9: ent("משהו אחר לגמרי", { P4947: claim(999) }) } });
+  const o2 = await searchNf("מועדון קרב", { fetch: fx2 });
+  assert.deepEqual(o2.titles, []); assert.equal(o2.via, undefined); assert.equal(o2.partial, undefined);
+  assert.ok(!fx2.calls.some((c) => c.path === "/movie/999"));
+  assert.ok(fx2.calls.some((c) => c.path === "/search/multi" && !heb.test(c.q.get("query"))), "תעתיק אחרי ויקינתונים");
+});
+
+test("ויקינתונים לא זמין: תוצאה ריקה, partial (לא נשמר ל-Firestore)", async () => {
+  const fx = wiki(tmdb(), { down: true });
+  const out = await searchNf("חילופי בתים", { fetch: fx });
+  assert.deepEqual(out.titles, []); assert.equal(out.via, undefined); assert.equal(out.partial, true);
+  assert.equal(fx.wcalls.length, 1);
+  const store = {};
+  const r = await handleSearch("חילופי בתים", { fetch: wiki(tmdb(), { down: true }), readJson: async () => null, writeJson: async (p, o) => { store[p] = o; }, now: () => 1 });
+  assert.equal(r.status, 200); assert.equal(r.json.partial, true); assert.deepEqual(store, {});
+});
+
+test("ויקינתונים: לא נקרא לשאילתה בלי עברית, כש-TMDB כבר מצא, או כשיש כינוי שנלמד", async () => {
+  const fx = wiki(tmdb(), {});
+  await searchNf("nothing here", { fetch: fx });
+  assert.equal(fx.wcalls.length, 0, "בלי עברית");
+  const fx2 = wiki(tmdb({ "/search/multi": { results: [{ media_type: "movie", ...mov(1, "הנוקמים") }] } }), {});
+  const out = await searchNf("הנוקמים", { fetch: fx2 });
+  assert.deepEqual(out.titles, ["m1"]); assert.equal(fx2.wcalls.length, 0, "TMDB מצא");
+  const { aliasPath } = await import("../api/nf-search.js");
+  const fx3 = wiki(tmdb(), {});
+  await handleSearch("חילופי בתים", { fetch: fx3, readJson: async (p, dflt) => (p === aliasPath("חילופי בתים") ? { t: "A Couple of Lies" } : dflt), writeJson: async () => {}, now: () => 1 });
+  assert.equal(fx3.wcalls.length, 0, "כינוי קודם");
+});

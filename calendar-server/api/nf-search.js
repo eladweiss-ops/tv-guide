@@ -1,6 +1,9 @@
 // GET /api/nf-search?q=...  → חיפוש מלא בנטפליקס דרך TMDB (המפתח בשרת: TMDB_API_KEY)
 //   {v, q, collection, brand, titles:[k], persons:[...], items:{k:{k,id,type,title,orig,year,overview,poster,backdrop,vote,nf,ds,others,link,dlink}}}
 //   nf=true: יש ב-flatrate של נטפליקס ישראל; link = חיפוש בנטפליקס. ds=true: יש ב-flatrate של דיסני+ ישראל (provider 337); dlink = חיפוש בדיסני+. others = שירותים אחרים בישראל (מידע בלבד).
+// שאילתה בעברית בלי שום תוצאה ב-TMDB: ויקינתונים (wbsearchentities + wbgetentities, תווית/כינוי עברי זהה לשאילתה אחרי norm, או מתחיל בה כשאין זהה)
+//   → מזהי TMDB מ-P4983 (סדרה, "t<id>") ו-P4947 (סרט, "m<id>"), עד 3 פריטים, ב-titles עם via:"wikidata". כשל/timeout (4 שניות) בוויקינתונים = partial
+//   (נשמר בזיכרון 5 דקות בלבד ומנסים שוב), כדי ש"אין תוצאות" לא יינעל ל-12 שעות. אחריו, אם עדיין אין כלום: תעתיק לאנגלית. כינוי שנלמד (alias) קודם לכל זה.
 // מטמון: זיכרון + Firestore דרך _db.js (cache/nf/<hash>.json) ל-12 שעות. קצב: 30 בדקה ל-IP. שגיאות: 400 קלט, 429 קצב, 502 TMDB, 503 לא מוגדר.
 // POST /api/nf-search {q, k, t} → לומד כינוי בעברית (alias/<hash>.json): חיפוש בעברית שלא מצא, ואחריו בחירת k מחיפוש t באנגלית.
 //   מעכשיו חיפוש q מחפש את t (גם אצל כל המשתמשים). אימות: q בעברית, t בלי עברית, וחיפוש t באמת מחזיר את k. הראשון קובע. קצב: 5 בשעה ל-IP.
@@ -14,7 +17,7 @@ export const PARTIAL_TTL = 5 * 60000;
 const provCache = new Map(); // k -> {t, v}  (זמינות לפי פריט, בין חיפושים)
 export const _clearCache = () => { mem.clear(); provCache.clear(); aliasMem.clear(); };
 
-export const CACHE_V = "4"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
+export const CACHE_V = "5"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
 export const hashOf = (q) => createHash("sha256").update(CACHE_V + "|" + (norm(q) || q.toLowerCase())).digest("hex").slice(0, 32);
 
 // ---- כינויים בעברית שנלמדו מהשימוש ----

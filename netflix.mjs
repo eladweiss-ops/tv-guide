@@ -74,14 +74,14 @@ const IMG = "https://image.tmdb.org/t/p/";
 // ---------- רשת ----------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// fetch עם timeout של 15 שניות, ו-retry אחד על 429/5xx לפי Retry-After (ברירת מחדל 2 שניות)
+// fetch עם timeout של 15 שניות, ועד 3 ניסיונות חוזרים על 429/5xx לפי Retry-After (ברירת מחדל 2, 4, 6 שניות)
 export async function fetchRetry(url, init = {}, { retry = true } = {}) {
   let res;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     res = await fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
-    if (!retry || attempt === 1 || !(res.status === 429 || res.status >= 500)) return res;
+    if (!retry || attempt === 3 || !(res.status === 429 || res.status >= 500)) return res;
     const ra = Number(res.headers && res.headers.get && res.headers.get("retry-after"));
-    await sleep(Math.min(Number.isFinite(ra) && ra >= 0 ? ra * 1000 : 2000, 10000));
+    await sleep(Math.min(Number.isFinite(ra) && ra >= 0 ? ra * 1000 : 2000 * (attempt + 1), 10000));
   }
   return res;
 }
@@ -156,7 +156,7 @@ async function list(tmdb, type, extra, { pages = 1, limit = ROW_LIMIT, d = disc 
 // ---------- שורות חדשות ----------
 // כותרות השורות (הלקוח מצייר לפיהן, לכן כאן המקום היחיד לשנות ניסוח)
 export const ROW_META = {
-  top10: { title: "🔥 טופ 10 בישראל" }, // הרשימה הרשמית של נטפליקס (שבועית), ראו top10
+  top10: { title: "🔥 הכי נצפים בישראל השבוע" }, // הרשימה הרשמית של נטפליקס (שבועית), ראו top10
   popular: { title: "הכי נצפים" },
   recent: { title: "יצא לאחרונה" },
   top: { title: "הכי מדורגים" },
@@ -483,6 +483,7 @@ export function pickMatch(results, e, type, catalog) {
     const exact = normName(r.title || r.name) === normName(e.title) || normName(r.original_title || r.original_name) === normName(e.title);
     const inCat = !!(catalog && catalog.has(key(type, r.id)));
     if (!exact && !(inCat && i < 3)) return;
+    if (type === "tv" && catalog && catalog.size && !inCat) return; // סדרה ישנה באותו שם שלא בנטפליקס ישראל
     const yr = +String(r.release_date || r.first_air_date || "").slice(0, 4);
     let s = (exact ? 100 : 0) + (inCat ? 60 : 0) + Math.min(10, Math.log10(1 + (r.popularity || 0)) * 3);
     if (e.year && yr) s += type === "movie" ? (Math.abs(yr - e.year) <= 1 ? 30 : 0) : yr <= e.year ? 10 : -20;
@@ -496,11 +497,11 @@ async function matchTop10(tmdb, entries, type, catalog) {
     try {
       const j = await tmdb("/search/" + type, { query: e.title, language: "en-US", include_adult: "false" });
       const r = pickMatch(j.results, e, type, catalog);
-      return r ? { type, id: r.id, pop: r.popularity || 0, rank: e.rank, nfid: e.nfid, avail: e.avail, date: r.release_date || r.first_air_date || "" } : null;
+      return r ? { type, id: r.id, pop: r.popularity || 0, rank: e.rank, nfid: e.nfid, avail: e.avail, sure: !!(catalog && catalog.has(key(type, r.id))), date: r.release_date || r.first_air_date || "" } : null;
     } catch (e2) { return null; }
   }), 4);
   const once = new Set();
-  return got.filter((r) => r && !once.has(r.id) && once.add(r.id));
+  return got.filter((r) => r && !once.has(key(r.type, r.id)) && once.add(key(r.type, r.id)));
 }
 
 // ---------- "חדש בנטפליקס": תמונת מצב של הקטלוג (netflix-seen.json) ----------
@@ -527,8 +528,8 @@ async function crawlType(tmdb, type, d, { maxPages = CRAWL_MAX_PAGES, deadline =
   let bad = pages > Math.min(maxPages, 500) ? 1 : 0; // יותר עמודים מהתקרה: הסריקה לא שלמה
   await pool(Array.from({ length: Math.min(pages, maxPages, 500) - 1 }, (_, i) => async () => {
     if (Date.now() > deadline) { bad++; return; }
-    try { add(await tmdb("/discover/" + type, { ...d, ...sort, page: String(i + 2) })); } catch (e) { bad++; }
-  }));
+    try { add(await tmdb("/discover/" + type, { ...d, ...sort, page: String(i + 2) })); } catch (e) { bad++; console.error("סריקת קטלוג " + type + " עמוד " + (i + 2) + ": " + e.message); }
+  }), 4); // 4 לכל סוג (8 בסך הכול) – פחות 429 מ-TMDB
   return { map: out, ok: bad === 0, pages };
 }
 
@@ -712,7 +713,7 @@ async function buildService(svc, ctx) {
     } catch (e) { console.error("תמונת מצב " + svc.id + ": " + e.message); }
   }
   // טופ 10 הרשמי (נטפליקס בלבד): סדרות וסרטים לסירוגין, לפי הדירוג
-  const nfids = new Map();
+  const nfids = new Map(), nfSure = new Set();
   refs.top10 = [];
   if (svc.top10 && ctx.top10 !== false) {
     try {
@@ -721,7 +722,7 @@ async function buildService(svc, ctx) {
       const all = mergeRow(mtv, mmv, (a, b) => a.rank - b.rank, 20);
       for (const r of all) {
         const k = key(r.type, r.id);
-        if (/^\d{3,12}$/.test(r.nfid || "")) nfids.set(k, r.nfid);
+        if (/^\d{3,12}$/.test(r.nfid || "")) { nfids.set(k, r.nfid); if (r.sure) nfSure.add(k); }
         // מתי עלה לנטפליקס (מהעמוד עצמו): מדויק יותר מתמונת המצב
         if (r.avail && dDays(r.avail, today) <= SEEN_NEW_DAYS && dDays(r.avail, today) >= -1 && !(arr.get(k) && arr.get(k) < r.avail)) arr.set(k, r.avail);
       }
@@ -821,7 +822,8 @@ async function buildService(svc, ctx) {
   if (region) out.region = region; // הקטלוג של אזור אחר (לא ישראל)
   await writeFile(dir + "/" + svc.file, JSON.stringify(out));
   if (seen) {
-    for (const k of nfids.keys()) seen.nf[k] = nfids.get(k);
+    for (const k of nfSure) seen.nf[k] = nfids.get(k); // נשמר לתמיד רק כשההתאמה אומתה מול הקטלוג
+    for (const k of Object.keys(seen.nf)) if (!seen.k[k]) delete seen.nf[k]; // יצא מהקטלוג
     try { await writeFile(dir + "/" + svc.seenFile, seenText(seen)); } catch (e) { console.error(svc.seenFile + ": " + e.message); }
   }
   console.log(`${svc.file}: ${Object.keys(outItems).length} פריטים; ` + Object.keys(outRows).map((n) => `${n}=${outRows[n].length}`).join(" "));

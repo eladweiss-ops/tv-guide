@@ -174,7 +174,7 @@ test("finalize: top10 ריקה לא נכתבת; מלאה נכתבת ראשונה
   const f = finalize({ top10: [], popular: ["m1"], recent: [], top: [] }, items, SERVICES.netflix);
   assert.ok(!("top10" in f.rows) && !("top10" in f.rowMeta) && f.rows.popular);
   const g = finalize({ top10: ["m1", "m2", "m3", "m4", "m5"], popular: ["m1"], recent: ["m1"], top: [] }, items, SERVICES.netflix);
-  assert.deepEqual(Object.keys(g.rows)[0], "top10"); assert.equal(g.rows.top10.length, 5); assert.equal(g.rowMeta.top10.title, "🔥 טופ 10 בישראל");
+  assert.deepEqual(Object.keys(g.rows)[0], "top10"); assert.equal(g.rows.top10.length, 5); assert.equal(g.rowMeta.top10.title, "🔥 הכי נצפים בישראל השבוע");
 });
 
 // ---------- ריצה מלאה עם מוקים ----------
@@ -200,6 +200,7 @@ function fullMock({ log = [], top10 = true, extraCatalog = [] } = {}) {
       if (/\.asc$/.test(q.sort_by || "")) { // סריקת קטלוג
         const pg = Number(q.page || 1), base = d[1] === "movie" ? 7000 : 8000;
         const res = Array.from({ length: 20 }, (_, n) => ({ id: base + (pg - 1) * 20 + n, popularity: 1 + n }));
+        if (pg === 1 && d[1] === "tv") for (const id of [336240, 300001, 96677, 202411, 39351]) res.push({ id, popularity: 60 }); // הסדרות של הטופ 10 בקטלוג הישראלי
         if (pg === 2) for (const k of extraCatalog) if ((k[0] === "m") === (d[1] === "movie")) res.push({ id: +k.slice(1), popularity: 80, first_air_date: "2025-08-15" });
         return json({ page: pg, total_pages: 2, total_results: 40, results: res });
       }
@@ -228,7 +229,7 @@ test("run: טופ 10 ראשון עם קישורים ישירים, 'חדש בנט
   const o1 = await run({ tmdbKey: "k", dir, now: Date.UTC(2026, 9, 31, 3) });
   assert.ok(o1);
   const s1 = JSON.parse(await readFile(join(dir, "netflix-seen.json"), "utf8"));
-  assert.equal(s1.seed, "2026-10-31"); assert.ok(!s1.k.t256711); assert.equal(Object.keys(s1.k).length, 80);
+  assert.equal(s1.seed, "2026-10-31"); assert.ok(!s1.k.t256711); assert.equal(Object.keys(s1.k).length, 85);
   // לילה 2 (8.11): מוריד הגשם הופיע בקטלוג
   const log = [];
   globalThis.fetch = fullMock({ log, extraCatalog: ["t256711"] });

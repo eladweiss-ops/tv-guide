@@ -81,7 +81,7 @@ test("OMDb 401: אזהרה בלי המפתח ועצירה", async () => {
   assert.ok(!msgs.join("\n").includes("SECRETKEY"));
 });
 
-test("fetchRetry: 429 עם Retry-After מנסה פעם אחת נוספת", async () => {
+test("fetchRetry: 429 עם Retry-After מנסה שוב, עד 3 פעמים נוספות", async () => {
   let n = 0;
   globalThis.fetch = async () => (++n === 1 ? json({}, 429, { "retry-after": "0" }) : json({ ok: 1 }));
   const res = await fetchRetry("http://x/");
@@ -90,7 +90,7 @@ test("fetchRetry: 429 עם Retry-After מנסה פעם אחת נוספת", async
   n = 0;
   globalThis.fetch = async () => { n++; return json({}, 503, { "retry-after": "0" }); };
   assert.equal((await fetchRetry("http://x/")).status, 503);
-  assert.equal(n, 2);
+  assert.equal(n, 4);
 });
 
 test("pool: לא יותר מ-N במקביל", async () => {

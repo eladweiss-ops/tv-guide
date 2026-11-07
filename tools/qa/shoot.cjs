@@ -96,7 +96,7 @@ function nfFixtureData() {
   // טופ 10 בישראל: 16 פריטים עם מזהה נטפליקס (קישור ישיר /title/), ודוקו ספורט
   j.rows.top10 = mix(16, 17); j.rows.top10.forEach((k, i) => { j.items[k].nfid = String(81944880 + i); j.items[k].link = "https://www.netflix.com/title/" + (81944880 + i); });
   j.rows.sportdoc = mix(8, 5);
-  j.rowMeta = { popular: { title: "הכי נצפים" }, recent: { title: "יצא לאחרונה" }, top: { title: "הכי מדורגים" }, israeli: { title: "🇮🇱 ישראלי בנטפליקס" }, week: { title: "✨ חדש בנטפליקס" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, comedy: { title: "😂 קומדיה" }, crime: { title: "🔪 מתח ופשע" }, docu: { title: "🎙 דוקו" }, sportdoc: { title: "⚽ דוקו ספורט" }, top10: { title: "🔥 טופ 10 בישראל" }, family: { title: "👨‍👩‍👧 לכל המשפחה" } };
+  j.rowMeta = { popular: { title: "הכי נצפים" }, recent: { title: "יצא לאחרונה" }, top: { title: "הכי מדורגים" }, israeli: { title: "🇮🇱 ישראלי בנטפליקס" }, week: { title: "✨ חדש בנטפליקס" }, series: { title: "📺 סדרות" }, movies: { title: "🎬 סרטים" }, comedy: { title: "😂 קומדיה" }, crime: { title: "🔪 מתח ופשע" }, docu: { title: "🎙 דוקו" }, sportdoc: { title: "⚽ דוקו ספורט" }, top10: { title: "🔥 הכי נצפים בישראל השבוע" }, family: { title: "👨‍👩‍👧 לכל המשפחה" } };
   Object.keys(j.items).forEach((k) => { if (k !== "x_edge") j.items[k].poster = "https://image.tmdb.org/t/p/w342/fx_" + k + ".jpg"; });
   return j;
 }
@@ -504,7 +504,7 @@ function dsFixtureData() {
       nfChk(await page.evaluate(() => document.querySelectorAll("#main [data-nflz]").length) === 0, "all rows built after scrolling");
       nfChk(await page.evaluate(() => document.querySelectorAll("#main .nfmore").length) === 13, "a 'more' chip on every row");
       nfChk(await page.evaluate(() => document.querySelectorAll('#main [data-nfrow="docu"] .nfc').length) === 10, "docu row has 10 cards");
-      const tx = await page.textContent("#main"); ["🔥 טופ 10 בישראל", "🇮🇱 ישראלי בנטפליקס", "✨ חדש בנטפליקס", "📺 סדרות", "🎬 סרטים", "😂 קומדיה", "🔪 מתח ופשע", "🎙 דוקו", "⚽ דוקו ספורט", "👨‍👩‍👧 לכל המשפחה"].forEach((t) => nfChk(tx.indexOf(t) >= 0, "title " + t));
+      const tx = await page.textContent("#main"); ["🔥 הכי נצפים בישראל השבוע", "🇮🇱 ישראלי בנטפליקס", "✨ חדש בנטפליקס", "📺 סדרות", "🎬 סרטים", "😂 קומדיה", "🔪 מתח ופשע", "🎙 דוקו", "⚽ דוקו ספורט", "👨‍👩‍👧 לכל המשפחה"].forEach((t) => nfChk(tx.indexOf(t) >= 0, "title " + t));
       await snap("20_nf_rows_bottom");
       // טופ 10: קישור ישיר לכותר בנטפליקס (nfid), לא חיפוש
       await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);

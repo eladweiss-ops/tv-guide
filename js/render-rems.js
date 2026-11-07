@@ -43,7 +43,7 @@
     var now = Date.now(), cut = now - MISS_MS, live = {}, seen = {}, out = [], ch = false;
     TVG.REMS.forEach(function (x) { if (progKey(x.k)) live[x.k] = x; });
     missLoad().forEach(function (m) {
-      if (!m || !m.k || seen[m.k] || !(m.ts >= cut) || (m.ts > now && !live[m.k])) { ch = true; return; } // ישן, כפול, או בוטל לפני השידור
+      if (!m || !m.k || seen[m.k] || !(m.ts >= cut) || (m.end > now && !live[m.k])) { ch = true; return; } // ישן, כפול, או בוטל לפני סוף השידור
       seen[m.k] = 1; out.push(m);
     });
     Object.keys(live).forEach(function (k) {

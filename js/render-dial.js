@@ -26,11 +26,11 @@
   }
   // ערוץ חדשות (i24, ערוץ הכנסת, ערוץ 14…): כל מה שאינו ספורט/סרט/סדרה נצבע כחדשות – שמות תוכניות האקטואליה ("הפטריוטים", "שבע") לא אומרים "חדשות"
   var NOTNEWS = /סרט|סדרה|קומדיה|דרמה|תעודה/;
-  function newsCh(ch) { return !!ch && (ch._n === "news" || ch.id === "x14" || /^ערוץ 14$/.test(ch.name)); }
+  function newsCh(ch) { return !!ch && ((ch._n === "news" && !/france|fox|פוקס/i.test(ch.name || "")) || ch.id === "x14" || /^ערוץ 14$/.test(ch.name)); }
   function pgOf(t, noCh) {
     var ch = !noCh && TVG.G && TVG.G.channels.filter(function (c) { return c.id === TVG.chId; })[0];
     if ((ch && ch._n === "sport") || /ליגת|ליגה|(^|\s)ל\.\s|כדורגל|כדורסל|יורוליג|NBA|פרמייר|גביע|אולפן ספורט|מונדיאל/.test(t)) return "sport";
-    if (/חדשות|מהדורה|מהדורת|מבזק|יומן|פוליטי/.test(t) || (newsCh(ch) && !NOTNEWS.test(t))) return "news";
+    if (/חדשות|מהדורה|מהדורת|מבזק|יומן(?! מסע)|פוליטי/.test(t) || (newsCh(ch) && !NOTNEWS.test(t))) return "news";
     if (/בוקר|מטבח|שף|אוכל|בישול|בריאות|טיול|(^|\s)עם(\s|\.|$)/.test(t)) return "life";
     if (/תשדיר|קליפ|שידור חוזר|פרסומות|מוזיקה/.test(t)) return "oth";
     return "ent";

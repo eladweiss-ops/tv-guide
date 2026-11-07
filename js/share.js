@@ -169,7 +169,7 @@
     $("#rem").classList.remove("over");
     $("#remBody").innerHTML = '<h2>שיתוף</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
       '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div><p class="shnote" id="shNote" hidden>הקישור מופיע גם בתמונה</p>' +
-      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
+      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button>';
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
     // היסטוריה: #rem רשום ב-nav.js כשכבה. אם החלון כבר פתוח (שיתוף מתוך חלון תזכורת) לא משתנה hidden, ולכן אין רשומה כפולה
@@ -182,7 +182,7 @@
     TVG.rem = null; TVG.LP = null;
     $("#rem").classList.add("over"); // מעל דף התוכן (#nfsheet, אותה שכבה)
     $("#remBody").innerHTML = '<h2>💌 המלצה</h2><p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' + MSG_FIELD +
-      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת קישור</button>';
+      '<button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button>';
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
@@ -241,7 +241,8 @@
     } else fallback();
   }
   function copyLink() {
-    var l = curParts().link, ok = function () { done("🔗 הקישור הועתק"); };
+    // ההודעה המלאה (פרטים, מילה אישית וקישור) – כמו בוואטסאפ. קישור לבד מוצג בוואטסאפ רק עם התמונה הכללית של האתר, בלי פרטי התוכנית
+    var l = textOf(curParts(), false), ok = function () { done("📋 ההודעה הועתקה"); };
     function old() {
       var t = document.createElement("textarea"); t.value = l; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;opacity:0"; document.body.appendChild(t); t.select();
       var good = false; try { good = document.execCommand("copy"); } catch (e) {} t.remove(); if (good) ok(); else TVG.pill("לא הצלחנו להעתיק", 1800);

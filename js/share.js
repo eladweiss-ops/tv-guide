@@ -197,7 +197,7 @@
     $("#rem").classList.remove("over");
     $("#remBody").innerHTML = '<h2>שיתוף</h2>' + msgField(sugTv(r.p)) + '<p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
       '<div class="chips" role="group" aria-label="סוג ההודעה"><button type="button" class="chip" data-shmode="text" aria-pressed="true">טקסט</button><button type="button" class="chip" data-shmode="card" aria-pressed="false">🖼 ככרטיס צבעוני</button></div><p class="shnote" id="shNote" hidden>הקישור מופיע גם בתמונה</p>' +
-      '<div class="folbar shbar"><button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
+      '<div class="folbar shbar"><a class="btn wa" id="shWa" data-shwa href="#" rel="noopener">🟢 שליחה בוואטסאפ</a><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
     // היסטוריה: #rem רשום ב-nav.js כשכבה. אם החלון כבר פתוח (שיתוף מתוך חלון תזכורת) לא משתנה hidden, ולכן אין רשומה כפולה
@@ -210,7 +210,7 @@
     TVG.rem = null; TVG.LP = null;
     $("#rem").classList.add("over"); // מעל דף התוכן (#nfsheet, אותה שכבה)
     $("#remBody").innerHTML = '<h2>💌 המלצה</h2>' + msgField(sugNf(x)) + '<p class="shsub">בערך ככה זה ייראה</p><div id="shPrev"></div>' +
-      '<div class="folbar shbar"><button type="button" class="btn wa" data-shwa>🟢 שליחה בוואטסאפ</button><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
+      '<div class="folbar shbar"><a class="btn wa" id="shWa" data-shwa href="#" rel="noopener">🟢 שליחה בוואטסאפ</a><button type="button" class="ghost shcopy" data-shcopy>העתקת ההודעה</button></div>'; // מוצמד לתחתית החלון: תמיד מתחת לאגודל
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
@@ -237,6 +237,7 @@
     var el = $("#shPrev"); if (!el || !S) return;
     var r = { id: S.id, p: S.p };
     el.innerHTML = bubbleHtml(curParts(), S.mode, S.url);
+    var wa = $("#shWa"); if (wa) wa.href = S.mode === "text" && TVG.isIOS ? TVG.waHref(textOf(curParts(), false)) : "#"; // אייפון: הקשה על קישור אמיתי פותחת את וואטסאפ
     if (S.mode === "text") return;
     if (S.blob) return;
     var cur = S; // הגנה מפני החלפת תוכנית באמצע
@@ -261,9 +262,9 @@
     if (msg.indexOf("📤") === 0) TVG.celebrate && TVG.celebrate("share");
     TVG.pill(msg, 1800);
   }
-  function send() {
+  function send(e) {
     var x = curParts(), text = textOf(x, S.mode === "card");
-    if (S.mode === "text") { openWa(text); done("📤 נשלח לוואטסאפ"); return; }
+    if (S.mode === "text") { if (TVG.isIOS && e && e.currentHref) TVG.waWatch(text); else openWa(text); done("📤 נשלח לוואטסאפ"); return; } // אייפון: הקישור עצמו פותח (ברירת המחדל של הדפדפן)
     if (!S.blob) { TVG.pill("הכרטיס עוד בהכנה, עוד רגע", 1500); return; }
     var file = null; try { file = new File([S.blob], "tv-guide.png", { type: "image/png" }); } catch (e) {}
     var fallback = function () { download(S.blob); openWa(text); if (!$("#rem").hidden) TVG.closeRem(); TVG.pill("התמונה נשמרה במכשיר. צרפו אותה להודעה בוואטסאפ", 5000); };
@@ -287,7 +288,8 @@
     if (!S || !t.closest("#rem")) return;
     if ((b = t.closest("[data-shsug]"))) { e.stopPropagation(); pickSug(+b.getAttribute("data-shsug")); return; }
     if ((b = t.closest("[data-shmode]"))) { e.stopPropagation(); S.mode = b.getAttribute("data-shmode"); syncChips(); paintPrev(); return; }
-    if (t.closest("[data-shwa]")) { e.stopPropagation(); send(); return; }
+    var wb = t.closest("[data-shwa]");
+    if (wb) { e.stopPropagation(); var real = TVG.isIOS && S.mode === "text" && /^whatsapp:/.test(wb.getAttribute("href") || ""); if (!real) e.preventDefault(); send({ currentHref: real }); return; }
     if (t.closest("[data-shcopy]")) { e.stopPropagation(); copyLink(); return; }
   }, true);
 

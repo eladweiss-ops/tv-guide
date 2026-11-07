@@ -43,13 +43,26 @@
   TVG.isIOS = /iPhone|iPad|iPod/.test(UA);
   TVG.isAndroid = !TVG.isIOS && /Android/i.test(UA);
   TVG.isStandalone = !!((window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone);
-  // פתיחת וואטסאפ עם טקסט. אייפון: רק whatsapp:// ישר לאפליקציה – בלי טיימר, בלי wa.me ובלי הודעת "לא נפתח?"
-  // (wa.me מתוך אפליקציית מסך הבית נפתח בדפדפן פנימי ריק או בדף ההורדה; וההודעה המושהית קפצה גם כשוואטסאפ כן נפתח,
-  // כי iOS שואל לפעמים "לפתוח בוואטסאפ?" והדף לא מוסתר בזמן השאלה). אנדרואיד: whatsapp:// ואחרי 1.5 שניות wa.me כגיבוי
-  // אם לא יצאנו מהדף. מחשב: wa.me בחלון חדש
+  // פתיחת וואטסאפ עם טקסט. אייפון: באפליקציית מסך הבית location.href = "whatsapp://…" לא עושה כלום – לכן לחיצה על קישור אמיתי
+  // (<a href>, כמו הכפתור הירוק בחלון השיתוף). wa.me לא: נפתח בדפדפן פנימי בדף ההורדה. אם אחרי 3 שניות לא יצאנו מהאפליקציה:
+  // "לא נפתח? · שיתוף…" → חלון השיתוף של iOS (שם וואטסאפ מופיע). אנדרואיד: whatsapp:// ואחרי 1.5 שניות wa.me. מחשב: wa.me בחלון חדש
+  TVG.waHref = function (text) { return "whatsapp://send?text=" + encodeURIComponent(text); };
+  TVG.waWatch = function (text) { // אייפון: גיבוי אם וואטסאפ לא נפתח
+    var left = false, onHide = function () { if (document.hidden) left = true; }, onBlur = function () { left = true; };
+    document.addEventListener("visibilitychange", onHide); window.addEventListener("blur", onBlur);
+    setTimeout(function () {
+      document.removeEventListener("visibilitychange", onHide); window.removeEventListener("blur", onBlur);
+      if (left || document.hidden || !navigator.share) return;
+      TVG.pill("לא נפתח?", 7000, "שיתוף…", function () { navigator.share({ text: text }).catch(function () {}); });
+    }, 3000);
+  };
   TVG.openWa = function (text) {
     var enc = encodeURIComponent(text), web = "https://wa.me/?text=" + enc;
-    if (TVG.isIOS) { location.href = "whatsapp://send?text=" + enc; return; }
+    if (TVG.isIOS) {
+      var a = document.createElement("a"); a.href = TVG.waHref(text); a.rel = "noopener"; a.style.display = "none";
+      document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 0);
+      TVG.waWatch(text); return;
+    }
     if (TVG.isAndroid) {
       var left = false, onHide = function () { if (document.hidden) left = true; }, onBlur = function () { left = true; };
       document.addEventListener("visibilitychange", onHide); window.addEventListener("blur", onBlur);

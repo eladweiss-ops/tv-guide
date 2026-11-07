@@ -22,7 +22,16 @@ const touch = require("./touch.cjs"); // מגע אמיתי (CDP) לצעדי flui
 
 const OUT = path.resolve(process.argv[2] || "shots");
 const REPO = path.resolve(__dirname, "..", "..");
-const FIXED_NOW = process.env.TVG_NOW || "2026-11-01T20:15:00+02:00"; // inside the range guide.json covers
+// תאריכים יחסיים: כל הבדיקות לפי "היום" של FIXED_NOW (שעון ישראל), לא תאריך קבוע – אחרת הן נשברות כשהלוח מתקדם
+const ilDay = (ms) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jerusalem" }).format(new Date(ms)); // YYYY-MM-DD
+const ilHm = (ms) => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms));
+const addDays = (d, n) => { const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const ilAt = (d, hm) => { for (const off of ["+02:00", "+03:00"]) { const iso = d + "T" + hm + ":00" + off, ms = Date.parse(iso); if (ilDay(ms) === d && ilHm(ms) === hm) return iso; } return d + "T" + hm + ":00+02:00"; };
+const FIXED_NOW = process.env.TVG_NOW || ilAt(ilDay(Date.now()), "20:15"); // ברירת מחדל: היום ב-20:15 (בתוך הלוח)
+const D0 = ilDay(Date.parse(FIXED_NOW)), D1 = addDays(D0, 1), DM1 = addDays(D0, -1);
+const WD_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const dLbl = (d) => { const t = new Date(d + "T12:00:00Z"); return "יום " + WD_HE[t.getUTCDay()] + " " + t.getUTCDate() + "." + (t.getUTCMonth() + 1); }; // "יום שני 2.11"
+const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const SEL = ["208", "199", "3787", "3819", "3547", "334", "3588", "301", "255", "315", "559", "223"]; // seeded tvg.sel
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -204,7 +213,7 @@ function dsFixtureData() {
       const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
       const st = () => page.evaluate(() => { const b = document.getElementById("toNow"), nd = document.querySelector(".nextday"); return { show: !!b && b.classList.contains("show"), txt: b ? b.textContent : "", nd: nd ? nd.textContent : "", day: TVG.day, y: window.scrollY }; });
       await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(700); /* דרך "עכשיו": הקשה על הלשונית הפעילה גוללת לראש */
-      let s = await st(); T(!s.show, "toNow hidden when now-row centered"); T(/^מחר, יום שני 2\.11/.test(s.nd), "nextday label: " + s.nd);
+      let s = await st(); T(!s.show, "toNow hidden when now-row centered"); T(new RegExp("^מחר, " + reEsc(dLbl(D1))).test(s.nd), "nextday label: " + s.nd);
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(400);
       s = await st(); if (s.show) T(s.txt === "↑עכשיו", "arrow up at bottom: " + s.txt); await snap("02b_grid_end");
       await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(400);
@@ -212,36 +221,36 @@ function dsFixtureData() {
       if (s.show) { await page.click("#toNow"); await page.waitForTimeout(900); s = await st(); T(!s.show, "toNow hides after tap"); }
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(300);
       await page.click(".nextday"); await page.waitForTimeout(500);
-      s = await st(); T(s.day === "2026-11-02" && s.y === 0 && s.show && s.txt === "חזרה להיום→", "nextday → 2.11 at top, back-to-today shown: " + JSON.stringify(s)); await snap("02d_grid_nextday");
+      s = await st(); T(s.day === D1 && s.y === 0 && s.show && s.txt === "חזרה להיום→", "nextday → tomorrow at top, back-to-today shown: " + JSON.stringify(s)); await snap("02d_grid_nextday");
     });
     await step("grid_past", async () => { // לוח: ימים שעברו (past/) בפס הימים, טעינה, כותרת "שודר", חזרה להיום
       const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
       await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(900);
       const days = await page.$$eval(".days .day", (a) => a.map((b) => b.getAttribute("data-day") + (b.classList.contains("pastd") ? "p" : "")));
-      T(days.indexOf("2026-10-31p") >= 0 && days.indexOf("2026-11-01") === days.indexOf("2026-10-31p") + 1, "past days before today: " + days.join(","));
-      await page.click('.day[data-day="2026-10-31"]'); await page.waitForSelector(".pastlbl"); await page.waitForTimeout(1200);
+      T(days.indexOf(DM1 + "p") >= 0 && days.indexOf(D0) === days.indexOf(DM1 + "p") + 1, "past days before today: " + days.join(","));
+      await page.click('.day[data-day="' + DM1 + '"]'); await page.waitForSelector(".pastlbl"); await page.waitForTimeout(1200);
       const s = await page.evaluate(() => ({ lbl: document.querySelector(".pastlbl").textContent, rows: document.querySelectorAll("#main .list .row[data-pts]").length, dim: document.querySelectorAll("#main .row.past").length, btn: document.getElementById("toNow").textContent, show: document.getElementById("toNow").classList.contains("show") }));
-      T(s.lbl === "שודר ביום שבת 31.10" && s.rows > 5 && s.dim === 0 && s.show && s.btn === "חזרה להיום←", "past day view: " + JSON.stringify(s));
+      T(s.lbl === "שודר ב" + dLbl(DM1) && s.rows > 5 && s.dim === 0 && s.show && s.btn === "חזרה להיום←", "past day view: " + JSON.stringify(s));
       await snap("02e_grid_past");
       await page.click("#toNow"); await page.waitForTimeout(600);
       const b = await page.evaluate(() => ({ day: TVG.day, now: !!document.querySelector("#main .row.now"), show: document.getElementById("toNow").classList.contains("show") }));
-      T(b.day === "2026-11-01" && b.now && !b.show, "back to today: " + JSON.stringify(b));
+      T(b.day === D0 && b.now && !b.show, "back to today: " + JSON.stringify(b));
     });
     await step("grid_midnight", async () => { // אחרי חצות: מה שמשודר עכשיו התחיל אתמול - הלוח נפתח על אתמול, וכפתור "עכשיו" מיום אחר מחזיר אליו
       const T = (c, m) => { if (!c) throw new Error("assert: " + m); };
-      await page.clock.setFixedTime(new Date("2026-11-02T00:05:00+02:00"));
+      await page.clock.setFixedTime(new Date(ilAt(D1, "00:05")));
       try {
         await fresh(); await page.click('[data-tab="now"]'); await page.waitForTimeout(400); await page.click('[data-tab="grid"]'); await page.waitForTimeout(900);
         const st = () => page.evaluate(() => { const b = document.getElementById("toNow"), nd = document.querySelector(".nextday"); return { day: TVG.day, now: !!document.querySelector("#main .row.now"), lbl: !!document.querySelector(".pastlbl"), nd: nd ? nd.textContent : "", show: b.classList.contains("show"), txt: b.textContent }; });
-        let s = await st(); T(s.day === "2026-11-01" && s.now && !s.lbl && /^היום, יום שני 2\.11/.test(s.nd), "opens on yesterday with now-row: " + JSON.stringify(s));
+        let s = await st(); T(s.day === D0 && s.now && !s.lbl && new RegExp("^היום, " + reEsc(dLbl(D1))).test(s.nd), "opens on yesterday with now-row: " + JSON.stringify(s));
         await snap("02f_grid_midnight");
-        await page.click('.day[data-day="2026-11-02"]'); await page.waitForTimeout(500);
-        s = await st(); T(s.day === "2026-11-02", "tapping today after midnight stays on today (no bounce back): " + JSON.stringify(s));
-        await page.click('.day[data-day="2026-11-01"]'); await page.waitForTimeout(500);
+        await page.click('.day[data-day="' + D1 + '"]'); await page.waitForTimeout(500);
+        s = await st(); T(s.day === D1, "tapping today after midnight stays on today (no bounce back): " + JSON.stringify(s));
+        await page.click('.day[data-day="' + D0 + '"]'); await page.waitForTimeout(500);
         await page.click(".nextday"); await page.waitForTimeout(500);
-        s = await st(); T(s.day === "2026-11-02" && s.show && s.txt === "→עכשיו", "today shows '→עכשיו': " + JSON.stringify(s));
+        s = await st(); T(s.day === D1 && s.show && s.txt === "→עכשיו", "today shows '→עכשיו': " + JSON.stringify(s));
         await page.click("#toNow"); await page.waitForTimeout(600);
-        s = await st(); T(s.day === "2026-11-01" && s.now && !s.show, "back to now: " + JSON.stringify(s));
+        s = await st(); T(s.day === D0 && s.now && !s.show, "back to now: " + JSON.stringify(s));
       } finally { await page.clock.setFixedTime(new Date(FIXED_NOW)); }
     });
     await step("synopsis", async () => {
@@ -423,7 +432,7 @@ function dsFixtureData() {
       const sh = await page.textContent("#nfsheet");
       dsChk(sh.indexOf("זמין בדיסני+") >= 0 && sh.indexOf("זמין בנטפליקס") < 0, "availability says Disney+ only");
       dsChk(await page.evaluate(() => { const a = document.querySelector("#nfsBar .nfgo"); return !!a && /^▶ פתח בדיסני\+$/.test(a.textContent.trim()) && /^https:\/\/www\.disneyplus\.com\//.test(a.href) && a.classList.contains("btn"); }), "primary orange button: ▶ פתח בדיסני+");
-      dsChk(sh.indexOf("⏰ להזכיר לי לצפות") >= 0 && sh.indexOf("🔔 תודיע לי") >= 0, "watch reminder + alerts exist");
+      dsChk(sh.indexOf("⏰ להזכיר לי לצפות") >= 0 && sh.indexOf("🔔 תודיע לי") < 0, "watch reminder; no alerts for content already on Disney+ (1.77)");
       dsChk(sh.indexOf("כשזה מגיע לנטפליקס") < 0, "no 'arrives on Netflix' chip on a Disney+ page");
       dsChk(await page.evaluate(() => !!document.querySelector("[data-ptynf]")), "party button exists");
       await snap("53_ds_page");
@@ -726,7 +735,7 @@ function dsFixtureData() {
       await page.goto(base + "index.html?nf=m1", { waitUntil: "networkidle" }); await page.waitForTimeout(800); A(!(await shown("#nfsheet")), "unknown key does not open"); A(/לא מצאנו/.test(await page.textContent("#pill")), "friendly toast");
     });
     await nfsStep("nfs-open-from-rem", async () => { // H: הקשה על תזכורת צפייה (?rem=nf|...) פותחת את דף התוכן עם ▶ פתח בנטפליקס, לא את חלון הנודניק
-      await fresh(); const ts = new Date("2026-11-01T21:00:00+02:00").getTime(), k = "nf|m299534|" + ts;
+      await fresh(); const ts = new Date(ilAt(D0, "21:00")).getTime(), k = "nf|m299534|" + ts;
       await page.evaluate(([k, ts]) => { localStorage.setItem("tvg.rem", JSON.stringify([{ k, id: "", ts, end: ts + 7200000, title: "הנוקמים: סוף המשחק", ch: "נטפליקס", desc: "", lead: 0, at: 1, nx: { t: "הנוקמים: סוף המשחק", ty: "movie", p: "", l: "https://www.netflix.com/search?q=Avengers%3A%20Endgame" } }])); localStorage.setItem("tvg.calTok", "qa0123456789abcdefghijklmn"); }, [k, ts]);
       await page.goto(base + "index.html?rem=" + encodeURIComponent(k), { waitUntil: "networkidle" }); await page.waitForTimeout(1500);
       A(await shown("#nfsheet"), "?rem=nf|… opens the content page"); A(!(await shown("#snzRoot")), "not the broadcast snooze sheet"); A(!/[?&]rem=/.test(page.url()), "url cleaned");
@@ -1444,7 +1453,7 @@ function dsFixtureData() {
 
     // ---- 🍿 ערב צפייה (js/party.js): שרת /api/party מדומה (page.route), בלי קריאות חיות. רץ בקבוצת nfs. TVG_SKIP=pty מדלג ----
     {
-      const NOWMS = Date.parse(FIXED_NOW), PID = "PartyIdAAAAAAAAAAAAAAA", AT_SUN = Date.parse("2026-11-01T21:00:00+02:00");
+      const NOWMS = Date.parse(FIXED_NOW), PID = "PartyIdAAAAAAAAAAAAAAA", AT_SUN = Date.parse(ilAt(D0, "21:00"));
       let P = null;
       const ptyReset = (o) => { P = Object.assign({ at: AT_SUN, kind: "nf", title: "הסדרה הגדולה", ch: "נטפליקס", img: "https://image.tmdb.org/t/p/w342/fx_t88001.jpg", link: "https://www.netflix.com/search?q=Big", place: "home", host: "אלעד",
         rs: [{ name: "דנה", ans: "yes" }, { name: "יוסי", ans: "yes" }, { name: "רון", ans: "maybe" }], mine: null, cancelled: false, go: 0, goOff: 1200, calls: [], subs: false, list: [], unknown: false }, o || {}); };

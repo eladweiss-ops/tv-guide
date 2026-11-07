@@ -14,7 +14,7 @@ const T = require("./touch.cjs");
 const OUT = path.resolve(process.argv[2] || "fluid");
 const ONLY = (process.argv[3] || process.env.TVG_ONLY || "").split(",").filter(Boolean);
 const REPO = path.resolve(__dirname, "..", "..");
-const FIXED_NOW = process.env.TVG_NOW || "2026-11-01T20:15:00+02:00";
+const FIXED_NOW = process.env.TVG_NOW || (new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jerusalem" }).format(new Date()) + "T20:15:00" + (/GMT+3/.test(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Jerusalem", timeZoneName: "short" }).format(new Date())) ? "+03:00" : "+02:00")); // היום ב-20:15 (שעון ישראל)
 const SEL = ["208", "199", "3787", "3819", "3547", "334", "3588", "301", "255", "315", "559", "223"];
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const androidUA = (m) => "Mozilla/5.0 (Linux; Android 14; " + m + ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";

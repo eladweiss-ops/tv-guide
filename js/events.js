@@ -77,6 +77,8 @@
     if (t.closest("[data-tnmore]")) { TVG.tnOpen = true; TVG.render(); return; } // 🌙 הערב שלך: שאר השורות
     if (t.closest("[data-tnx]")) { TVG.store("tvg.tnHint", dstr(new Date())); TVG.render(); return; } // הרמז נעלם עד מחר
     if (t.closest("[data-tnfav]")) { TVG.openFavs(); return; }
+    var mx = t.closest("[data-missx]"); if (mx) { var mk = mx.getAttribute("data-missx"); TVG.missX(mk, true); TVG.render(); TVG.pill("הוסר מהרשימה", 3000, "ביטול", function () { TVG.missX(mk, false); TVG.render(); }); return; } // 😅 פספסת?: הסרה, עם ביטול
+    if (t.closest("[data-missmore]")) { TVG.missOpen = true; TVG.render(); return; } // 😅 פספסת?: שאר השורות
     if (t.closest("[data-favadd]")) { TVG.favPick = true; TVG.startSearch("", false); return; }
     var fp = t.closest("[data-favpick]");
     if (fp) { var ft2 = fp.getAttribute("data-favpick"); FAV.add(ft2); TVG.saveFav(); TVG.updFav(); TVG.favPick = false; TVG.setSearch(false); TVG.openFavs(); TVG.pill("★ " + ft2 + " נוסף למועדפים", 1800); return; }

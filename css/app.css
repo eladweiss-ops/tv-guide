@@ -823,3 +823,21 @@
   .tnwhy { white-space: nowrap; }
 
   .tonight .tnmore { display: block; margin: 2px auto 0; }
+
+  /* 😅 פספסת? (render-rems.js missHtml): תזכורות ששודרו ב-3 הימים האחרונים, עם השידור החוזר הקרוב. משטח אחד כמו "🌙 הערב שלך", שורות מופרדות בקו דק */
+  .miss { margin: 18px 0 8px; padding: 12px 8px 4px; border-radius: 26px; background: var(--surface); }
+  .miss .sech { margin: 0; padding: 0 10px 2px; }
+  .misslist .srow.missrow { flex-wrap: nowrap; background: transparent; border: 0; border-radius: 0; padding: 0 2px; gap: 2px; }
+  .misslist .srow.missrow > .go { flex: 1 1 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px; min-height: 56px; color: inherit; font: inherit; }
+  .misslist .srow.missrow > .go + * { margin-inline-start: 0; }
+  .misslist .srow.missrow + .srow.missrow, .missrest > .srow.missrow:first-child { border-top: .5px solid var(--line); }
+  .missrow .ttl { line-height: 1.35; }
+  .missrow .sub, .missrow .mnext { display: flex; gap: .3em; max-width: 100%; white-space: nowrap; font-size: .88rem; line-height: 1.35; }
+  .missrow .sub > span, .missrow .mnext > span { flex: none; }
+  .missrow .sub > bdi, .missrow .mnext > bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* שורה אחת: רק שם ערוץ ארוך במיוחד נחתך ב-… */
+  .missrow .mnext { color: var(--ink); font-weight: 600; }
+  .missrow .mnext.none { color: var(--muted); font-weight: 400; }
+  .missrow .rbts { flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 0; } /* ✕ למעלה ו-⏰ מתחתיו: יותר רוחב לטקסט */
+  .missrow .rbts .missx { order: -1; }
+  .missx { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 1rem; }
+  .miss .missmore { display: block; margin: 0 auto; }

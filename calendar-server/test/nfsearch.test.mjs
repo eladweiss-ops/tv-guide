@@ -17,7 +17,7 @@ function mockRes() {
   r.setHeader = (k, v) => { r.headers[k.toLowerCase()] = v; return r; };
   r.status = (c) => { r.code = c; return r; };
   r.json = (o) => { r.body = o; return r; };
-  r.end = () => r;
+  r.end = (b) => { if (b !== undefined) r.body = b; return r; };
   return r;
 }
 
@@ -253,13 +253,54 @@ test("כינוי בעברית: נלמד רק כשהחיפוש באנגלית ב�
   assert.deepEqual(after.json.titles, ["t336240"], "אחרי: נמצא");
   assert.equal(after.json.q, "חילופי בתים", "השאילתה המקורית בתשובה");
   assert.equal(after.json.alias, "A Couple of Lies", "מסומן כינוי (ל'לא נכון?')");
-  // אישור שגוי (k שלא נמצא בחיפוש) לא דורס
-  assert.equal((await handleAlias({ q: "חילופי בתים", t: "Something Else", k: "t1" }, d)).status, 422);
+  // הראשון שאושר קובע: t אחר → 409 בלי לדרוס; אותו t (אותיות אחרות) → 200
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "Something Else", k: "t1" }, d)).status, 409);
   assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
-  // "לא נכון?": מחיקה, ואז חיפוש בעברית שוב ריק
-  assert.equal((await handleAlias({ q: "חילופי בתים", del: 1 }, d)).json.deleted, true);
+  const same = await handleAlias({ q: "חילופי בתים", t: "a couple of lies", k: "t336240" }, d);
+  assert.equal(same.status, 200); assert.equal(same.json.exists, true);
+  assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
+  // "לא נכון?": בלי t → 400; t שלא תואם לשמור → 409 (לא נמחק); t תואם (בלי תלות באותיות) → נמחק
+  assert.equal((await handleAlias({ q: "חילופי בתים", del: 1 }, d)).status, 400);
+  assert.equal((await handleAlias({ q: "חילופי בתים", del: 1, t: "Something Else" }, d)).status, 409);
+  assert.ok(store[aliasPath("חילופי בתים")]);
+  assert.equal((await handleAlias({ q: "חילופי בתים", del: 1, t: "A COUPLE OF LIES" }, d)).json.deleted, true);
   assert.ok(!store[aliasPath("חילופי בתים")]);
   assert.equal((await handleSearch("חילופי בתים", d)).json.titles.length, 0);
+  const again = await handleAlias({ q: "חילופי בתים", del: 1, t: "A Couple of Lies" }, d);
+  assert.equal(again.status, 200); assert.equal(again.json.deleted, false, "כבר נמחק: בלי שגיאה");
+  // אחרי מחיקה אפשר ללמד כינוי חדש
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "A Couple of Lies", k: "t336240" }, d)).status, 200);
+});
+
+test("כינוי: רק לשאילתה שלא מוצאת כלום בעצמה (409), ותוצאה חלקית = 503", async () => {
+  const { handleAlias, aliasPath } = await import("../api/nf-search.js");
+  const hit = { media_type: "tv", id: 336240, name: "A Couple of Lies", original_name: "Bytet", first_air_date: "2026-10-30", overview: "x" };
+  const fx = tmdb({ "/search/multi": (u) => (["A Couple of Lies", "הנוקמים"].includes(u.searchParams.get("query")) ? { results: [hit] } : { results: [] }) });
+  const store = {};
+  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = o; }, delJson: async (p) => { delete store[p]; }, now: () => 5 };
+  const r = await handleAlias({ q: "הנוקמים", t: "A Couple of Lies", k: "t336240" }, d);
+  assert.equal(r.status, 409); assert.equal(r.json.error, "query has results");
+  assert.ok(!store[aliasPath("הנוקמים")]);
+  // ויקינתונים נופל → החיפוש בעברית חלקי → לא בטוח שאין תוצאות: 503 ולא נשמר
+  const fx2 = wiki(fx, { down: true });
+  const r2 = await handleAlias({ q: "חילופי בתים", t: "A Couple of Lies", k: "t336240" }, { ...d, fetch: fx2 });
+  assert.equal(r2.status, 503);
+  assert.ok(!store[aliasPath("חילופי בתים")]);
+});
+
+test("כינוי בזיכרון: 'אין כינוי' 60 שניות, כינוי שנמצא 2 דקות", async () => {
+  const { aliasPath } = await import("../api/nf-search.js");
+  const fx = tmdb({ "/search/multi": (u) => (u.searchParams.get("query") === "A Couple of Lies" ? { results: [{ media_type: "tv", id: 336240, name: "A Couple of Lies", first_air_date: "2026-10-30" }] } : { results: [] }) });
+  const store = {};
+  let t = 1_000_000;
+  const d = { fetch: wiki(fx, {}), readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async () => {}, now: () => t };
+  assert.equal((await handleSearch("חילופי בתים", d)).json.alias, undefined);
+  store[aliasPath("חילופי בתים")] = { t: "A Couple of Lies" }; // נלמד ב-instance אחר
+  t += 59_000; assert.equal((await handleSearch("חילופי בתים", d)).json.alias, undefined, "עדיין במטמון 'אין'");
+  t += 2_000; assert.equal((await handleSearch("חילופי בתים", d)).json.alias, "A Couple of Lies", "אחרי 60 שניות");
+  delete store[aliasPath("חילופי בתים")]; // נמחק ב-instance אחר
+  t += 119_000; assert.equal((await handleSearch("חילופי בתים", d)).json.alias, "A Couple of Lies", "כינוי נשמר עד 2 דקות");
+  t += 2_000; assert.equal((await handleSearch("חילופי בתים", d)).json.alias, undefined, "אחרי 2 דקות");
 });
 
 test("POST /api/nf-search: קצב 5 בשעה ל-IP", async () => {
@@ -357,4 +398,122 @@ test("ויקינתונים: לא נקרא לשאילתה בלי עברית, כש
   const fx3 = wiki(tmdb(), {});
   await handleSearch("חילופי בתים", { fetch: fx3, readJson: async (p, dflt) => (p === aliasPath("חילופי בתים") ? { t: "A Couple of Lies" } : dflt), writeJson: async () => {}, now: () => 1 });
   assert.equal(fx3.wcalls.length, 0, "כינוי קודם");
+});
+
+test("ויקינתונים: 'מתחיל ב...' רק בגבול מילה ('הבית' לא תואם ל'הביתה'), ו-User-Agent עם כתובת יצירת קשר", async () => {
+  const tm = tmdb({ "/tv/11": { id: 11, name: "Home", first_air_date: "2020-01-01" }, "/tv/12": { id: 12, name: "Our Home", first_air_date: "2021-01-01" } });
+  const fx = wiki(tm, {
+    search: [{ id: "Q11", label: "הביתה" }, { id: "Q12", label: "הבית שלנו" }],
+    entities: { Q11: ent("הביתה", { P4983: claim(11) }), Q12: ent("הבית שלנו", { P4983: claim(12) }) },
+  });
+  const out = await searchNf("הבית", { fetch: fx });
+  assert.deepEqual(out.titles, ["t12"]);
+  assert.ok(!fx.calls.some((c) => c.path === "/tv/11"), "הביתה נדחה");
+  assert.match(fx.wcalls[0].init.headers["user-agent"], /^tv-guide-cal\/1\.0 \(https:\/\/eladweiss-ops\.github\.io\/tv-guide\/; personal TV guide\)$/);
+});
+
+test("ויקינתונים: תקציב זמן משותף לשתי הקריאות; חריגה = failed (partial)", async () => {
+  const { wikiKeys } = await import("../api/_nfs.js");
+  const slow = async (url, init) => {
+    const u = new URL(url), a = u.searchParams.get("action");
+    if (a === "wbsearchentities") { await new Promise((r) => setTimeout(r, 40)); return jr({ search: [{ id: "Q1", label: "x" }] }); }
+    return new Promise((res, rej) => { init.signal.addEventListener("abort", () => rej(new Error("aborted"))); }); // נתקע עד שהתקציב נגמר
+  };
+  const t0 = Date.now();
+  const r = await wikiKeys("חילופי בתים", { fetch: slow, wikiBudget: 100 });
+  const took = Date.now() - t0;
+  assert.equal(r.failed, true);
+  assert.ok(took < 400, "נעצר בתוך התקציב (" + took + "ms)");
+});
+
+// ---- /n/<k>: תצוגה מקדימה בוואטסאפ ----
+const { handleOg, ogHtml } = await import("../api/nf-search.js");
+const metaOf = (html, p) => { const m = html.match(new RegExp('<meta (?:property|name)="' + p + '" content="([^"]*)">')); return m ? m[1] : null; };
+const longHe = "שני זוגות מחליפים בתים לחופשה אחת, ומגלים שכל אחד מהם מסתיר משהו מהשני. מה שהתחיל כהרפתקה קטנה ומשעשעת הופך לאט לאט למסע חשיפה של סודות, שקרים ואהבות ישנות שלא נגמרו באמת.";
+
+test("og: k תקין → כותרת בעברית, תקציר מקוצר, תמונת רקע w780 עם מידות, הפניה מיידית לאפליקציה, ומטמון זיכרון + Firestore", async () => {
+  const fx = tmdb({ "/tv/336240": (u) => (u.searchParams.get("language") === "he-IL"
+    ? { id: 336240, name: "חילופי בתים", original_name: "Bytet", overview: longHe, backdrop_path: "/bd12345.jpg", poster_path: "/abcde12345.jpg" }
+    : { id: 336240, name: "A Couple of Lies", original_name: "Bytet", overview: "Two couples swap homes" }) });
+  const store = {};
+  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, now: () => 3_000_000 };
+  const r = await handleOg("t336240", "", d);
+  assert.equal(r.status, 200); assert.equal(r.generic, false); assert.equal(r.cache, "miss");
+  const h = r.html;
+  assert.match(h, /^<!doctype html>\n<html lang="he" dir="rtl">/);
+  assert.equal(metaOf(h, "og:title"), "חילופי בתים · סדרה בנטפליקס");
+  const desc = metaOf(h, "og:description");
+  assert.ok(desc.length <= 151 && desc.endsWith("…") && longHe.startsWith(desc.slice(0, -1)), desc);
+  assert.equal(metaOf(h, "og:image"), "https://image.tmdb.org/t/p/w780/bd12345.jpg");
+  assert.equal(metaOf(h, "og:image:width"), "780"); assert.equal(metaOf(h, "og:image:height"), "439");
+  assert.equal(metaOf(h, "og:type"), "website");
+  assert.equal(metaOf(h, "og:url"), "https://tv-guide-cal.vercel.app/n/t336240");
+  assert.equal(metaOf(h, "twitter:card"), "summary_large_image");
+  assert.ok(h.includes('<meta http-equiv="refresh" content="0;url=https://eladweiss-ops.github.io/tv-guide/?nf=t336240">'));
+  assert.ok(h.includes('location.replace("https://eladweiss-ops.github.io/tv-guide/?nf=t336240")'));
+  assert.ok(store["cache/og/t336240.json"], "נכתב ל-Firestore");
+  const n = fx.calls.length;
+  assert.equal((await handleOg("t336240", "", d)).cache, "mem"); assert.equal(fx.calls.length, n);
+  _clearCache();
+  const fromDb = await handleOg("t336240", "d", d);
+  assert.equal(fromDb.cache, "db"); assert.equal(fx.calls.length, n);
+  // דיסני+: אותו מטמון, תווית והפניה עם s=d
+  assert.equal(metaOf(fromDb.html, "og:title"), "חילופי בתים · סדרה בדיסני+");
+  assert.ok(fromDb.html.includes("?nf=t336240&amp;s=d"));
+  assert.equal(metaOf(fromDb.html, "og:url"), "https://tv-guide-cal.vercel.app/n/t336240?s=d");
+  // אחרי 24 שעות: שוב TMDB
+  assert.equal((await handleOg("t336240", "", { ...d, now: () => 3_000_000 + 24 * 3600 * 1000 + 1 })).cache, "miss");
+});
+
+test("og: סרט בלי עברית ובלי רקע → שם באנגלית, פוסטר w500, 'סרט בנטפליקס'", async () => {
+  const fx = tmdb({ "/movie/238": (u) => (u.searchParams.get("language") === "he-IL"
+    ? { id: 238, title: "", original_title: "The Godfather", overview: "", poster_path: "/abcde12345.jpg" }
+    : { id: 238, title: "The Godfather", original_title: "The Godfather", overview: "Spanning the years 1945 to 1955." }) });
+  const r = await handleOg("m238", "", { fetch: fx, readJson: async () => null, writeJson: async () => {} });
+  assert.equal(metaOf(r.html, "og:title"), "The Godfather · סרט בנטפליקס");
+  assert.equal(metaOf(r.html, "og:description"), "Spanning the years 1945 to 1955.");
+  assert.equal(metaOf(r.html, "og:image"), "https://image.tmdb.org/t/p/w500/abcde12345.jpg");
+  assert.equal(metaOf(r.html, "og:image:width"), "500"); assert.equal(metaOf(r.html, "og:image:height"), "750");
+});
+
+test("og: TMDB לא זמין → דף כללי (זפזופ, og-join.png) עם ההפניה, לא נשמר ל-Firestore", async () => {
+  const store = {};
+  const r = await handleOg("m603", "", { fetch: async () => jr({}, 500), readJson: async () => null, writeJson: async (p, o) => { store[p] = o; } });
+  assert.equal(r.status, 200); assert.equal(r.generic, true);
+  assert.equal(metaOf(r.html, "og:title"), "זפזופ · המלצה בנטפליקס");
+  assert.equal(metaOf(r.html, "og:image"), "https://eladweiss-ops.github.io/tv-guide/og-join.png");
+  assert.equal(metaOf(r.html, "og:image:width"), null);
+  assert.ok(r.html.includes('location.replace("https://eladweiss-ops.github.io/tv-guide/?nf=m603")'));
+  assert.deepEqual(store, {});
+  // id לא תואם בתשובה = כמו כשל
+  const r2 = await handleOg("m604", "", { fetch: async () => jr({ id: 1, title: "Other" }), readJson: async () => null, writeJson: async () => {} });
+  assert.equal(r2.generic, true);
+});
+
+test("og: escaping של כל מה שמגיע מ-TMDB", () => {
+  const h = ogHtml("m1", false, { type: "movie", title: '<script>alert("x")</script> & \'q\'', desc: '"><img src=x onerror=alert(1)>', image: "https://image.tmdb.org/t/p/w780/abcde.jpg", w: 780, h: 439 });
+  assert.equal((h.match(/<script/g) || []).length, 1, "רק סקריפט ההפניה");
+  assert.ok(!h.includes("<img src=x"));
+  assert.ok(h.includes("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;q&#39;"));
+  assert.ok(h.includes("&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"));
+});
+
+test("og handler: k לא תקין → 400; תקין → text/html עם max-age=3600; כללי → max-age=300; קצב 60 לדקה", async () => {
+  for (const og of ["x1", "m", "t1234567890", "m1<script>", "../m1"]) {
+    const r = mockRes(); await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.7" }, query: { og } }, r);
+    assert.equal(r.code, 400, og); assert.equal(r.headers["cache-control"], "no-store");
+  }
+  const saved = globalThis.fetch;
+  try {
+    globalThis.fetch = tmdb({ "/movie/603": { id: 603, title: "מטריקס", overview: "ניאו", backdrop_path: "/bd12345.jpg" } });
+    let r = mockRes(); await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.8" }, query: { og: "m603", s: "d" } }, r);
+    assert.equal(r.code, 200); assert.equal(r.headers["content-type"], "text/html; charset=utf-8"); assert.equal(r.headers["cache-control"], "public, max-age=3600");
+    assert.equal(metaOf(r.body, "og:title"), "מטריקס · סרט בדיסני+");
+    globalThis.fetch = async () => jr({}, 500);
+    r = mockRes(); await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.8" }, query: { og: "t5" } }, r);
+    assert.equal(r.code, 200); assert.equal(r.headers["cache-control"], "public, max-age=300");
+    for (let i = 0; i < 58; i++) await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.8" }, query: { og: "t5" } }, mockRes());
+    r = mockRes(); await nfh({ method: "GET", headers: { "x-real-ip": "7.7.7.8" }, query: { og: "t5" } }, r);
+    assert.equal(r.code, 429);
+  } finally { globalThis.fetch = saved; }
 });

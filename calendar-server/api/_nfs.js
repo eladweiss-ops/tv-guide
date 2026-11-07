@@ -20,6 +20,12 @@ export const norm = (s) => {
   try { t = t.normalize("NFD"); } catch (e) {}
   return t.replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9֐-׿]+/g, "");
 };
+// כמו norm אבל רווח בודד בין מילים: להשוואת "מתחיל ב..." רק בגבול מילה ("הבית" לא תואם ל"הביתה")
+export const normWords = (s) => {
+  let t = String(s || "").toLowerCase();
+  try { t = t.normalize("NFD"); } catch (e) {}
+  return t.replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9֐-׿]+/g, " ").trim();
+};
 
 export function cleanQuery(q) {
   if (typeof q !== "string") return "";
@@ -201,14 +207,18 @@ export async function searchNf(q0, d = {}) {
 }
 
 // ---- ויקינתונים: שם בעברית → מזהה TMDB (P4983 סדרה, P4947 סרט) ----
-// מחזיר {hits:[{type,id,label}], failed}. מתקבלת רק ישות שהתווית/כינוי שלה בעברית זהה לשאילתה (אחרי norm), או מתחיל בה כשאין זהה.
+// מחזיר {hits:[{type,id,label}], failed}. מתקבלת רק ישות שהתווית/כינוי שלה בעברית זהה לשאילתה (אחרי norm), או מתחילה בה בגבול מילה כשאין זהה.
+// תקציב זמן משותף לשתי הקריאות: WIKI_BUDGET (3 שניות); חריגה = failed (partial).
 export const WIKI_API = "https://www.wikidata.org/w/api.php";
 export const WIKI_MAX = 3;
-const WIKI_UA = "tv-guide-cal/1.0 (personal TV guide)";
-async function wget(params, d) {
+export const WIKI_BUDGET = 3000;
+export const WIKI_UA = "tv-guide-cal/1.0 (https://eladweiss-ops.github.io/tv-guide/; personal TV guide)"; // מדיניות ויקימדיה: UA עם דרך יצירת קשר
+async function wget(params, d, end) {
+  const left = end - Date.now();
+  if (left <= 0) throw new Error("wikidata budget");
   const u = new URL(WIKI_API);
   for (const [k, v] of Object.entries({ ...params, format: "json" })) u.searchParams.set(k, String(v));
-  const r = await (d.fetch || fetch)(u.toString(), { headers: { "user-agent": WIKI_UA, accept: "application/json" }, signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined });
+  const r = await (d.fetch || fetch)(u.toString(), { headers: { "user-agent": WIKI_UA, accept: "application/json" }, signal: AbortSignal.timeout ? AbortSignal.timeout(left) : undefined });
   if (!r.ok) { const e = new Error("wikidata " + r.status); e.status = r.status; throw e; }
   return await r.json();
 }
@@ -216,13 +226,14 @@ const claimIds = (cl, p) => (Array.isArray(cl && cl[p]) ? cl[p] : [])
   .map((c) => c && c.mainsnak && c.mainsnak.datavalue && c.mainsnak.datavalue.value)
   .filter((v) => typeof v === "string" && /^[0-9]{1,9}$/.test(v)).map(Number);
 export async function wikiKeys(q, d = {}) {
-  const nq = norm(q);
+  const nq = norm(q), wq = normWords(q);
   if (nq.length < 2) return { hits: [], failed: false };
+  const end = Date.now() + (d.wikiBudget || WIKI_BUDGET);
   try {
-    const s = await wget({ action: "wbsearchentities", search: q, language: "he", uselang: "he", type: "item", limit: 5 }, d);
+    const s = await wget({ action: "wbsearchentities", search: q, language: "he", uselang: "he", type: "item", limit: 5 }, d, end);
     const res = (s && Array.isArray(s.search) ? s.search : []).filter((r) => r && typeof r.id === "string" && /^Q[0-9]{1,12}$/.test(r.id));
     if (!res.length) return { hits: [], failed: false };
-    const g = await wget({ action: "wbgetentities", ids: res.map((r) => r.id).join("|"), props: "claims|labels|aliases", languages: "en|he" }, d);
+    const g = await wget({ action: "wbgetentities", ids: res.map((r) => r.id).join("|"), props: "claims|labels|aliases", languages: "en|he" }, d, end);
     const ents = (g && g.entities) || {};
     const cands = [];
     res.forEach((r, i) => {
@@ -231,7 +242,7 @@ export async function wikiKeys(q, d = {}) {
       const names = [he, ...((e.aliases && Array.isArray(e.aliases.he)) ? e.aliases.he.map((a) => a && a.value) : [])];
       if (r.match && r.match.language === "he" && typeof r.match.text === "string") names.push(r.match.text);
       const ok = names.filter((x) => typeof x === "string" && x);
-      const hit = ok.find((x) => norm(x) === nq) || ok.find((x) => norm(x).startsWith(nq));
+      const hit = ok.find((x) => norm(x) === nq) || ok.find((x) => normWords(x).startsWith(wq + " "));
       if (!hit) return;
       const rank = norm(hit) === nq ? 0 : 1;
       const label = hit.replace(/[\u0000-\u001f\u007f]/g, " ").trim();

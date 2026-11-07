@@ -376,13 +376,13 @@ test("snooze: מגבלת קצב לטוקן אחרי אימות (429)", async () 
 test("vercel.json: Referrer-Policy ו-nosniff על /api ועל /cal, וה-CORS נשמר", () => {
   const v = JSON.parse(file("../vercel.json"));
   const by = (src) => Object.fromEntries(v.headers.find((h) => h.source === src).headers.map((h) => [h.key, h.value]));
-  for (const src of ["/api/(.*)", "/cal/(.*)"]) {
+  for (const src of ["/api/(.*)", "/cal/(.*)", "/n/(.*)"]) {
     const h = by(src);
     assert.equal(h["Referrer-Policy"], "no-referrer");
     assert.equal(h["X-Content-Type-Options"], "nosniff");
   }
   assert.equal(by("/api/(.*)")["Access-Control-Allow-Origin"], "*");
-  assert.deepEqual(v.rewrites, [{ source: "/cal/:t.ics", destination: "/api/cal?t=:t" }]);
+  assert.deepEqual(v.rewrites, [{ source: "/cal/:t.ics", destination: "/api/cal?t=:t" }, { source: "/n/:k", destination: "/api/nf-search?og=:k" }]);
 });
 
 // ---------- מצב אימות JWT בלוג ----------

@@ -21,7 +21,8 @@ New-Item -ItemType Directory -Force $tmp | Out-Null
 $tar = Join-Path $env:TEMP ("tvg-deploy-" + $sha + ".tar")
 git -C $repo archive --format=tar -o $tar origin/main   # whole tree: some server tests also check js/ and manifest
 if ($LASTEXITCODE -ne 0) { Fail "git archive" }
-tar -xf $tar -C $tmp
+$tarExe = Join-Path $env:SystemRoot "System32	ar.exe"; if (-not (Test-Path $tarExe)) { $tarExe = "tar" }  # tar של Windows: מתוך Git Bash (פקודת !) ה-tar של GNU מפרש את "C:" כשרת מרוחק
+& $tarExe -xf $tar -C $tmp
 Remove-Item -Force $tar
 $srv = Join-Path $tmp "calendar-server"
 Set-Location $srv

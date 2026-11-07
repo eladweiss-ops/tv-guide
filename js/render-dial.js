@@ -102,7 +102,7 @@
       return { p: p, a: Math.max(0, (p.s - d0) / 60000), b: Math.min(1440, (p.e - d0) / 60000) };
     });
     TVG.D = { segs: segs, d0: d0 };
-    TVG.TN = []; if (TVG.day === dstr(now)) h = tonightHtml(now) + h; // 🌙 הערב שלך: בראש המסך, רק כשמוצג היום
+    TVG.TN = []; if (TVG.day === dstr(now)) h = tonightHtml(now) + (TVG.teamHtml ? TVG.teamHtml(now) : "") + h; // 🌙 הערב שלך: בראש המסך, רק כשמוצג היום
     if (!segs.length) return h + '<p class="none">אין נתונים ליום הזה.</p>' + TVG.soonHtml(now);
     var T = dialT(), svg = '<svg id="dial" viewBox="-20 -20 400 400" tabindex="0" role="slider" aria-label="שעה ביום" aria-valuemin="0" aria-valuemax="1439" aria-valuenow="' + T + '"><circle class="face" cx="180" cy="180" r="121"></circle>';
     segs.forEach(function (s, i) { var d = arcPath(s.a, s.b); if (d) svg += '<path data-i="' + i + '" class="k-' + pgOf(s.p.title) + '" d="' + d + '"></path>'; });

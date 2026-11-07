@@ -15,6 +15,7 @@
   TVG.openLead = openLead;
   TVG.openRem = openRem;
   TVG.quickAdd = quickAdd;
+  TVG.remRec = recOf; // ⚽ הקבוצה שלי (team.js): תזכורות אוטומטיות שקטות, באותה רשומה כמו quickAdd
   TVG.saveIcs = saveIcs;
   TVG.setLead = setLead;
   TVG.setupCal = setupCal;

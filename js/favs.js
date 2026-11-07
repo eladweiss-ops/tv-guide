@@ -26,6 +26,7 @@
       var sub = (live ? "● משודר עכשיו · " : "") + (n ? "הבא: " + TVG.dayLabel(dstr(n.p.s)) + " " + hhmm(n.p.s) + " · " + n.c.name : "אין שידור בימים הקרובים") + (a.length ? " · " + a.length + " שידורים" : "");
       return '<div class="srow"><button type="button" class="go sg" data-topic="' + esc(t) + '"><span class="ttl">⭐ ' + esc(t) + '<br><span class="sub">' + esc(sub) + '</span></span></button><button type="button" class="rbt" data-topicdel="' + esc(t) + '" aria-label="הפסקת מעקב: ' + esc(t) + '">✕</button></div>';
     }).join("") : '<p class="none">אפשר להוסיף גם קבוצה, שחקן או שף: מחפשים למשל "מכבי חיפה" או "חיים כהן" ולוחצים "⭐ להוסיף למועדפים".</p>';
+    if (TVG.teamFavHtml) h += TVG.teamFavHtml(); // ⚽ הקבוצה שלי (team.js)
     h += '<button type="button" class="btn" data-favadd>הוספת תוכנית</button><button type="button" class="ghost" data-topicadd>הוספת מילה (קבוצה, שחקן…)</button>';
     if (titles.length > 1) h += '<button type="button" class="ghost" data-favclear>' + (TVG.delArm ? "בטוח? לחיצה נוספת תסיר את כולם" : "הסר הכל") + "</button>";
     h += '<button type="button" class="ghost" data-favclose>סגירה</button>';

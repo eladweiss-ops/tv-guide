@@ -824,6 +824,41 @@
 
   .tonight .tnmore { display: block; margin: 2px auto 0; }
 
+  /* ⚽ הקבוצה שלי (team.js): כרטיס בלשונית "היום" מתחת ל"🌙 הערב שלך" (אותו משטח ושורות), מתג תזכורת אוטומטית, ובורר בתוך חלון המועדפים */
+  .tonight.team .tmhd { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-inline-end: 0; }
+  .tonight.team .tmhd > div { min-width: 0; }
+  .tonight.team .tmedit { flex: none; min-height: 44px; margin-top: -10px; font-weight: 600; text-decoration: none; }
+  .tmrow .ttl .tagk { margin-inline-end: 2px; }
+  .tmrow.tmrr .time { color: var(--muted); }
+  .tmreps { border-top: .5px solid var(--line); }
+  .tmauto { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; margin: 10px 0 0; padding: 10px 14px; border: 0; border-radius: 18px; background: var(--soft); color: var(--ink); text-align: start; font: inherit; }
+  .tmal { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .tmal b { font-weight: 700; font-size: .98rem; line-height: 1.3; }
+  .tmal span { color: var(--muted); font-size: .85rem; line-height: 1.35; }
+  .tmsw { flex: none; position: relative; width: 51px; height: 31px; border-radius: 999px; background: var(--sel); transition: background-color .2s; }
+  .tmsw::after { content: ""; position: absolute; top: 2px; right: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .22s cubic-bezier(.3,.7,.4,1); }
+  .tmauto[aria-checked="true"] .tmsw { background: #30D158; } /* מתג כמו ב-iOS: ירוק כשפעיל (לא כפתור כתום נוסף) */
+  .tmauto[aria-checked="true"] .tmsw::after { transform: translateX(-20px); }
+  @media (prefers-reduced-motion: reduce) { .tmsw, .tmsw::after { transition: none; } }
+  .tmsel { display: flex; flex-direction: column; gap: 8px; }
+  .tmone { background: var(--surface); border-radius: 18px; padding: 4px 4px 10px; padding-inline-start: 14px; }
+  .tmone:not(:has(.tmsp)) { padding-bottom: 4px; }
+  .tmn { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
+  .tmn b { font-size: 1.02rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .tmq { margin: 0 0 6px; color: var(--muted); font-size: .88rem; }
+  .tmsp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .tmsp { margin-inline-end: 8px; }
+  .tmsp .chip { padding: 0 6px; white-space: nowrap; justify-content: center; }
+  .tmside { white-space: nowrap; }
+  .tmrow .sub .tagk { vertical-align: 1px; }
+  .tmrow .sub bdi { white-space: nowrap; }
+  .tmlbl { margin: 4px 0 -4px; color: var(--muted); font-size: .85rem; font-weight: 600; }
+  #tmSug .chips { gap: 8px; }
+  #tmSug .chip { min-height: 44px; }
+  .tmc { color: var(--muted); font-size: .8rem; font-weight: 600; margin-inline-start: 2px; }
+  .chip[aria-pressed="true"] .tmc { color: var(--ink); }
+  .tmhint { margin: 0 0 8px; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+
   /* 😅 פספסת? (render-rems.js missHtml): תזכורות ששודרו ב-3 הימים האחרונים, עם השידור החוזר הקרוב. משטח אחד כמו "🌙 הערב שלך", שורות מופרדות בקו דק */
   .miss { margin: 18px 0 8px; padding: 12px 8px 4px; border-radius: 26px; background: var(--surface); }
   .miss .sech { margin: 0; padding: 0 10px 2px; }

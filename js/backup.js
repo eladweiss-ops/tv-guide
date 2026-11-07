@@ -6,7 +6,7 @@
   TVG.myTok = myTok;
 
   // ---- גיבוי אוטומטי בענן + קישור אישי לשחזור ----
-  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok", "tvg.recent", "tvg.topics", "tvg.wl", "tvg.fol", "tvg.parties", "tvg.gid", "tvg.name", "tvg.nffav"]; // ⭐ שמורי נטפליקס; 🍿 ערב צפייה: הערבים שלי, מזהה האורח, השם
+  var BK = ["tvg.sel", "tvg.fav", "tvg.prov", "tvg.theme", "tvg.lead", "tvg.tab", "tvg.rem", "tvg.calmode", "tvg.calTok", "tvg.recent", "tvg.topics", "tvg.wl", "tvg.fol", "tvg.parties", "tvg.gid", "tvg.name", "tvg.nffav", "tvg.teams", "tvg.teamAuto", "tvg.teamX"]; // ⚽ הקבוצה שלי; ⭐ שמורי נטפליקס; 🍿 ערב צפייה: הערבים שלי, מזהה האורח, השם
   var BKSET = {}; BK.forEach(function (k) { if (k !== "tvg.calTok") BKSET[k] = 1; });
   var APP_URL = location.origin + location.pathname.replace(/index\.html$/, "");
   function myTok() { if (!TVG.calTok) { TVG.calTok = TVG.newTok(); TVG.store("tvg.calTok", TVG.calTok); } return TVG.calTok; }

@@ -161,9 +161,9 @@ test("שגיאות: שאילתה קצרה 400, בלי מפתח 503, TMDB נופ�
   assert.deepEqual(store, {});
 });
 
-test("handler: GET בלבד, 429 אחרי 30 בקשות לדקה ל-IP, כותרות מטמון", async () => {
+test("handler: GET (ו-POST לכינויים), 429 אחרי 30 בקשות לדקה ל-IP, כותרות מטמון", async () => {
   const req = { method: "GET", headers: { "x-real-ip": "9.9.9.9" }, query: { q: "a" } };
-  let r = mockRes(); await nfh({ ...req, method: "POST" }, r); assert.equal(r.code, 405);
+  let r = mockRes(); await nfh({ ...req, method: "PUT" }, r); assert.equal(r.code, 405);
   r = mockRes(); await nfh(req, r); assert.equal(r.code, 400); assert.equal(r.headers["cache-control"], "no-store");
   for (let i = 0; i < 29; i++) await nfh(req, mockRes());
   r = mockRes(); await nfh(req, r); assert.equal(r.code, 429); assert.equal(r.body.error, "rate"); assert.equal(r.headers["retry-after"], "60");
@@ -230,4 +230,36 @@ test("תעתיק: שם עברי שלא במאגר ('לכידתו של אל מא�
   assert.equal(out.via, "el mayo");
   assert.deepEqual(out.titles, ["t338689"]);
   assert.equal(out.items.t338689.nf, true);
+});
+
+test("כינוי בעברית: נלמד רק כשהחיפוש באנגלית באמת מוצא את k, ואז חיפוש בעברית מחפש את השם באנגלית", async () => {
+  const { handleAlias, aliasPath } = await import("../api/nf-search.js");
+  const fx = tmdb({ "/search/multi": (u) => (u.searchParams.get("query") === "A Couple of Lies" ? { results: [{ media_type: "tv", id: 336240, name: "A Couple of Lies", original_name: "Bytet", first_air_date: "2026-10-30", overview: "x", poster_path: "/abcde12345.jpg" }] } : { results: [] }) });
+  const store = {};
+  const d = { fetch: fx, readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, now: () => 2_000_000 };
+  const before = await handleSearch("חילופי בתים", d);
+  assert.equal(before.json.titles.length, 0, "לפני: אין תוצאה");
+  // קלט לא תקין
+  assert.equal((await handleAlias({ q: "home swap", t: "A Couple of Lies", k: "t336240" }, d)).status, 400, "q חייב עברית");
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "בעברית", k: "t336240" }, d)).status, 400, "t בלי עברית");
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "A Couple of Lies", k: "x1" }, d)).status, 400, "k לא תקין");
+  // k שהחיפוש לא מוצא: לא נלמד
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "A Couple of Lies", k: "t999" }, d)).status, 422);
+  assert.ok(!store[aliasPath("חילופי בתים")]);
+  // תקין
+  assert.equal((await handleAlias({ q: "חילופי בתים", t: "A Couple of Lies", k: "t336240" }, d)).status, 200);
+  assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
+  const after = await handleSearch("  חילופי   בתים ", d);
+  assert.deepEqual(after.json.titles, ["t336240"], "אחרי: נמצא");
+  assert.equal(after.json.q, "חילופי בתים", "השאילתה המקורית בתשובה");
+  // הראשון קובע
+  const r2 = await handleAlias({ q: "חילופי בתים", t: "Something Else", k: "t1" }, d);
+  assert.equal(r2.json.kept, true); assert.equal(store[aliasPath("חילופי בתים")].t, "A Couple of Lies");
+});
+
+test("POST /api/nf-search: קצב 5 בשעה ל-IP", async () => {
+  const req = (n) => ({ method: "POST", headers: { "x-real-ip": "9.9.9.9" }, body: { q: "שם " + n, t: "x", k: "bad" } });
+  let last;
+  for (let i = 0; i < 6; i++) { last = mockRes(); await nfh(req(i), last); }
+  assert.equal(last.code, 429);
 });

@@ -15,6 +15,16 @@
   var cache = {};                       // מפתח שאילתה -> תשובה מנוקה
   var S = { key: "", state: "idle" };   // state: loading | err | rate | ok
   var timer = 0, seq = 0;
+  // ---- לימוד כינויים בעברית: חיפוש בעברית לא מצא, ותוך 10 דקות בחרו תוצאה מחיפוש באנגלית → השרת זוכר (לכל המשתמשים) ----
+  var HEB = /[֐-׿]/, miss = null;
+  document.addEventListener("click", function (e) {
+    var t = e.target, b = t && t.closest && t.closest("[data-nfopen]"); if (!b || !miss) return;
+    var k = b.getAttribute("data-nfopen"), q = String(TVG.q || "").trim();
+    if (Date.now() - miss.t > 600000) { miss = null; return; }
+    if (!RE_K.test(k || "") || !TVG.nfX[k] || q.length < 2 || HEB.test(q) || !TVG.CAL_API) return;
+    var body = JSON.stringify({ q: miss.q, t: q, k: k }); miss = null;
+    try { fetch(TVG.CAL_API + "/api/nf-search", { method: "POST", headers: { "content-type": "application/json" }, body: body }).catch(function () {}); } catch (x) {}
+  }, true);
 
   // ---- ניקוי תשובת השרת (עוד שכבה מעל הרשימה הלבנה בשרת) ----
   function str(v, n) { return typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").slice(0, n) : ""; }
@@ -54,6 +64,7 @@
         .then(function (j) {
           var res = safeRes(j); if (!res) throw new Error("shape");
           cache[key] = res;
+          if (HEB.test(key) && empty(res)) miss = { q: key, t: Date.now() }; // חיפוש בעברית שלא מצא: אולי עוד רגע ימצאו באנגלית (לימוד כינוי)
           if (my === seq) S.state = "ok";
           done(key);
         })

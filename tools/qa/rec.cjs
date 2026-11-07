@@ -47,7 +47,7 @@ const A = (c, m) => { if (!c) { fails++; console.log("  FAIL " + m); } else cons
     A(!(await page.$("#remBody [data-shmode]")), "no card chips for streaming");
     await page.fill("#shMsg", "זו הסדרה שסיפרתי לך עליה בצהריים"); await page.waitForTimeout(300);
     const prev = await page.textContent("#shPrev");
-    A(/💬 זו הסדרה שסיפרתי/.test(prev) && /\?nf=[mt]\d+$/.test(prev.trim()) && !/%D7/.test(prev), "preview has the note; link stays short (no Hebrew in it)");
+    A(/💬 זו הסדרה שסיפרתי/.test(prev) && /tv-guide-cal\.vercel\.app\/n\/[mt]\d+$/.test(prev.trim()) && !/%D7/.test(prev), "preview has the note; link stays short (no Hebrew in it)");
     await page.evaluate(() => document.activeElement && document.activeElement.blur()); await shot("02_rec_sheet");
     await page.evaluate(() => { const b = document.querySelector("#remBody"); if (b) b.scrollTop = 9999; }); await shot("02b_rec_sheet_bottom");
     await page.keyboard.press("Escape"); await page.waitForTimeout(300);
@@ -69,7 +69,7 @@ const A = (c, m) => { if (!c) { fails++; console.log("  FAIL " + m); } else cons
       await p2.goto(base + "index.html?nf=" + DK + "&s=d", { waitUntil: "networkidle" }); await p2.waitForTimeout(1800);
       A(await p2.evaluate(() => !document.querySelector("#nfsheet").hidden && /דיסני\+/.test(document.querySelector("#nfsBar").textContent)), "Disney+ link opens the Disney+ page in a clean browser");
       await p2.click("#nfsBar [data-nfrec]"); await p2.waitForTimeout(400);
-      A(/\?nf=[mt]\d+&s=d$/.test((await p2.textContent("#shPrev")).trim()), "💌 from a Disney+ page marks s=d");
+      A(/(\/n\/[mt]\d+\?s=d|\?nf=[mt]\d+&s=d&t=\S+)$/.test((await p2.textContent("#shPrev")).trim()), "💌 from a Disney+ page marks s=d");
       await c2.close();
     } else console.log("  (no Disney-only item to test)");
     await page.goto(base + "index.html", { waitUntil: "networkidle" }); await page.waitForTimeout(900);

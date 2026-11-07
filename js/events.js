@@ -73,6 +73,10 @@
     var wh = t.closest("[data-when]"); if (wh) { TVG.sWhen = wh.getAttribute("data-when"); TVG.render(); return; }
     var kd = t.closest("[data-kind]"); if (kd) { TVG.sKind = kd.getAttribute("data-kind"); TVG.render(); return; }
     if (t.closest("[data-remlist]")) { var lst = TVG.LASTHITS.map(function (x) { return { id: x.c.id, p: x.p }; }); if (TVG.srv()) TVG.quickAdd(lst); else { TVG.rem = lst[0] || null; TVG.askCal(); } return; }
+    if (t.closest("[data-tnall]")) { var tn = (TVG.TN || []).filter(function (x) { return !(x.fol && TVG.pushOn); }).map(function (x) { return { id: x.c.id, p: x.p }; }); if (TVG.srv()) TVG.quickAdd(tn); else { TVG.rem = tn.filter(function (r) { return r.p.s > new Date(); })[0] || null; TVG.askCal(); } return; } // 🌙 הערב שלך: תזכורת לכל השורות
+    if (t.closest("[data-tnmore]")) { TVG.tnOpen = true; TVG.render(); return; } // 🌙 הערב שלך: שאר השורות
+    if (t.closest("[data-tnx]")) { TVG.store("tvg.tnHint", dstr(new Date())); TVG.render(); return; } // הרמז נעלם עד מחר
+    if (t.closest("[data-tnfav]")) { TVG.openFavs(); return; }
     if (t.closest("[data-favadd]")) { TVG.favPick = true; TVG.startSearch("", false); return; }
     var fp = t.closest("[data-favpick]");
     if (fp) { var ft2 = fp.getAttribute("data-favpick"); FAV.add(ft2); TVG.saveFav(); TVG.updFav(); TVG.favPick = false; TVG.setSearch(false); TVG.openFavs(); TVG.pill("★ " + ft2 + " נוסף למועדפים", 1800); return; }

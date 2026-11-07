@@ -37,7 +37,7 @@
     favs.sort(function (x, y) { return x.p.s - y.p.s; });
     var h = "";
     if (soon.length) h += '<h2 class="sech">מתחיל בקרוב</h2>' + soon.slice(0, 3).map(function (x) { return airRow(x.c, x.p, x.c.name + " · בעוד " + inMin(x.p.s, now)); }).join("");
-    if (favs.length) h += '<h2 class="sech">★ המועדפים שלי, בקרוב</h2>' + favs.slice(0, 6).map(function (x) { return airRow(x.c, x.p, x.c.name + " · " + TVG.dayLabel(dstr(x.p.s))); }).join("");
+    if (favs.length && !(TVG.TN && TVG.TN.length)) h += '<h2 class="sech">★ המועדפים שלי, בקרוב</h2>' + favs.slice(0, 6).map(function (x) { return airRow(x.c, x.p, x.c.name + " · " + TVG.dayLabel(dstr(x.p.s))); }).join("");
     return h;
   }
 })(window.TVG);

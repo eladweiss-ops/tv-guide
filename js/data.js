@@ -3,13 +3,13 @@
 (function (TVG) {
   TVG.files["data"] = 1;
   var esc = TVG.esc, DAYS = TVG.DAYS, dstr = TVG.dstr, sel = TVG.sel;
-  // כותרת עם תג "🟢 שידור ישיר" (lv=1 מהמקור, או "ישיר"/LIVE בכותרת). "ישיר!" בתחילת הכותרת יורד כדי לא לחזור פעמיים
+  // כותרת עם תג "● שידור ישיר" (lv=1 מהמקור, או "ישיר"/LIVE בכותרת). "ישיר!" בתחילת הכותרת יורד כדי לא לחזור פעמיים
   var RE_LIVE_PRE = /^s*(ישיר|LIVE)s*[!:-–]*s*/i;
   TVG.isLiveP = function (p) { return !!p && (p.lv === 1 || RE_LIVE_PRE.test(p.title || "") || /LIVE/.test(p.title || "")); };
   TVG.ttlHtml = function (p) {
     if (!p) return "";
     if (!TVG.isLiveP(p)) return esc(p.title);
-    return '<span class="tagk live">🟢 שידור ישיר</span> ' + esc(String(p.title).replace(RE_LIVE_PRE, "") || p.title);
+    return '<span class="tagk live">● שידור ישיר</span> ' + esc(String(p.title).replace(RE_LIVE_PRE, "") || p.title);
   };
   TVG.allDays = allDays;
   TVG.chans = chans;

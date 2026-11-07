@@ -1,4 +1,4 @@
-/* js/render-dial.js - מסך 'היום' (החוגה).
+/* js/render-dial.js - מסך 'היום' (החוגה), ובראשו הכרטיס '🌙 הערב שלך'.
    חלק ממרחב השמות TVG (ראו index.html). נטען אחרי: core, data, reminders, ui, reminder-sheet, push, render-rems, render-common, render-now, render-grid, netflix. */
 (function (TVG) {
   TVG.files["render-dial"] = 1;
@@ -9,6 +9,7 @@
   TVG.kindOf = kindOf;
   TVG.updateDial = updateDial;
   TVG.vDial = vDial;
+  TVG.tonightList = tonightList;
 
   // ---- שעון היום ----
   var CX = 180,
@@ -43,12 +44,62 @@
     var now = new Date(), d0 = TVG.dObj(TVG.day).getTime();
     return TVG.day === dstr(now) ? Math.floor((now - d0) / 60000) : 20 * 60;
   }
+  // ---- 🌙 הערב שלך: מה שמעניין אותך מעכשיו ועד סוף הערב (04:00), בערוצים שלך ----
+  // מקורות: מועדפים (כותרת), נושאים, סדרות במעקב. שורה אחת לכל כותרת (השידור הקרוב), לפי שעה, עד 5
+  var TN_MAX = 5;
+  function tonightList(now) {
+    var end = TVG.tonightEnd(), seen = {}, out = [], alts = (TVG.TOPICS || []).map(function (tp) { return { t: tp, a: TVG.topicAlts(tp) }; });
+    var fols = (TVG.FOL || []).some(function (x) { return !x.x; });
+    TVG.chans().forEach(function (c) {
+      (TVG.by.get(c.id) || []).forEach(function (p) {
+        if (p.e <= now || p.s >= end || seen[p.title]) return;
+        var why = "", fol = fols && TVG.folFind && TVG.folFind(TVG.folKey(p.title));
+        if (FAV.has(p.title)) why = "מועדף";
+        else if (fol) why = "סדרה במעקב";
+        else { for (var i = 0; i < alts.length; i++) if (TVG.topicHit(p, alts[i].a)) { why = alts[i].t; break; } }
+        if (!why) return;
+        seen[p.title] = 1;
+        out.push({ c: c, p: p, why: why, fol: !!fol });
+      });
+    });
+    return out.sort(function (x, y) { return x.p.s - y.p.s || x.p.title.localeCompare(y.p.title); });
+  }
+  function tnWindow(now) { var hr = now.getHours(); return hr >= 12 || hr < 4; } // מהצהריים ועד סוף הערב
+  function bd(s) { return "<bdi>" + esc(TVG.bidi(s)) + "</bdi>"; }
+  function tonightHtml(now) {
+    TVG.TN = [];
+    if (!TVG.by || !tnWindow(now)) return "";
+    var empty = !FAV.size && !(TVG.TOPICS || []).length && !(TVG.FOL || []).some(function (x) { return !x.x; });
+    if (empty) {
+      if (TVG.store("tvg.tnHint") === dstr(now)) return "";
+      return '<div class="remall tnhint"><button type="button" class="tnhgo" data-tnfav>⭐ סמנו תוכניות במועדפים ונציג כאן מה מעניין אותך הערב</button><button type="button" class="tnx" data-tnx aria-label="הסתרה עד מחר">✕</button></div>';
+    }
+    var all = tonightList(now), rows = all.slice(0, TN_MAX);
+    if (!rows.length) return "";
+    TVG.TN = rows;
+    var n = rows.length, folOn = TVG.pushOn, open = 0, h = "", SHOW = 3; // 3 גלויות: שהטבעת לא תיפול מתחת לקפל
+    rows.forEach(function (x, i) {
+      if (i === SHOW) h += '<div class="tnrest"' + (TVG.tnOpen ? "" : " hidden") + ">";
+      var v = TVG.remKey(x.c.id, x.p.s), live = x.p.s <= now, on = !!TVG.hasRem(v), byFol = x.fol && folOn;
+      if (!live && !on && !byFol) open++;
+      var sub = (live ? "משודר עכשיו · " : "") + bd(x.c.name) + ' · <span class="tnwhy">' + (x.why === "מועדף" ? "⭐ מועדף" : x.why === "סדרה במעקב" ? "📺 במעקב" : "⭐ " + bd(x.why)) + "</span>";
+      var act = live ? "" : byFol ? '<button type="button" class="rbt on" data-folopen="' + esc(TVG.folKey(x.p.title)) + '" aria-label="סדרה במעקב, יש תזכורת: ' + esc(x.p.title) + '">📺</button>'
+        : '<button type="button" class="rbt' + (on ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="' + (on ? "יש תזכורת: " : "תזכורת: ") + esc(x.p.title) + '">' + (on ? "✓" : "⏰") + "</button>";
+      h += '<div class="srow tnrow' + (live ? " tnlive" : "") + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl"><bdi>' + TVG.ttlHtml(x.p) + '</bdi><br><span class="sub">' + sub + "</span></span></button>" + act + "</div>";
+    });
+    if (n > SHOW) h += "</div>" + (TVG.tnOpen ? "" : '<button type="button" class="linkb tnmore" data-tnmore>עוד ' + (n - SHOW) + " ›</button>");
+    var cnt = all.length > n ? n + " הקרובים מתוך " + all.length + " שמעניינים אותך הערב" : n === 1 ? "דבר אחד שמעניין אותך הערב" : n + " דברים שמעניינים אותך הערב";
+    var anyFuture = rows.some(function (x) { return x.p.s > now; });
+    var btn = open ? '<button type="button" class="ghost tnall" data-tnall>⏰ להזכיר על הכול</button>' : anyFuture ? '<p class="tndone">✓ יש תזכורת לכל אלה</p>' : "";
+    return '<section class="tonight" aria-label="הערב שלך"><div class="tnhd"><h2 class="sech">🌙 הערב שלך</h2><p class="tncnt">' + cnt + '</p></div><div class="tnlist">' + h + "</div>" + btn + "</section>";
+  }
   function vDial() {
     var now = new Date(), h = TVG.pickers(now), d0 = TVG.dObj(TVG.day).getTime(), d1 = d0 + 86400000;
     var segs = (TVG.by.get(TVG.chId) || []).filter(function (p) { return p.e > d0 && p.s < d1; }).map(function (p) {
       return { p: p, a: Math.max(0, (p.s - d0) / 60000), b: Math.min(1440, (p.e - d0) / 60000) };
     });
     TVG.D = { segs: segs, d0: d0 };
+    TVG.TN = []; if (TVG.day === dstr(now)) h = tonightHtml(now) + h; // 🌙 הערב שלך: בראש המסך, רק כשמוצג היום
     if (!segs.length) return h + '<p class="none">אין נתונים ליום הזה.</p>' + TVG.soonHtml(now);
     var T = dialT(), svg = '<svg id="dial" viewBox="-20 -20 400 400" tabindex="0" role="slider" aria-label="שעה ביום" aria-valuemin="0" aria-valuemax="1439" aria-valuenow="' + T + '"><circle class="face" cx="180" cy="180" r="121"></circle>';
     segs.forEach(function (s, i) { var d = arcPath(s.a, s.b); if (d) svg += '<path data-i="' + i + '" class="k-' + pgOf(s.p.title) + '" d="' + d + '"></path>'; });

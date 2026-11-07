@@ -126,7 +126,9 @@ async function ogData(k, d) {
   const o = shapeTitle(base, ok(en) ? en : null, type);
   if (!o) return null;
   const bd = img(base.backdrop_path || (en && en.backdrop_path), "w780"), ps = img(base.poster_path || (en && en.poster_path), "w500");
-  return { type, title: o.title, desc: trimText(o.overview), image: bd || ps, w: bd ? 780 : ps ? 500 : 0, h: bd ? 439 : ps ? 750 : 0 };
+  // בלי שם עברי ב-TMDB (מחזיר את השם המקורי, למשל "Bytet"): השם באנגלית, כמו ברשימות (netflix.mjs shapeItem)
+  const t = /[֐-׿]/.test(o.title || "") || !ok(en) ? o.title : (en.title || en.name || o.title);
+  return { type, title: t, desc: trimText(o.overview), image: bd || ps, w: bd ? 780 : ps ? 500 : 0, h: bd ? 439 : ps ? 750 : 0 };
 }
 export function ogHtml(k, ds, v) {
   const target = APP_URL + "?nf=" + k + (ds ? "&s=d" : ""), self = SELF_URL + "/n/" + k + (ds ? "?s=d" : "");

@@ -86,7 +86,7 @@
   }
 
   // ---- כרטיס "כרטיס כניסה" 1200x630 (גם היחס של תצוגת קישור) ----
-  var GRAD = { sport: ["#5E5CE6", "#BF5AF2"], ent: ["#FF9F0A", "#FF375F"], news: ["#0A84FF", "#5AC8FA"], life: ["#30D158", "#00B8A9"], oth: ["#8E8E93", "#48484A"] };
+  var GRAD = { sport: ["#5E5CE6", "#BF5AF2"], ent: ["#FF4F9A", "#C0268C"], news: ["#0A84FF", "#5AC8FA"], life: ["#30D158", "#00B8A9"], oth: ["#8E8E93", "#48484A"] };
   function fontsReady(sample) {
     if (!document.fonts || !document.fonts.load) return Promise.resolve();
     var s = "אבגדה" + sample, loads = ["400 40px Heebo", "600 56px Heebo", "700 56px Heebo", "800 110px Heebo"].map(function (f) { return document.fonts.load(f, s).catch(function () {}); });
@@ -224,7 +224,8 @@
       wide: tmdbImg(x.backdrop), poster: tmdbImg(x.poster), // לתצוגה המקדימה בלבד (כמו שהשרת יציג בוואטסאפ)
       title: String(x.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: [x.type === "tv" ? "סדרה" : "סרט", x.year ? String(x.year) : "", svc].filter(Boolean).join(" · "),
-      syn: d, link: APP + "?nf=" + k + (svc === "דיסני+" ? "&s=d" : "") + (inList(k, svc) ? "" : "&t=" + encodeURIComponent(String(x.title || "").slice(0, 60))) // s=d: דיסני+ (טוען את disney.json לפני הפתיחה); t= רק לתוכן מחוץ לרשימות (נפתח מהשם)
+      // ברשימות: קישור דרך השרת (/n/<k>) – בוואטסאפ מופיעה תמונת הסדרה, והדף עובר מיד לאפליקציה. מחוץ לרשימות: ישר לאפליקציה עם השם (t=), כדי שייפתח
+      syn: d, link: inList(k, svc) ? "https://tv-guide-cal.vercel.app/n/" + k + (svc === "דיסני+" ? "?s=d" : "") : APP + "?nf=" + k + (svc === "דיסני+" ? "&s=d" : "") + "&t=" + encodeURIComponent(String(x.title || "").slice(0, 60)) // s=d: דיסני+ (טוען את disney.json לפני הפתיחה); t= רק לתוכן מחוץ לרשימות (נפתח מהשם)
     };
   }
   function curParts() { // החלקים להודעה הנוכחית, עם המילה האישית

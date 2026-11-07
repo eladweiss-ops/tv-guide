@@ -15,6 +15,12 @@ git add guide.json hot-cache.json extra-cache.json
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
   Run "git commit -m ""Israeli sources (home computer)"""
-  Run "git pull --rebase"
-  Run "git push"
+  # גם העדכון הלילי ב-GitHub כותב את hot-cache.json/extra-cache.json (ממסר תל אביב). בהתנגשות: הנתונים הטריים מכאן גוברים (-X theirs בזמן rebase = הקומיט שלנו).
+  # אם עדיין נכשל: מבטלים ומתיישרים ל-GitHub – הריצה הבאה תשלים, ולא נשאר מאגר תקוע
+  Run "git pull --rebase -X theirs"
+  if ($LASTEXITCODE -ne 0) {
+    Run "git rebase --abort"
+    Run "git reset --hard origin/main"
+    "rebase failed - aligned to origin/main, will retry next run" | Out-File $log -Append -Encoding utf8
+  } else { Run "git push" }
 } else { "no changes" | Out-File $log -Append -Encoding utf8 }

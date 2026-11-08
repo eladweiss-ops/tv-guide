@@ -249,6 +249,7 @@ export async function runTonight(d) {
       if (!list.length) { st.none++; continue; }
       const pl = buildTonight(list, await d.load(t), now);
       if (!pl) { st.covered++; continue; }
+      const m2 = await d.readJson(tnMark(t), null); if (m2 && m2.d === day) { st.dup++; continue; } // ריצה מקבילה כבר סימנה
       await d.writeJson(tnMark(t), { d: day, at: now, n: list.length }); // לפני השליחה: ניסיון חוזר של QStash או ריצה כפולה לא ישלחו שוב
       const r = await d.sendTo(t, pl);
       if (r && r.ok) st.sent++; else st.fail++;
@@ -259,11 +260,12 @@ export async function runTonight(d) {
 
 // ---------- תזמון (מה-cron היומי) ----------
 async function publish(body, at, d) {
+  const dedup = "tn19-" + body.d + (body.from ? "-" + body.from : "");
   const token = d.token !== undefined ? d.token : process.env.QSTASH_TOKEN;
   const fx = d.fetch || fetch;
   const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
     method: "POST", signal: !d.fetch && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
-    headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "1" },
+    headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "1", "upstash-deduplication-id": dedup },
     body: JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));

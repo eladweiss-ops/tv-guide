@@ -54,11 +54,11 @@ export default async function handler(req, res, d = {}) {
   if (au !== 200) return res.status(au).json({ error: au === 503 ? "not configured" : "unauthorized" });
   try {
     // אותו cron, שני שלבים: קודם רענון מעקב הסדרות (תזכורות, חשוב יותר וקל יותר) עם חצי מהזמן, אחר כך בדיקת רשימות המעקב של נטפליקס
-    const t0 = Date.now();
     // הלוח נטען פעם אחת בהרצה ומשותף לשני השלבים. שלב המעקב מוגבל ל-20 שניות (לא מתחיל עבודה חדשה אחריהן), ולבדיקת נטפליקס נשארים 25+
     // 🌙 הערב שלך: מתזמן ב-QStash הודעה אחת ל-19:00 שעון ישראל של היום. ראשון (קל, לא תלוי בזמן שנשאר); כישלון לא פוגע בבדיקה היומית
     let tn;
     try { tn = await (d.scheduleTonight || scheduleTonight)({ readJson: d.readJson || readJson, writeJson: d.writeJson || writeJson, fetch: d.fetch, now: d.now }); } catch (e) { tn = { error: true }; console.error("tonight schedule", e && e.message); }
+    const t0 = Date.now(); // אחרי התזמון: QStash איטי לא אוכל מהזמן של בדיקת המעקב
     let gm = null; const guideOnce = () => (gm = gm || getGuide(d));
     let fo;
     try {

@@ -13,7 +13,7 @@
   TVG.topLayerEl = function () { var L = order[order.length - 1]; return L ? $(L.sel) : null; }; // השכבה הפתוחה העליונה (גרירת חלון תחתון, sheetdrag.js)
   TVG.closeTop = function () { return closeTop(); }; // אותה סגירה כמו Escape / "חזור": דרך ה-close של השכבה, וההיסטוריה מתנקה ב-sync
 
-  var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q", "from", "t", "s"]; // t: שם התוכן בקישור 💌 המלצה, לתוכן מחוץ לרשימות; s=d: התוכן בדיסני+ (share.js) // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
+  var URL_PARAMS = ["tab", "rem", "nf", "e", "w", "go", "p", "q", "from", "t", "s", "tn"]; // tn=1: מהתראת "🌙 הערב שלך" (19:00) – לשונית היום, היום, למעלה // t: שם התוכן בקישור 💌 המלצה, לתוכן מחוץ לרשימות; s=d: התוכן בדיסני+ (share.js) // 🍿 ערב צפייה: w (מזהה הערב), go (ספירה 3-2-1 מהתראה)
   var TABS = { now: 1, grid: 1, rems: 1, dial: 1, nf: 1 };
   var layers = [];   // {n, sel, close, open}
   var depth = 0;     // כמה רשומות היסטוריה דחפנו
@@ -126,6 +126,7 @@
     else if (pw) { if (TVG.openParty) TVG.openParty(pw, p.get("go") === "1"); } // 🍿 ערב צפייה: ?w=<id>[&go=1]
     else if (pp != null) { if (TVG.openShared) TVG.openShared(pp); }
     else if (hasQ) openQuery(q);
+    else if (p.get("tn") === "1") { TVG.day = TVG.dstr(new Date()); TVG.scrub = null; if (TVG.tab !== "dial") switchTab("dial"); else TVG.render(); window.scrollTo(0, 0); } // 🌙 הכרטיס "הערב שלך" מוצג רק כשהיום הוא היום
     if (isBoot) cleanUrl(URL_PARAMS);
   }
   function afterBoot() {

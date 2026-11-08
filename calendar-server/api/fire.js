@@ -7,7 +7,9 @@ import { fail } from "./_guard.js";
 import { START_SUFFIX } from "./_rems.js";
 import { isDerKey, folPath } from "./_fol.js";
 import { derivedStillAired, rederive } from "./_fcheck.js";
-import { readJson, writeJson } from "./_db.js";
+import { readJson, writeJson, listJson } from "./_db.js";
+import { fireTonight } from "./_tonight.js"; // 🌙 הערב שלך ב-19:00
+import { getGuide } from "./_fcheck.js";
 
 export const config = { api: { bodyParser: false } }; // צריך את הגוף הגולמי לאימות תקציר החתימה
 
@@ -59,6 +61,10 @@ export default async function handler(req, res) {
     if (!au.ok) return res.status(403).end();
     let b;
     try { b = JSON.parse(raw || "{}"); } catch (e) { return res.status(400).json({ error: "bad request" }); }
+    if (b && b.tn === 1) { // 🌙 הערב שלך: הודעה יומית אחת (מתוזמנת מה-cron), שולחת לכל מי שיש לו מה לראות הערב
+      const r = await fireTonight(b, { list: listJson, readJson, writeJson, load, sendTo, guide: () => getGuide({}), deadline: Date.now() + 45000 });
+      return res.status(r.status).json(r.json);
+    }
     if (!b || !okToken(b.t) || typeof b.k !== "string") return res.status(400).json({ error: "bad request" });
     const r = await handleFire(b, { load: loadAll, sendTo, dropSched, reschedule, checkDerived });
     return res.status(r.status).json(r.json);

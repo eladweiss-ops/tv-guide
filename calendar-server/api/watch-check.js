@@ -10,6 +10,7 @@ import { reschedule } from "./_push.js";
 import { SEARCH_TTL } from "./_nfs.js";
 import { fail } from "./_guard.js";
 import { cleanParties } from "./_party.js"; // 🍿 ערב צפייה
+import { scheduleTonight } from "./_tonight.js"; // 🌙 הערב שלך ב-19:00
 
 // כל המשתמשים עם רשימת מעקב: אוסף wl ב-Firestore (מזהה המסמך = הטוקן). הערכים כבר נקראו: אין קריאה שנייה לכל משתמש
 export async function listUsers(list = listJson) {
@@ -55,13 +56,16 @@ export default async function handler(req, res, d = {}) {
     // אותו cron, שני שלבים: קודם רענון מעקב הסדרות (תזכורות, חשוב יותר וקל יותר) עם חצי מהזמן, אחר כך בדיקת רשימות המעקב של נטפליקס
     const t0 = Date.now();
     // הלוח נטען פעם אחת בהרצה ומשותף לשני השלבים. שלב המעקב מוגבל ל-20 שניות (לא מתחיל עבודה חדשה אחריהן), ולבדיקת נטפליקס נשארים 25+
+    // 🌙 הערב שלך: מתזמן ב-QStash הודעה אחת ל-19:00 שעון ישראל של היום. ראשון (קל, לא תלוי בזמן שנשאר); כישלון לא פוגע בבדיקה היומית
+    let tn;
+    try { tn = await (d.scheduleTonight || scheduleTonight)({ readJson: d.readJson || readJson, writeJson: d.writeJson || writeJson, fetch: d.fetch, now: d.now }); } catch (e) { tn = { error: true }; console.error("tonight schedule", e && e.message); }
     let gm = null; const guideOnce = () => (gm = gm || getGuide(d));
     let fo;
     try {
       fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems, o) => reschedule(t, rems, o), deadline: t0 + FOLLOW_BUDGET_MS + 10000, ...d, ...(d.follow || {}), guide: guideOnce });
     } catch (e) { console.error("follow-check", e && e.message); fo = { error: true }; }
     const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 52000, ...d, guide: guideOnce }); // משאיר זמן לניקוי ערבי הצפייה לפני maxDuration 60
-    r.follow = fo;
+    r.follow = fo; r.tn = tn;
     // 🍿 ערב צפייה: ניקוי קטן (עד 100 ערבים שעברו יומיים), מכבד את הזמן שנשאר. כישלון כאן לא פוגע בבדיקה היומית
     try { r.parties = await (d.cleanParties || cleanParties)(Date.now(), { deadline: t0 + 55000 }); } catch (e) { r.parties = -1; console.error("party cleanup failed"); }
     console.log("watch-check", JSON.stringify(r));

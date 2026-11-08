@@ -837,6 +837,7 @@
   .tmal span { color: var(--muted); font-size: .85rem; line-height: 1.35; }
   .tmsw { flex: none; position: relative; width: 51px; height: 31px; border-radius: 999px; background: var(--sel); transition: background-color .2s; }
   .tmsw::after { content: ""; position: absolute; top: 2px; right: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .22s cubic-bezier(.3,.7,.4,1); }
+  .tmauto.tnset { margin-top: 0; } /* 🌙 בהגדרות: ישר מתחת לכותרת "התראות" */
   .tmauto[aria-checked="true"] .tmsw { background: #30D158; } /* מתג כמו ב-iOS: ירוק כשפעיל (לא כפתור כתום נוסף) */
   .tmauto[aria-checked="true"] .tmsw::after { transform: translateX(-20px); }
   @media (prefers-reduced-motion: reduce) { .tmsw, .tmsw::after { transition: none; } }

@@ -21,7 +21,31 @@
     $("#instBtn").textContent = TVG.isAndroid ? "התקנת האפליקציה" : "הוסף למסך הבית";
     $("#instTxt").textContent = TVG.dip ? "אפשר להתקין את הלוח כאפליקציה, והוא ייפתח במסך מלא." : ios ? "בספארי: לוחצים על כפתור השיתוף ואז על ״הוסף למסך הבית״." : "בתפריט הדפדפן: ״הוסף למסך הבית״ או ״התקן אפליקציה״.";
   }
-  function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); if (TVG.wlRender) TVG.wlRender(); }
+  function openSet() { TVG.closeFavs(); $("#setsheet").hidden = false; $("#scrim2").hidden = false; setInst(); tnRender(); if (TVG.wlRender) TVG.wlRender(); }
+
+  // ---- 🌙 הערב שלך ב-19:00: התראה אחת בערב עם מה שמעניין אותך (השרת: calendar-server/api/_tonight.js) ----
+  // tvg.tn19: "0" = כבוי; חסר = פעיל (נשלח רק כשיש פוש, ורק בערב שיש בו משהו מהמועדפים/הנושאים/המעקב שעוד אין עליו תזכורת). עולה לשרת עם הגיבוי
+  function tnOn() { return TVG.store("tvg.tn19") !== "0"; }
+  function tnRender() {
+    var box = $("#tnSet"); if (!box) return;
+    var push = !!TVG.pushOn, on = push && tnOn();
+    var sub = push ? "רק כשיש משהו בשבילך הערב"
+      : TVG.canPush ? "צריך להפעיל התראות לטלפון. הקשה כאן להפעלה"
+      : TVG.isIOS && !TVG.isStandalone ? "התראות עובדות רק מהאפליקציה שבמסך הבית" : "המכשיר הזה לא תומך בהתראות";
+    box.innerHTML = '<button type="button" class="tmauto tnset" role="switch" aria-checked="' + on + '" data-tn19><span class="tmal"><b>🌙 הערב שלך ב-19:00</b><span>' + sub + '</span></span><i class="tmsw" aria-hidden="true"></i></button>';
+  }
+  TVG.tnRender = tnRender;
+  function tnSet(v) { TVG.store("tvg.tn19", v ? "1" : "0"); tnRender(); }
+  function tnTap() {
+    if (!TVG.pushOn) { // בלי פוש: מפעילים התראות (ההגדרה נשארת פעילה), והמתג מתעדכן כשההפעלה מסתיימת
+      TVG.store("tvg.tn19", "1"); TVG.enablePush();
+      var n = 0, iv = setInterval(function () { if (TVG.pushOn || ++n > 40) { clearInterval(iv); tnRender(); } }, 500);
+      return;
+    }
+    if (tnOn()) { tnSet(false); TVG.pill("🌙 הערב שלך כבוי", 4000, "ביטול", function () { tnSet(true); TVG.pill("הוחזר ✓", 1200); }); }
+    else { tnSet(true); TVG.pill("🌙 נעדכן אותך ב-19:00 כשיש משהו בשבילך הערב", 3000); }
+  }
+  document.addEventListener("click", function (e) { var t = e.target.closest && e.target.closest("[data-tn19]"); if (t) tnTap(); });
 
   // ---- שיתוף האפליקציה עם חברים: קישור ההזמנה join/ (תמונה ותיאור משלו בוואטסאפ) ----
   var JOIN = "https://eladweiss-ops.github.io/tv-guide/join/";

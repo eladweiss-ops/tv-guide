@@ -8,6 +8,9 @@
   "functions": {
     "api/watch-check.js": {
       "maxDuration": 60
+    },
+    "api/fire.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

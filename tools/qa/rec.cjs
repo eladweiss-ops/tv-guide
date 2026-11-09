@@ -59,6 +59,10 @@ const A = (c, m) => { if (!c) { fails++; console.log("  FAIL " + m); } else cons
     await page.goto(base + "index.html?nf=t999999&t=" + encodeURIComponent("סדרה לדוגמה"), { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
     A(/סדרה לדוגמה/.test((await page.textContent("#nfsBody")) || "") && !/[?&]t=/.test(page.url()), "item outside the lists opens from its title; url cleaned");
     await shot("03_friend_stub");
+    // 3b2. 💌 על תוכן מחוץ לרשימות: גם הוא דרך השרת (/n/) – בוואטסאפ תמונת הסדרה, לא הלוגו
+    await page.click("#nfsBar [data-nfrec]"); await page.waitForTimeout(500);
+    A(/tv-guide-cal\.vercel\.app\/n\/t999999$/.test((await page.textContent("#shPrev")).trim()), "💌 on an item outside the lists links via /n/ (series image in WhatsApp)");
+    await shot("03b_rec_stub"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
     // 3c. דיסני+: הקישור מסומן s=d, ואצל החבר (דפדפן נקי) נטען disney.json לפני הפתיחה
     const DK = Object.keys(JSON.parse(fs.readFileSync(path.join(REPO, "disney.json"), "utf8")).items).find((k) => !nf.items[k]);
     if (DK) {
@@ -69,7 +73,7 @@ const A = (c, m) => { if (!c) { fails++; console.log("  FAIL " + m); } else cons
       await p2.goto(base + "index.html?nf=" + DK + "&s=d", { waitUntil: "networkidle" }); await p2.waitForTimeout(1800);
       A(await p2.evaluate(() => !document.querySelector("#nfsheet").hidden && /דיסני\+/.test(document.querySelector("#nfsBar").textContent)), "Disney+ link opens the Disney+ page in a clean browser");
       await p2.click("#nfsBar [data-nfrec]"); await p2.waitForTimeout(400);
-      A(/(\/n\/[mt]\d+\?s=d|\?nf=[mt]\d+&s=d&t=\S+)$/.test((await p2.textContent("#shPrev")).trim()), "💌 from a Disney+ page marks s=d");
+      A(/\/n\/[mt]\d+\?s=d$/.test((await p2.textContent("#shPrev")).trim()), "💌 from a Disney+ page marks s=d");
       await c2.close();
     } else console.log("  (no Disney-only item to test)");
     await page.goto(base + "index.html", { waitUntil: "networkidle" }); await page.waitForTimeout(900);

@@ -214,7 +214,6 @@
     paintPrev();
     $("#rem").hidden = false; $("#scrim2").hidden = false;
   }
-  function inList(k, svc) { var L = svc === "דיסני+" ? TVG.DS : TVG.NF; return !!(L && L.items && L.items[k]); }
   function tmdbImg(u) { return /^https:\/\/image\.tmdb\.org\/t\/p\/[a-z0-9]+\/[\w-]+\.(jpg|jpeg|png|webp)$/i.test(u || "") ? u : ""; }
   function nfParts(x, k) {
     var svc = TVG.nfSvc && TVG.nfSvc(x) === "disney" ? "דיסני+" : "נטפליקס", d = String(x.overview || "").replace(/\s+/g, " ").trim();
@@ -224,8 +223,8 @@
       wide: tmdbImg(x.backdrop), poster: tmdbImg(x.poster), // לתצוגה המקדימה בלבד (כמו שהשרת יציג בוואטסאפ)
       title: String(x.title || "").replace(/\*/g, "").replace(/\s+/g, " ").trim(),
       day: [x.type === "tv" ? "סדרה" : "סרט", x.year ? String(x.year) : "", svc].filter(Boolean).join(" · "),
-      // ברשימות: קישור דרך השרת (/n/<k>) – בוואטסאפ מופיעה תמונת הסדרה, והדף עובר מיד לאפליקציה. מחוץ לרשימות: ישר לאפליקציה עם השם (t=), כדי שייפתח
-      syn: d, link: inList(k, svc) ? "https://tv-guide-cal.vercel.app/n/" + k + (svc === "דיסני+" ? "?s=d" : "") : APP + "?nf=" + k + (svc === "דיסני+" ? "&s=d" : "") + "&t=" + encodeURIComponent(String(x.title || "").slice(0, 60)) // s=d: דיסני+ (טוען את disney.json לפני הפתיחה); t= רק לתוכן מחוץ לרשימות (נפתח מהשם)
+      // תמיד דרך השרת (/n/<k>): בוואטסאפ מופיעה תמונת התוכן, והדף עובר מיד לאפליקציה עם השם (t=), כך שגם תוכן מחוץ לרשימות נפתח
+      syn: d, link: "https://tv-guide-cal.vercel.app/n/" + k + (svc === "דיסני+" ? "?s=d" : "") // s=d: דיסני+ (טוען את disney.json לפני הפתיחה)
     };
   }
   function curParts() { // החלקים להודעה הנוכחית, עם המילה האישית

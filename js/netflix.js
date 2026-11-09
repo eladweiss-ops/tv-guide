@@ -447,7 +447,7 @@
     }
     if (t.closest("[data-nfdsretry]")) { TVG.dsState = "idle"; TVG.render(); return; }
     var fv = t.closest("[data-nffav]"); if (fv) { toggleFav(fv.getAttribute("data-nffav")); return; }
-    var rc = t.closest("[data-nfrec]"); if (rc) { var rk = rc.getAttribute("data-nfrec"), rx = getItem(rk); if (rx && TVG.openShareNf) TVG.openShareNf(rx, rk); return; } // 💌 המלצה
+    var rc = t.closest("[data-nfrec]"); if (rc) { var rk = rc.getAttribute("data-nfrec"), rx = getItem(rk) || (stubT && stubT.k === rk ? stubItem(rk, stubT.t, prefSvc === "disney") : null); if (rx && TVG.openShareNf) TVG.openShareNf(rx, rk); return; } // 💌 המלצה (גם מדף שנפתח מקישור המלצה על תוכן מחוץ לרשימות: השלד מהשם)
     var mo = t.closest("[data-nfmore]"); if (mo) { openNfList(mo.getAttribute("data-nfmore")); return; }
     var o = t.closest("[data-nfopen]"); if (o) { e.preventDefault(); openNf(o.getAttribute("data-nfopen"), null, o.getAttribute("data-nfpref")); return; }
     if (t.closest("[data-nfclose]")) closeNf();

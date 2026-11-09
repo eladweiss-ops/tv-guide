@@ -2,7 +2,7 @@
 // החיבור לפי מזהה, לא לפי שם: ויקינתונים (P4947 סרט / P4983 סדרה = מזהה TMDB) → הערך בוויקיפדיה העברית. כך אין סכנה לתקציר של סרט אחר באותו שם.
 // מהערך: תחילת פרק העלילה (2-3 משפטים, בלי להרוס את ההמשך), ואם אין – פסקת הפתיחה.
 // heOverviews(list:[{k,type,id}], d) → {k: "תקציר"}; כשל/חריגת זמן = מה שהספקנו (בלי זריקה). משמש את השרת (nf-search) ואת netflix.mjs.
-// d: {fetch, wikiBudget, max}. בלי תלויות, כדי ש-netflix.mjs (שורש המאגר) יוכל לייבא אותו.
+// d: {fetch, wikiBudget, max, onFail}. onFail = נקרא בכשל רשת/זמן (כדי לא לשמור "אין תקציר" במטמון). בלי תלויות, כדי ש-netflix.mjs (שורש המאגר) יוכל לייבא אותו.
 export const HEW_SPARQL = "https://query.wikidata.org/sparql";
 export const HEW_API = "https://he.wikipedia.org/w/api.php";
 export const HEW_UA = "tv-guide-cal/1.0 (https://eladweiss-ops.github.io/tv-guide/; personal TV guide)"; // מדיניות ויקימדיה: UA עם דרך יצירת קשר
@@ -77,8 +77,8 @@ export async function heOverviews(list0, d = {}) {
         const pages = j && j.query && j.query.pages, p = pages && Object.values(pages)[0];
         const t = p && typeof p.extract === "string" ? pickDesc(p.extract) : "";
         if (t) out[k] = t;
-      } catch (e) { /* ערך אחד שנכשל לא מפיל את השאר */ }
+      } catch (e) { if (d.onFail) d.onFail(); } // ערך אחד שנכשל לא מפיל את השאר
     }));
-  } catch (e) { console.error("hewiki", e && e.message); }
+  } catch (e) { console.error("hewiki", e && e.message); if (d.onFail) d.onFail(); }
   return out;
 }

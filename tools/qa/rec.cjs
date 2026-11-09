@@ -63,6 +63,19 @@ const A = (c, m) => { if (!c) { fails++; console.log("  FAIL " + m); } else cons
     await page.click("#nfsBar [data-nfrec]"); await page.waitForTimeout(500);
     A(/tv-guide-cal\.vercel\.app\/n\/t999999$/.test((await page.textContent("#shPrev")).trim()), "💌 on an item outside the lists links via /n/ (series image in WhatsApp)");
     await shot("03b_rec_stub"); await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+    // 3d. תקציר בלי עברית: הדף נפתח מיד, והתקציר העברי (?he=) מחליף אותו כשמגיע
+    const EK = Object.keys(nf.items).find((k) => !/[֐-׿]/.test(nf.items[k].overview || ""));
+    if (EK) {
+      await page.route(new RegExp("nf-search\\?he=" + EK), (r) => setTimeout(() => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ k: EK, he: "תקציר לדוגמה בעברית מוויקיפדיה. משפט שני של העלילה." }) }), 700));
+      await page.goto(base + "index.html?nf=" + EK, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(500);
+      A(await page.evaluate(() => !document.querySelector("#nfsheet").hidden), "page opens without waiting for the Hebrew synopsis");
+      await page.waitForTimeout(1500);
+      A(/תקציר לדוגמה בעברית/.test(await page.textContent("#nfsBody .nfov")), "Hebrew synopsis replaces the English one when it arrives");
+      await shot("03d_he_desc");
+      await page.click("#nfsBar [data-nfrec]"); await page.waitForTimeout(400);
+      A(/תקציר לדוגמה בעברית/.test(await page.textContent("#shPrev")), "💌 uses the Hebrew synopsis too");
+      await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+    } else console.log("  (no item without a Hebrew synopsis to test)");
     // 3c. דיסני+: הקישור מסומן s=d, ואצל החבר (דפדפן נקי) נטען disney.json לפני הפתיחה
     const DK = Object.keys(JSON.parse(fs.readFileSync(path.join(REPO, "disney.json"), "utf8")).items).find((k) => !nf.items[k]);
     if (DK) {

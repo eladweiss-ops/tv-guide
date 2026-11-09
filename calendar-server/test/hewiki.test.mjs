@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 process.env.TMDB_API_KEY = "k".repeat(32);
 console.error = () => {};
 const { pickDesc, heOverviews, HEW_MAX } = await import("../api/_hewiki.js");
-const { heFill, handleOg, _clearCache } = await import("../api/nf-search.js");
+const { handleHe, handleOg, handleSearch, _clearCache, HE_NONE_TTL } = await import("../api/nf-search.js");
 
 const jr = (o, status = 200) => ({ ok: status < 400, status, json: async () => o });
 const PLOT_TXT = "עצמאות (באנגלית: Tell Me Everything) הוא סרט קולנוע ישראלי משנת 2026 שכתב וביים משה רוזנטל.[1]\nהסרט זכה בעשרה פרסי אופיר.\n\n\n== תקציר העלילה ==\nהסרט מתרחש ב-1987. משפחת שבת, משפחה ישראלית מחולון, מתכוננת לבר המצווה של בועז. בועז מגלה על אביו סוד שישנה את חיי המשפחה. בשנת 1996 בועז כבר מתכונן ללימודים באוניברסיטה העברית ומנסה לחדש את הקשר עם אביו, ומגלה שהכול השתנה.\n\n== שחקנים ==\nאסי כהן";
@@ -80,12 +80,32 @@ test("heOverviews: כתובת ערך שאינה ויקיפדיה העברית נ
   assert.equal(fx.calls.length, 1);
 });
 
-test("heFill: רק פריטים בלי תקציר בעברית; תקציר עברי קיים לא נוגעים", async () => {
-  const fx = wiki({ bindings: [art("tm", 1404400, "עצמאות (סרט)"), art("tm", 9, "סרט תשע")], pages: { "עצמאות (סרט)": PLOT_TXT, "סרט תשע": PLOT_TXT } });
-  const a = { k: "m1404400", type: "movie", id: 1404400, overview: "Amid the late '80s" }, b = { k: "m9", type: "movie", id: 9, overview: "תקציר קיים בעברית" };
-  await heFill([a, b], { fetch: fx });
-  assert.ok(a.overview.startsWith("הסרט מתרחש")); assert.equal(b.overview, "תקציר קיים בעברית");
-  assert.doesNotMatch(decodeURIComponent(new URL(fx.calls[0]).searchParams.get("query")), /"9"/, "פריט עם עברית לא נשאל");
+test("handleHe: תקציר מוויקיפדיה, מטמון זיכרון + Firestore; 'אין ערך' נשמר יום; כשל רשת לא נשמר", async () => {
+  _clearCache();
+  const store = {}, rw = { readJson: async (p, dflt) => store[p] ?? dflt, writeJson: async (p, o) => { store[p] = JSON.parse(JSON.stringify(o)); }, now: () => 5_000_000 };
+  const fx = wiki({ bindings: [art("tm", 1404400, "עצמאות (סרט)")], pages: { "עצמאות (סרט)": PLOT_TXT } });
+  const r = await handleHe("m1404400", { ...rw, fetch: fx });
+  assert.equal(r.status, 200); assert.ok(r.json.he.startsWith("הסרט מתרחש")); assert.equal(r.cache, "miss");
+  assert.ok(store["cache/he/m1404400.json"].v.startsWith("הסרט מתרחש"));
+  assert.equal((await handleHe("m1404400", { ...rw, fetch: fx })).cache, "mem");
+  _clearCache(); const n = fx.calls.length;
+  assert.equal((await handleHe("m1404400", { ...rw, fetch: fx })).cache, "db"); assert.equal(fx.calls.length, n);
+  // אין ערך: "" נשמר, ואחרי יום שואלים שוב
+  const r2 = await handleHe("m5", { ...rw, fetch: wiki() });
+  assert.equal(r2.json.he, ""); assert.equal(store["cache/he/m5.json"].v, "");
+  _clearCache(); assert.equal((await handleHe("m5", { ...rw, fetch: wiki() })).cache, "db");
+  _clearCache(); assert.equal((await handleHe("m5", { ...rw, fetch: wiki(), now: () => 5_000_000 + HE_NONE_TTL + 1 })).cache, "miss");
+  // כשל: לא נשמר ל-Firestore
+  const r3 = await handleHe("m6", { ...rw, fetch: wiki({ failSparql: true }) });
+  assert.equal(r3.json.he, ""); assert.equal(r3.failed, true); assert.equal(store["cache/he/m6.json"], undefined);
+  assert.equal((await handleHe("x1", rw)).status, 400);
+});
+
+test("חיפוש לא מחכה לוויקיפדיה: אין פנייה לוויקינתונים בחיפוש", async () => {
+  _clearCache();
+  const fx = wiki();
+  await handleSearch("tell me everything", { fetch: fx, readJson: async () => null, writeJson: async () => {} });
+  assert.ok(!fx.calls.some((u) => /wikidata\.org\/sparql|he\.wikipedia/.test(u)), "בלי ויקיפדיה בחיפוש");
 });
 
 test("og: סרט בלי תקציר עברי ב-TMDB → og:description מוויקיפדיה העברית", async () => {

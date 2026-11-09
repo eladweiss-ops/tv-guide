@@ -261,6 +261,20 @@
     if (typeof r.mc === "number") a.push(rateA("mc", "https://www.metacritic.com/search/" + q + "/", "ביקורות ב-Metacritic", String(Math.round(r.mc)), "Metacritic"));
     return a.length ? '<div class="nfrates">' + a.join("") + "</div>" : "";
   }
+  // תקציר בעברית מוויקיפדיה (השרת: ?he=<k>), לתוכן ש-TMDB אין לו תקציר עברי. ברקע, אחרי שהדף כבר מוצג: החיפוש לא מחכה לזה
+  var HEO = {}, HEB_RE = /[֐-׿]/; // k -> "תקציר" | "" (אין) | null (בדרך)
+  function heDesc(x, k) {
+    if (!x || HEB_RE.test(x.overview || "") || !/^[mt][0-9]{1,9}$/.test(k || "") || !TVG.CAL_API) return;
+    if (HEO[k]) { x.overview = HEO[k]; return; }
+    if (HEO[k] !== undefined) return;
+    HEO[k] = null;
+    fetch(TVG.CAL_API + "/api/nf-search?he=" + k).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var t = j && j.k === k && typeof j.he === "string" && HEB_RE.test(j.he) ? j.he.slice(0, 400) : "";
+      HEO[k] = t; if (!t) return;
+      var y = getItem(k); if (y && !HEB_RE.test(y.overview || "")) y.overview = t; // גם ל💌 המלצה
+      if (TVG.nfOpen === k) reopen();
+    }).catch(function () { delete HEO[k]; }); // כשל רשת: ננסה בפתיחה הבאה
+  }
   function pageHtml(x) {
     var bd = imgUrl(x.backdrop), u = bd || imgUrl(x.poster);
     var h = '<div class="nfbd' + (u ? "" : " er") + (bd ? "" : " ispo") + '">' + (u ? '<img alt="" decoding="async" src="' + esc(u) + '">' : "") + '<span class="nfph" aria-hidden="true">🎬</span></div>';
@@ -324,7 +338,7 @@
       return;
     }
     if (!x) { TVG.nfOpenEv = null; if (TVG.pill) TVG.pill("לא מצאנו את התוכן הזה", 2200); return; }
-    TVG.nfOpen = k;
+    TVG.nfOpen = k; heDesc(x, k);
     $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x, k); $("#nfsBody").scrollTop = 0;
     $("#nfsheet").hidden = false; $("#scrim2").hidden = false;
     if (TVG.nfEnsure) TVG.nfEnsure(x); // פריט בלי פרטים (נפתח מהודעה): משלימים מהחיפוש
@@ -333,6 +347,7 @@
   // ציור מחדש של הדף הפתוח (אחרי שינוי התראה/תזכורת/נתונים), בלי לקפוץ לראש
   function reopen() {
     var x = TVG.nfOpen && getItem(TVG.nfOpen); if (!x || $("#nfsheet").hidden) return;
+    heDesc(x, TVG.nfOpen);
     var sc = $("#nfsBody").scrollTop;
     $("#nfsBody").innerHTML = pageHtml(x); $("#nfsBar").innerHTML = barHtml(x, TVG.nfOpen); $("#nfsBody").scrollTop = sc;
   }

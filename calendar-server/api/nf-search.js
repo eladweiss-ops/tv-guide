@@ -24,7 +24,7 @@ import { allow, clientIp, tooMany, fail } from "./_guard.js";
 const mem = new Map();      // hash -> {t, v}
 export const PARTIAL_TTL = 5 * 60000;
 const provCache = new Map(); // k -> {t, v}  (זמינות לפי פריט, בין חיפושים)
-export const _clearCache = () => { mem.clear(); provCache.clear(); aliasMem.clear(); ogMem.clear(); };
+export const _clearCache = () => { mem.clear(); provCache.clear(); aliasMem.clear(); ogMem.clear(); heMem.clear(); };
 
 export const CACHE_V = "7"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
 export const hashOf = (q) => createHash("sha256").update(CACHE_V + "|" + (norm(q) || q.toLowerCase())).digest("hex").slice(0, 32);
@@ -74,12 +74,28 @@ export async function handleAlias(body, d = {}) {
   return { status: 200, json: { ok: true } };
 }
 
-// תקציר בלי עברית (TMDB): תחילת העלילה מוויקיפדיה העברית, לפי מזהה TMDB דרך ויקינתונים (_hewiki.js). כשל = נשאר התקציר באנגלית
-export async function heFill(items, d = {}) {
-  const need = items.filter((o) => o && !hasHeb(o.overview));
-  if (!need.length) return;
-  const got = await heOverviews(need.map((o) => ({ k: o.k, type: o.type, id: o.id })), d);
-  need.forEach((o) => { if (got[o.k]) o.overview = got[o.k]; });
+// ---- ?he=<k>: תקציר בעברית מוויקיפדיה (_hewiki.js), לפריט ש-TMDB אין לו תקציר עברי ----
+// לא בתוך החיפוש (ויקינתונים יכול לקחת עד 3 שניות): האפליקציה מבקשת אותו ברקע כשנפתח דף התוכן, ומחליפה את האנגלי כשמגיע.
+// מטמון: זיכרון + Firestore (cache/he/<k>.json): נמצא 7 ימים, "אין ערך" יום. כשל רשת = לא נשמר (5 דקות בזיכרון).
+export const HE_TTL = 7 * 24 * 3600 * 1000, HE_NONE_TTL = 24 * 3600 * 1000;
+const heMem = new Map(); // k -> {exp, v}
+export async function handleHe(k0, d = {}) {
+  const k = String(k0 || "");
+  if (!okKey(k)) return { status: 400, json: { error: "bad key" } };
+  const now = d.now ? d.now() : Date.now(), rj = d.readJson || readJson, wj = d.writeJson || writeJson, path = "cache/he/" + k + ".json";
+  const m = heMem.get(k);
+  if (m && now < m.exp) return { status: 200, json: { k, he: m.v }, cache: "mem" };
+  try {
+    const b = await rj(path, null);
+    if (b && typeof b.t === "number" && typeof b.v === "string" && now - b.t < (b.v ? HE_TTL : HE_NONE_TTL)) { heMem.set(k, { exp: b.t + (b.v ? HE_TTL : HE_NONE_TTL), v: b.v }); return { status: 200, json: { k, he: b.v }, cache: "db" }; }
+  } catch (e) { /* מטמון לא זמין */ }
+  let failed = false;
+  const got = await heOverviews([{ k, type: k[0] === "t" ? "tv" : "movie", id: +k.slice(1) }], { ...d, onFail: () => { failed = true; } });
+  const v = got[k] || "";
+  heMem.set(k, { exp: now + (v ? HE_TTL : failed ? PARTIAL_TTL : HE_NONE_TTL), v });
+  if (heMem.size > 1000) for (const [x, y] of heMem) if (now >= y.exp) heMem.delete(x);
+  if (v || !failed) try { await wj(path, { t: now, v }); } catch (e) { console.error("nf-he cache write", e && e.message); }
+  return { status: 200, json: { k, he: v }, cache: "miss", failed: failed && !v };
 }
 
 // d (לבדיקות): {fetch, key, readJson, writeJson, now, noAlias}
@@ -104,7 +120,6 @@ export async function handleSearch(q0, d = {}) {
     return { status: e && e.status === 503 ? 503 : 502, json: { error: e && e.status === 503 ? "not configured" : "upstream" } };
   }
   if (!out) return { status: 400, json: { error: "bad query" } };
-  await heFill(Object.values(out.items || {}), d);
   const part = !!out.partial; // תוצאה חלקית (כשל בתת-קריאה): רק זיכרון ל-5 דקות, לא נכתבת ל-Firestore
   mem.set(h, { exp: now + (part ? PARTIAL_TTL : SEARCH_TTL), v: out });
   if (mem.size > 500) for (const [k, v] of mem) if (now >= v.exp) mem.delete(k);
@@ -135,7 +150,7 @@ async function ogData(k, d) {
   if (!base) return null;
   const o = shapeTitle(base, ok(en) ? en : null, type);
   if (!o) return null;
-  await heFill([o], d);
+  if (!hasHeb(o.overview)) { const h = await handleHe(o.k, d).catch(() => null); if (h && h.json && h.json.he) o.overview = h.json.he; } // וואטסאפ מחכה בסבלנות: כאן כן מחכים
   const bd = img(base.backdrop_path || (en && en.backdrop_path), "w780"), ps = img(base.poster_path || (en && en.poster_path), "w500");
   // בלי שם עברי ב-TMDB (מחזיר את השם המקורי, למשל "Bytet"): השם באנגלית, כמו ברשימות (netflix.mjs shapeItem)
   const t = /[֐-׿]/.test(o.title || "") || !ok(en) ? o.title : (en.title || en.name || o.title);
@@ -193,6 +208,14 @@ export default async function handler(req, res) {
       res.setHeader("cache-control", r.status !== 200 ? "no-store" : r.generic ? "public, max-age=300" : "public, max-age=3600");
       return res.status(r.status).end(r.status === 200 ? (req.method === "HEAD" ? "" : r.html) : "bad key");
     } catch (e) { return fail(res, e, "nf-og"); }
+  }
+  if ((req.method === "GET" || req.method === "HEAD") && req.query && req.query.he != null) {
+    try {
+      if (!allow("nfh:ip:" + clientIp(req), 60)) return tooMany(res);
+      const r = await handleHe(String(req.query.he));
+      res.setHeader("cache-control", r.status !== 200 || r.failed ? "no-store" : "public, max-age=86400");
+      return res.status(r.status).json(r.json);
+    } catch (e) { return fail(res, e, "nf-he"); }
   }
   if (req.method === "POST") {
     try {

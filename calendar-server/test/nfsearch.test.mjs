@@ -449,8 +449,8 @@ test("og: k תקין → כותרת בעברית, תקציר מקוצר, תמו�
   assert.equal(metaOf(h, "og:type"), "website");
   assert.equal(metaOf(h, "og:url"), "https://tv-guide-cal.vercel.app/n/t336240");
   assert.equal(metaOf(h, "twitter:card"), "summary_large_image");
-  assert.ok(h.includes('<meta http-equiv="refresh" content="0;url=https://eladweiss-ops.github.io/tv-guide/?nf=t336240">'));
-  assert.ok(h.includes('location.replace("https://eladweiss-ops.github.io/tv-guide/?nf=t336240")'));
+  assert.ok(h.includes('<meta http-equiv="refresh" content="0;url=https://eladweiss-ops.github.io/tv-guide/?nf=t336240&amp;t=%D7%97%D7%99%D7%9C%D7%95%D7%A4%D7%99%20%D7%91%D7%AA%D7%99%D7%9D">'));
+  assert.ok(h.includes('location.replace("https://eladweiss-ops.github.io/tv-guide/?nf=t336240&t=%D7%97%D7%99%D7%9C%D7%95%D7%A4%D7%99%20%D7%91%D7%AA%D7%99%D7%9D")'));
   assert.ok(store["cache/og/t336240.json"], "נכתב ל-Firestore");
   const n = fx.calls.length;
   assert.equal((await handleOg("t336240", "", d)).cache, "mem"); assert.equal(fx.calls.length, n);
@@ -474,6 +474,7 @@ test("og: סרט בלי עברית ובלי רקע → שם באנגלית, פו
   assert.equal(metaOf(r.html, "og:description"), "Spanning the years 1945 to 1955.");
   assert.equal(metaOf(r.html, "og:image"), "https://image.tmdb.org/t/p/w500/abcde12345.jpg");
   assert.equal(metaOf(r.html, "og:image:width"), "500"); assert.equal(metaOf(r.html, "og:image:height"), "750");
+  assert.ok(r.html.includes('location.replace("https://eladweiss-ops.github.io/tv-guide/?nf=m238&t=The%20Godfather")'), "השם בהפניה: האפליקציה פותחת לפיו תוכן מחוץ לרשימות");
 });
 
 test("og: TMDB לא זמין → דף כללי (זפזופ, og-join.png) עם ההפניה, לא נשמר ל-Firestore", async () => {

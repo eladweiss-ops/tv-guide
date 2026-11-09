@@ -11,7 +11,7 @@
 //   הראשון שאושר קובע: כינוי קיים עם t אחר → 409 (אותו t → 200). POST {q, del:1, t} → מחיקה ("לא נכון?") רק אם t זהה לכינוי השמור
 //   (בלי תלות באותיות גדולות/קטנות), אחרת 409; אין כינוי → 200 deleted:false. קצב: 5 בשעה ל-IP. בזיכרון: כינוי שנמצא 2 דקות, "אין כינוי" 60 שניות.
 // GET /n/<k>[?s=d] (rewrite ב-vercel.json → /api/nf-search?og=<k>&s=d): דף HTML קטן לתצוגה מקדימה בוואטסאפ (og:title/description/image מ-TMDB,
-//   he-IL עם נפילה ל-en-US) שמעביר מיד לאפליקציה ./?nf=<k>[&s=d]. k = m<id>|t<id>, s=d = דיסני+. מטמון: זיכרון + Firestore (cache/og/<k>.json) ל-24 שעות.
+//   he-IL עם נפילה ל-en-US) שמעביר מיד לאפליקציה ./?nf=<k>[&s=d]&t=<שם>. k = m<id>|t<id>, s=d = דיסני+. מטמון: זיכרון + Firestore (cache/og/<k>.json) ל-24 שעות.
 //   TMDB לא זמין: דף כללי ("זפזופ", og-join.png) עם אותה הפניה. קצב: 60 בדקה ל-IP. k לא תקין → 400.
 import { createHash } from "node:crypto";
 import { searchNf, cleanQuery, norm, SEARCH_TTL } from "./_nfs.js";
@@ -131,7 +131,8 @@ async function ogData(k, d) {
   return { type, title: t, desc: trimText(o.overview), image: bd || ps, w: bd ? 780 : ps ? 500 : 0, h: bd ? 439 : ps ? 750 : 0 };
 }
 export function ogHtml(k, ds, v) {
-  const target = APP_URL + "?nf=" + k + (ds ? "&s=d" : ""), self = SELF_URL + "/n/" + k + (ds ? "?s=d" : "");
+  // t= השם מ-TMDB: האפליקציה פותחת לפיו גם תוכן שלא ברשימות (netflix.js stubItem), כך שכל המלצה יכולה לעבור כאן ולקבל את תמונת התוכן
+  const target = APP_URL + "?nf=" + k + (ds ? "&s=d" : "") + (v && v.title ? "&t=" + encodeURIComponent(String(v.title).slice(0, 60)) : ""), self = SELF_URL + "/n/" + k + (ds ? "?s=d" : "");
   const svc = ds ? "בדיסני+" : "בנטפליקס";
   const title = v ? v.title + " · " + (v.type === "tv" ? "סדרה" : "סרט") + " " + svc : "זפזופ · המלצה " + svc;
   const desc = (v && v.desc) || "לוח שידורים, חיפוש ותזכורות – כל מה שעל המסך במקום אחד";
@@ -142,7 +143,7 @@ export function ogHtml(k, ds, v) {
   ].map(([p, c]) => '<meta property="' + p + '" content="' + esc(c) + '">');
   const name = [["description", desc], ["twitter:card", "summary_large_image"], ["twitter:title", title], ["twitter:description", desc], ["twitter:image", image]]
     .map(([p, c]) => '<meta name="' + p + '" content="' + esc(c) + '">');
-  const js = JSON.stringify(target); // target = כתובת קבועה + k שעבר okKey: אין תווים מיוחדים
+  const js = JSON.stringify(target); // target = כתובת קבועה + k שעבר okKey + t מקודד ב-encodeURIComponent: אין < או " בתוך הסקריפט
   return [
     "<!doctype html>", '<html lang="he" dir="rtl"><head><meta charset="utf-8">', '<meta name="viewport" content="width=device-width,initial-scale=1">',
     "<title>" + esc(title) + "</title>", ...name, ...prop,

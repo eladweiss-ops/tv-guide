@@ -18,6 +18,7 @@ import { searchNf, cleanQuery, norm, SEARCH_TTL } from "./_nfs.js";
 import { tget, shapeTitle, img, okKey } from "./_tmdb.js";
 import { readJson, writeJson } from "./_push.js";
 import { delJson } from "./_db.js";
+import { heOverviews, hasHeb } from "./_hewiki.js";
 import { allow, clientIp, tooMany, fail } from "./_guard.js";
 
 const mem = new Map();      // hash -> {t, v}
@@ -25,7 +26,7 @@ export const PARTIAL_TTL = 5 * 60000;
 const provCache = new Map(); // k -> {t, v}  (זמינות לפי פריט, בין חיפושים)
 export const _clearCache = () => { mem.clear(); provCache.clear(); aliasMem.clear(); ogMem.clear(); };
 
-export const CACHE_V = "6"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
+export const CACHE_V = "7"; // להעלות בכל שינוי בלוגיקת החיפוש, כדי שתוצאות ישנות לא יוגשו מהמטמון
 export const hashOf = (q) => createHash("sha256").update(CACHE_V + "|" + (norm(q) || q.toLowerCase())).digest("hex").slice(0, 32);
 
 // ---- כינויים בעברית שנלמדו מהשימוש ----
@@ -73,6 +74,14 @@ export async function handleAlias(body, d = {}) {
   return { status: 200, json: { ok: true } };
 }
 
+// תקציר בלי עברית (TMDB): תחילת העלילה מוויקיפדיה העברית, לפי מזהה TMDB דרך ויקינתונים (_hewiki.js). כשל = נשאר התקציר באנגלית
+export async function heFill(items, d = {}) {
+  const need = items.filter((o) => o && !hasHeb(o.overview));
+  if (!need.length) return;
+  const got = await heOverviews(need.map((o) => ({ k: o.k, type: o.type, id: o.id })), d);
+  need.forEach((o) => { if (got[o.k]) o.overview = got[o.k]; });
+}
+
 // d (לבדיקות): {fetch, key, readJson, writeJson, now, noAlias}
 export async function handleSearch(q0, d = {}) {
   const q1 = cleanQuery(q0);
@@ -95,6 +104,7 @@ export async function handleSearch(q0, d = {}) {
     return { status: e && e.status === 503 ? 503 : 502, json: { error: e && e.status === 503 ? "not configured" : "upstream" } };
   }
   if (!out) return { status: 400, json: { error: "bad query" } };
+  await heFill(Object.values(out.items || {}), d);
   const part = !!out.partial; // תוצאה חלקית (כשל בתת-קריאה): רק זיכרון ל-5 דקות, לא נכתבת ל-Firestore
   mem.set(h, { exp: now + (part ? PARTIAL_TTL : SEARCH_TTL), v: out });
   if (mem.size > 500) for (const [k, v] of mem) if (now >= v.exp) mem.delete(k);
@@ -125,6 +135,7 @@ async function ogData(k, d) {
   if (!base) return null;
   const o = shapeTitle(base, ok(en) ? en : null, type);
   if (!o) return null;
+  await heFill([o], d);
   const bd = img(base.backdrop_path || (en && en.backdrop_path), "w780"), ps = img(base.poster_path || (en && en.poster_path), "w500");
   // בלי שם עברי ב-TMDB (מחזיר את השם המקורי, למשל "Bytet"): השם באנגלית, כמו ברשימות (netflix.mjs shapeItem)
   const t = /[֐-׿]/.test(o.title || "") || !ok(en) ? o.title : (en.title || en.name || o.title);

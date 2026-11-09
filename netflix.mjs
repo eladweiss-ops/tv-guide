@@ -53,6 +53,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { heOverviews } from "./calendar-server/api/_hewiki.js";
 
 export const SCHEMA = 2;
 export const NETFLIX = "8"; // מזהה נטפליקס ב-TMDB
@@ -776,6 +777,11 @@ async function buildService(svc, ctx) {
     try { const o = JSON.parse(await readFile(dir + "/nf-he.json", "utf8")); if (o && typeof o === "object" && !Array.isArray(o)) overrides = o; } catch (e) {}
     const h = await hebrewTitles(items, { overrides, linkBase: svc.linkBase }).catch(() => null);
     if (h) console.log(`${svc.id}: שמות בעברית – חסרו ${h.need}, מוויקינתונים ${h.wiki}, ידני ${h.overrides}`);
+    // תקציר בלי עברית (נפוץ בתוכן ישראלי חדש): תחילת העלילה מוויקיפדיה העברית, לפי מזהה TMDB דרך ויקינתונים
+    const noHe = Object.values(items).filter((it) => !hasHeb(it.overview));
+    const heo = noHe.length ? await heOverviews(noHe.map((it) => ({ k: key(it.type, it.id), type: it.type, id: it.id })), { max: 60, wikiBudget: 30000 }).catch(() => ({})) : {};
+    for (const it of noHe) { const t = heo[key(it.type, it.id)]; if (t) it.overview = t; }
+    console.log(`${svc.id}: תקצירים בעברית – חסרו ${noHe.length}, מוויקיפדיה ${Object.keys(heo).length}`);
   }
 
   const byDate = (a, b) => (items[b].date || "").localeCompare(items[a].date || "");

@@ -41,6 +41,11 @@ test("scheduleCanary: מפרסם ל-/api/fire בעוד 5 דקות, עם dedup י
   assert.deepEqual(JSON.parse(calls[0].init.body), { canary: 1, at: NOW + cn.CANARY_DELAY });
   const c = await db.readJson(cn.CANARY, null);
   assert.equal(c.plan, NOW + cn.CANARY_DELAY); assert.equal(c.id, "mc1");
+  // ריצה שנייה באותו יום: לא מפרסמת ולא מזיזה את plan
+  const again = await cn.scheduleCanary({ readJson: db.readJson, writeJson: db.writeJson, fetch: fx, now: () => NOW + 3600000 });
+  assert.equal(again.dup, true); assert.equal(calls.length, 1);
+  assert.equal((await db.readJson(cn.CANARY, null)).plan, NOW + cn.CANARY_DELAY);
+  mem.m.clear();
   const bad = await cn.scheduleCanary({ readJson: db.readJson, writeJson: db.writeJson, fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }), now: () => NOW });
   assert.equal(bad.error, "publish failed");
   assert.equal((await cn.scheduleCanary({ readJson: db.readJson, writeJson: db.writeJson, token: "" })).skipped, "no QSTASH_TOKEN");

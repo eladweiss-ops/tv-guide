@@ -115,7 +115,7 @@ export default async function handler(req, res, d = {}) {
     try { cn = await (d.scheduleCanary || scheduleCanary)({ readJson: d.readJson || readJson, writeJson: d.writeJson || writeJson, fetch: d.fetch, now: d.now }); } catch (e) { cn = { error: true }; console.error("canary schedule", e && e.message); }
     const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 52000, ...d, guide: guideOnce }); // משאיר זמן לניקוי ערבי הצפייה לפני maxDuration 60
     r.follow = fo; r.tn = tn; r.team = tm; r.canary = cn;
-    try { r.rlog = await (d.cleanLog || ((dl) => listJ("push").then((rows) => cleanLog(rows.map((x) => x.id), Date.now(), { deadline: dl }))))(t0 + 55000); } catch (e) { r.rlog = -1; console.error("rlog cleanup", e && e.message); }
+    try { r.rlog = await (d.cleanLog || ((dl) => Promise.all([listJ("push"), listJ("rems")]).then(([a, b]) => cleanLog([...new Set(a.concat(b).map((x) => x.id))], Date.now(), { deadline: dl }))))(t0 + 55000); } catch (e) { r.rlog = -1; console.error("rlog cleanup", e && e.message); }
     // 🍿 ערב צפייה: ניקוי קטן (עד 100 ערבים שעברו יומיים), מכבד את הזמן שנשאר. כישלון כאן לא פוגע בבדיקה היומית
     try { r.parties = await (d.cleanParties || cleanParties)(Date.now(), { deadline: t0 + 55000 }); } catch (e) { r.parties = -1; console.error("party cleanup failed"); }
     console.log("watch-check", JSON.stringify(r));

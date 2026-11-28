@@ -98,12 +98,14 @@
     return { add: add, ack: ack || add.length > 0 };
   }
   // בעלייה ובחזרה לאפליקציה: שחזור הרשימה מהשרת (אחרי התקנה מחדש וקוד גיבוי), וצירוף תזכורות שהשרת הוסיף. מחזיר Promise (team.js מחכה לו לפני teamSync)
+  var pulledOnce = false;
   function pullRems() {
     if (!srv() || !TVG.calTok) return Promise.resolve(0);
+    var first = !pulledOnce; pulledOnce = true; // שחזור רשימה ריקה רק בפעם הראשונה (עלייה), ולא כשיש שמירה שלא הגיעה לשרת: אחרת מחיקה של התזכורת האחרונה בלי רשת הייתה חוזרת
     return fetch(CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !Array.isArray(j.rems)) return 0;
       var n = 0;
-      if (j.rems.length && !TVG.REMS.length) { TVG.REMS = j.rems.map(function (x) { var o = {}; Object.keys(x).forEach(function (k) { if (k !== "srv" && k !== "ks") o[k] = x[k]; }); return o; }); saveRems(); n = TVG.REMS.length; }
+      if (first && !TVG.syncBad && j.rems.length && !TVG.REMS.length) { TVG.REMS = j.rems.map(function (x) { var o = {}; Object.keys(x).forEach(function (k) { if (k !== "srv" && k !== "ks") o[k] = x[k]; }); return o; }); saveRems(); n = TVG.REMS.length; }
       var m = mergeSrv(j.rems); n += m.add.length;
       if (m.ack) syncRems();
       if (n && TVG.G && TVG.render) TVG.render();

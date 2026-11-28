@@ -16,7 +16,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const RAW = fs.readFileSync(path.join(ROOT, "guide.json"), "utf8");
 
 // לקוח אחד במצב נתון (localStorage), בזמן קבוע
-function client(nowMs, ls = {}) {
+function client(nowMs, ls = {}, raw = RAW) {
   const RealDate = Date;
   class FDate extends RealDate { constructor(...a) { if (a.length) super(...a); else super(nowMs); } static now() { return nowMs; } }
   const any = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => "" : any), apply: () => any, construct: () => any });
@@ -32,7 +32,7 @@ function client(nowMs, ls = {}) {
   run("core"); run("data"); run("channels"); run("reminders"); run("reminder-sheet");
   T.render = () => {}; T.pill = () => {};
   run("team");
-  T.G = JSON.parse(RAW); T.classify(); T.index();
+  T.G = JSON.parse(raw); T.classify(); T.index();
   T.sel.clear(); for (let id of JSON.parse(LS["tvg.sel"] || "[]")) { id = T.IDMAP[id] || id; if (T.by.has(id)) T.sel.add(id); } // boot.js
   T.gen = "all";
   return { T, FDate, LS, posts };
@@ -68,8 +68,8 @@ test("parity: games() – אותם משחקים, אותו ערוץ ראשי, א�
         JSON.parse(JSON.stringify(T.teamLib.games(multi, new FDate(now)).games.map((g) => [g.c.id, g.p.s.getTime(), g.t.n]))));
     }
   }
-  // הלוח האמיתי של השבוע: לפחות כמה משחקים (אחרת ההשוואה ריקה)
-  assert.ok(total > 10, `בדיקה אמיתית: ${total} משחקים, ${reps} חוזרים`);
+  // בלי רצפה: בשבוע שקט (או בפגרה) הלוח האמיתי יכול להיות בלי משחקים, והפריסה לא אמורה להיחסם בגלל זה. הכיסוי הלא-ריק – בבדיקה על הלוח הקבוע למטה
+  console.log(`team parity (live guide): ${total} games, ${reps} replays`);
 });
 
 test("parity: התזכורות ש-teamSync בלקוח מוסיף = autoAdds בשרת (מפתח, ערוץ, ts, end, כותרת, תקציר, lead), כולל tvg.teamX ותזכורות קיימות", () => {
@@ -96,5 +96,45 @@ test("parity: התזכורות ש-teamSync בלקוח מוסיף = autoAdds בש
       }
     }
   }
-  assert.ok(n > 4, `בדיקה אמיתית: ${n} תזכורות`);
+  console.log(`team parity (live guide): ${n} reminders`);
+});
+
+// לוח קבוע (לא תלוי בעדכון הלילי): משחק חי בשני ערוצים, שידור חוזר, כדורסל, ותוכנית "תקציר" – הלקוח והשרת חייבים להסכים, והתוצאה לא ריקה
+const FIXED = JSON.stringify({ updated: "2026-11-29T03:10:00.000Z",
+  channels: [{ id: "289", name: "ערוץ הספורט" }, { id: "301", name: "5+ LIVE" }, { id: "3819", name: "קשת" }, { id: "520", name: "ספורט 1" }, { id: "3550", name: "5GOLD" }],
+  programs: [
+    { ch: "289", start: "2026-11-30T20:30", title: "אולפן ליגת העל" },
+    { ch: "289", start: "2026-11-30T21:00", title: "ישיר! ליגת ווינר: מכבי חיפה - ביתר ירושלים", desc: "כדורגל, ליגת העל", lv: 1 },
+    { ch: "289", start: "2026-11-30T23:00", title: "תקציר: מכבי חיפה - ביתר ירושלים" },
+    { ch: "289", start: "2026-12-01T02:00", title: "ליגת ווינר: מכבי חיפה - ביתר ירושלים (ש.ח)", desc: "כדורגל" },
+    { ch: "289", start: "2026-12-01T04:00", title: "סגירה" },
+    { ch: "301", start: "2026-11-30T20:55", title: "ישיר! ליגת ווינר: מ. חיפה - ב. ירושלים", desc: "כדורגל", lv: 1 },
+    { ch: "301", start: "2026-11-30T23:00", title: "סגירה" },
+    { ch: "520", start: "2026-12-02T20:00", title: "יורוליג: מכבי ת\"א - ריאל מדריד", desc: "כדורסל, יורוליג", lv: 1 },
+    { ch: "520", start: "2026-12-02T22:00", title: "ליגת ווינר: הפועל ב\"ש - מכבי ת\"א", desc: "כדורגל" },
+    { ch: "520", start: "2026-12-03T00:00", title: "סגירה" },
+    { ch: "3550", start: "2026-12-01T12:00", title: "ליגת ווינר: מכבי חיפה - הפועל ב\"ש", desc: "כדורגל 95/96" },
+    { ch: "3550", start: "2026-12-01T14:00", title: "סגירה" },
+    { ch: "3819", start: "2026-11-29T20:00", title: "חדשות" },
+  ] });
+
+test("parity על לוח קבוע: games ו-teamSync זהים ולא ריקים (מכבי חיפה, מכבי ת״א, הפועל ב״ש × ענף × ערוצים)", () => {
+  const now = ilToMs("2026-11-29T12:00"), G = prepGuide(JSON.parse(FIXED));
+  let games0 = 0, recs = 0;
+  for (const sel of [[], ["289"], ["301", "520"]]) {
+    const { T, FDate } = client(now, { "tvg.sel": JSON.stringify(sel) }, FIXED);
+    for (const n of ["מכבי חיפה", "מכבי תל אביב", "הפועל באר שבע"]) for (const sport of SPORTS) {
+      const want = T.teamLib.games([{ n, sport }], new FDate(now)).games.map((g) => [g.c.id, g.p.s.getTime(), g.p.title, (g.alts || []).map((a) => a.c.id)]);
+      const got = games(G, [{ n, sport }], now, userChans(G, sel, now).map((c) => c.id)).games.map((g) => [g.c.id, g.p.s, g.p.title, g.alts.map((a) => a.c.id)]);
+      assert.deepEqual(got, JSON.parse(JSON.stringify(want)), `${n} ${sport} ${sel}`);
+      games0 += got.length;
+    }
+    const teams = [{ n: "מכבי חיפה", sport: "" }, { n: "מכבי תל אביב", sport: "" }];
+    const data = { "tvg.sel": JSON.stringify(sel), "tvg.teams": JSON.stringify(teams), "tvg.teamAuto": "1", "tvg.lead": "30", "tvg.push": "1", "tvg.calTok": "abcdefghij0123456789abcd" };
+    const c = client(now, data, FIXED); c.T.teamSync(true);
+    const got = autoAdds(G, teamUserOf(data), now, () => false, () => false).map((a) => a.rec);
+    assert.deepEqual(got, JSON.parse(JSON.stringify(c.T.REMS)), `teamSync ${sel}`);
+    recs += got.length;
+  }
+  assert.ok(games0 >= 12 && recs >= 6, `${games0} משחקים, ${recs} תזכורות`);
 });

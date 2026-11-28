@@ -27,7 +27,7 @@ function client(ls, reply) {
   const run = (f) => vm.runInContext(fs.readFileSync(path.join(ROOT, "js", f + ".js"), "utf8"), ctx, { filename: f + ".js" });
   run("core"); run("data"); run("channels"); run("reminders"); run("reminder-sheet");
   T.render = () => {}; T.pill = () => {};
-  run("team");
+  run("team"); run("snooze");
   return { T, LS, reqs, timers };
 }
 const TS = NOW + 30 * 3600000;
@@ -81,4 +81,13 @@ test("pullRems: בעלייה מצרף תזכורות שהשרת הוסיף ומ�
 test("pullRems: בלי התראות/יומן (srv() כבוי) – לא פונה לשרת, ומחזיר Promise", async () => {
   const { T, reqs } = client({ "tvg.push": "0" }, () => ({}));
   assert.equal(await T.pullRems(), 0); assert.equal(reqs.length, 0);
+});
+
+test("הקשה על התראה לתזכורת שהשרת הוסיף ועוד לא כאן (?rem=K): openSnooze מושך מהשרת ופותח אותה", async () => {
+  const k = "289|" + TS;
+  const { T, reqs } = client({}, (u, o) => (o && o.method === "POST" ? { ok: true } : { rems: [srvRec()] }));
+  let seen = null; const orig = T.hasRem; T.hasRem = (x) => { const r = orig(x); if (x === k && r) seen = r; return r; };
+  T.openSnooze(k); await tick(); await tick();
+  assert.ok(reqs.some((r) => /\/api\/rems\?t=/.test(r.u)), "משך מהשרת");
+  assert.ok(seen && seen.title, "נמצאה בניסיון השני");
 });

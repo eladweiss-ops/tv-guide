@@ -39,10 +39,15 @@
   }
   function show(html) { $("#remBody").innerHTML = html; $("#rem").hidden = false; $("#scrim2").hidden = false; }
 
-  function openSnooze(k) {
+  function openSnooze(k, again) {
     k = String(k || "");
     stopTimer();
     var x = TVG.hasRem(k) || (k.indexOf("f|") === 0 && TVG.G && TVG.folRem ? TVG.folRem(k) : null), pr = TVG.G ? TVG.findProg(k) : null; // f|: תזכורת שנגזרה ממעקב אחרי סדרה (series.js), לא נשמרת ב-REMS
+    // ⚽ תזכורת שהשרת הוסיף כשהאפליקציה הייתה סגורה (team-sync) עוד לא כאן: מושכים מהשרת ומנסים שוב פעם אחת (עד 4 שניות)
+    if (!x && !again && TVG.pullRems && TVG.srv && TVG.srv()) {
+      Promise.race([TVG.pullRems(), new Promise(function (ok) { setTimeout(ok, 4000); })]).then(function () { openSnooze(k, true); }, function () { openSnooze(k, true); });
+      return;
+    }
     TVG.rem = null; TVG.LP = null;
     SZ = { k: k, pick: 5, timer: 0, busy: false };
     if (!x) { // תזכורת לא קיימת / פגה: הודעה ידידותית

@@ -233,3 +233,24 @@ test("GET /api/rems?log=1: היומן של 30 הימים האחרונים, רק 
   res = mockRes(); await rh({ method: "GET", headers: {}, query: { t: TOK } }, res);
   assert.equal(res.body.rems[0].srv, 1); // GET רגיל: כולל את הממתינה (הלקוח מצרף)
 });
+
+test("cron היומי (GET /api/watch-check): שלבי ⚽ תזכורות קבוצה, 🐤 בדיקה יומית וניקוי היומן רצים בלי שגיאה", async () => {
+  await reset();
+  await db.writeJson(`rlog/${TOK}/2025-01-01.json`, { ev: [{ k: "a", e: "x", at: 1 }] }); // ישן מאוד: נמחק
+  process.env.CRON_SECRET = "cs";
+  calls = [];
+  try {
+    const res = mockRes();
+    await wc.default({ method: "GET", headers: { authorization: "Bearer cs" }, query: {} }, res, {
+      listUsers: async () => [], listFol: async () => [], guide: async () => GUIDE, now: () => NOW, fetch: fx, cleanCache: async () => 0,
+      scheduleTonight: async () => ({ skipped: "test" }), cleanParties: async () => 0,
+      team: { list: db.listJson, loadOwn, reschedule: resched, now: () => NOW },
+    });
+    assert.equal(res.code, 200);
+    assert.equal(res.body.team.added, 1, JSON.stringify(res.body.team));
+    assert.ok(res.body.canary && res.body.canary.scheduled, JSON.stringify(res.body.canary));
+    assert.ok(res.body.rlog >= 1, "ניקוי היומן: " + res.body.rlog);
+    assert.equal(await db.readJson(`rlog/${TOK}/2025-01-01.json`, null), null);
+    assert.ok(published().some((b) => b.canary === 1));
+  } finally { delete process.env.CRON_SECRET; }
+});

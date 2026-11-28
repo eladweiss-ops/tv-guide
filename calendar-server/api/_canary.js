@@ -13,16 +13,17 @@ export const CANARY_MAX_LAG = 10 * 60000;   // הגיע יותר מ-10 דקות 
 export async function scheduleCanary(d) {
   const token = d.token !== undefined ? d.token : process.env.QSTASH_TOKEN;
   if (!token) return { skipped: "no QSTASH_TOKEN" };
-  const now = d.now ? d.now() : Date.now(), at = now + CANARY_DELAY, fx = d.fetch || fetch;
+  const now = d.now ? d.now() : Date.now(), at = now + CANARY_DELAY, fx = d.fetch || fetch, day = ilDay(now);
+  const cur = (await d.readJson(CANARY, null)) || {};
+  if (cur.planDay === day && cur.id) return { dup: true, day }; // פעם ביום (ריצה כפולה של ה-cron לא מזיזה את plan, והניטור לא יתריע לשווא)
   const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
     method: "POST", signal: !d.fetch && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
-    headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2", "upstash-deduplication-id": "canary-" + ilDay(now) },
+    headers: { authorization: "Bearer " + token, "content-type": "application/json", "upstash-not-before": String(Math.floor(at / 1000)), "upstash-retries": "2", "upstash-deduplication-id": "canary-" + day },
     body: JSON.stringify({ canary: 1, at }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.messageId) return { error: "publish failed", status: r.status };
-  const cur = (await d.readJson(CANARY, null)) || {};
-  await d.writeJson(CANARY, { ...cur, plan: at, planAt: now, id: j.messageId });
+  await d.writeJson(CANARY, { ...cur, plan: at, planAt: now, planDay: day, id: j.messageId });
   return { scheduled: at };
 }
 

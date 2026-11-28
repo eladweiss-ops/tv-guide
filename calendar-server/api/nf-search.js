@@ -19,6 +19,7 @@ import { tget, shapeTitle, img, okKey } from "./_tmdb.js";
 import { readJson, writeJson } from "./_push.js";
 import { delJson } from "./_db.js";
 import { heOverviews, hasHeb } from "./_hewiki.js";
+import { handleVid } from "./_vid.js";
 import { allow, clientIp, tooMany, fail } from "./_guard.js";
 
 const mem = new Map();      // hash -> {t, v}
@@ -208,6 +209,14 @@ export default async function handler(req, res) {
       res.setHeader("cache-control", r.status !== 200 ? "no-store" : r.generic ? "public, max-age=300" : "public, max-age=3600");
       return res.status(r.status).end(r.status === 200 ? (req.method === "HEAD" ? "" : r.html) : "bad key");
     } catch (e) { return fail(res, e, "nf-og"); }
+  }
+  if (req.method === "GET" && req.query && req.query.vid != null) { // ▶ טריילר לתוכנית מהלוח (_vid.js)
+    try {
+      if (!allow("nfv:ip:" + clientIp(req), 60)) return tooMany(res);
+      const r = await handleVid(String(req.query.vid), String(req.query.y || ""));
+      res.setHeader("cache-control", r.status !== 200 || r.failed ? "no-store" : "public, max-age=86400");
+      return res.status(r.status).json(r.json);
+    } catch (e) { return fail(res, e, "nf-vid"); }
   }
   if ((req.method === "GET" || req.method === "HEAD") && req.query && req.query.he != null) {
     try {

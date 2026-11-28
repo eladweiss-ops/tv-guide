@@ -884,3 +884,5 @@
   .missrow .rbts .missx { order: -1; }
   .missx { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 1rem; }
   .miss .missmore { display: block; margin: 0 auto; }
+
+.ghost.vid { margin-top: 4px; } /* ▶ וידאו מתחת ל-📤 שיתוף (video.js) */

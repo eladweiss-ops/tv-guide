@@ -146,8 +146,9 @@
       TVG.G.programs.forEach(function (p) {
         var lid = TVG.IDMAP[p.ch] || p.ch;
         if ((lid === p.ch) !== leadPass || !TVG.by.has(lid)) return;
-        if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; if (ex !== 1 && ex.lv < 0 && (p.lv === 0 || p.lv === 1)) ex.lv = p.lv; return; }
+        if (seen[lid][p.start]) { var ex = seen[lid][p.start]; if (ex !== 1 && !ex.desc && p.desc) ex.desc = p.desc; if (ex !== 1 && ex.lv < 0 && (p.lv === 0 || p.lv === 1)) ex.lv = p.lv; if (ex !== 1 && !ex.u && p.u) ex.u = p.u; return; }
         var o = { title: unent(p.title), desc: p.desc || "", s: TVG.parse(p.start), rr: p.rr ? 1 : 0, lv: p.lv === 1 ? 1 : p.lv === 0 ? 0 : -1 };
+        if (p.u) o.u = p.u; // ▶ דף התוכנית בכאן (enrich_kan, video.js)
         seen[lid][p.start] = o; TVG.by.get(lid).push(o);
       });
     });

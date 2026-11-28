@@ -38,12 +38,13 @@
 | &nbsp;&nbsp;`celebrate` | `TVG.celebrate("rem"/"party"/"share")` בשני שלבים: **קפיצה** – אימוג׳י גדול (⏰/🍿/💌) עם ניצוצות במקום ההקשה, מעל החלונות (`#fxpop`, z 25, מתחת להודעה); **עלייה** – 7 אימוג׳ים עולים מהתחתית ושוקעים אל מאחורי סרגל הלשוניות (`#fx`, z 8), רק אחרי שכל החלונות התחתונים נסגרו (אחרת הם מאחוריהם). תזכורת: קפיצה תמיד, עלייה פעם ב-6 שעות (`tvg.cel`); "מגיע", ערב חדש ושליחה לחבר: תמיד. בהפחתת תנועה – כלום. |
 | &nbsp;&nbsp;`render-now/-grid/-dial/-rems/-common` · `netflix` · `swipe` | מסכים |
 | &nbsp;&nbsp;`search` · `favs` · `channels` · `settings` · `backup` | חיפוש+נושאים · מועדפים · בחירת ערוצים · הגדרות/ערכה/התקנה · גיבוי וקישור אישי |
+| &nbsp;&nbsp;`video` | ▶ מתחת ל-📤 שיתוף: דף התוכנית בכאן (`u`) · טריילר מ-TMDB בהתאמה בטוחה בלבד (`/api/nf-search?vid=`, `api/_vid.js`; נבדק רק כשהכפתור על המסך) · אחרת 🔎 חיפוש ביוטיוב |
 | &nbsp;&nbsp;`team` | ⚽ הקבוצה שלי: התאמת קבוצות לכותרות (`TVG.teamLib`: נרמול קיצורים, צדי משחק, ענף, שידור חוזר), כרטיס בלשונית היום מתחת ל"🌙 הערב שלך", בורר בחלון המועדפים, תזכורת אוטומטית (`TVG.teamSync`, דרך `TVG.remRec`). **גם בשרת** (`calendar-server/api/_team.js`, עותק נבדק מול הלקוח ב-`test/team-parity.test.mjs` – שינוי בהתאמה כאן דורש שינוי שם): תזכורות שהשרת הוסיף מגיעות עם `srv:1` ונקלטות ב-`TVG.mergeSrv` (reminders.js); `syncRems` שולח `tx` = teamX |
 | &nbsp;&nbsp;`update` · `boot` | עדכון אוטומטי · עליית האפליקציה (אחרון) |
 | `tools/qa/` | `node tools/qa/shoot.cjs <outDir> [baseUrl]` – צילומי מסך בכל המסכים ב-375/393/360/412 + כשל על שגיאות קונסולה. `node tools/qa/diff.cjs <A> <B>` – השוואת פיקסלים. פעם אחת: `cd tools/qa && npm install`. `node tools/qa/loadfail.cjs` – בודק את התאוששות מכשל טעינה (404 על קובץ js: רענון חד-פעמי ואז מסך "נסו שוב"). כל קובץ js מצהיר `TVG.files["name"]=1`, ו-`boot.js` מסמן `TVG.booted=true`. |
 | `sw.js` | Service worker – **רק** התראות פוש (בלי מטמון, כדי לא לשבור עדכונים). |
 | `join/index.html` + `og-join.png` | קישור ההזמנה לאפליקציה (`…/tv-guide/join/`): תמונה ותיאור משלו בתצוגה המקדימה בוואטסאפ, ומעבר מיידי לאפליקציה. התמונה: `node tools/og/make-og.cjs join`. |
-| `guide.json` | הלוח: `{updated, channels:[{id,name,prov}], programs:[{ch,start:"YYYY-MM-DDTHH:MM" שעון ישראל, title, desc?, rr?, lv?}]}` |
+| `guide.json` | הלוח: `{updated, channels:[{id,name,prov}], programs:[{ch,start:"YYYY-MM-DDTHH:MM" שעון ישראל, title, desc?, rr?, lv?, u?}], carried?:[id]}` · `u` = נתיב לדף התוכנית ב-kan.org.il (כאן 11, מ-`enrich_kan`) · `carried` = ערוצים שנכשלו בוואלה ונשארו מהלוח הקודם (`scrape.mjs`) |
 | `scrape.mjs` | איסוף מוואלה (`tv-guide.walla.co.il`). |
 | `enrich*.mjs`, `extra_channels.mjs`, `fill.mjs`, `sportfit.mjs` | העשרה, השלמת ימים, ערוצים חסרים, אימות התאמה בספורט. |
 | `calendar-server/` | שרת Vercel (`tv-guide-cal.vercel.app`): תזכורות, יומן מנוי, גיבוי, פוש. |

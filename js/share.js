@@ -82,7 +82,7 @@
   }
   function shareBtn(p, cid) {
     if (!cid) return "";
-    return '<button type="button" class="ghost shbtn" data-share="' + esc(cid) + "|" + p.s.getTime() + '">📤 שיתוף</button>';
+    return '<button type="button" class="ghost shbtn" data-share="' + esc(cid) + "|" + p.s.getTime() + '">📤 שיתוף</button>' + (TVG.vidBtn ? TVG.vidBtn(p, cid) : ""); // ▶ וידאו מתחת לשיתוף (video.js)
   }
 
   // ---- כרטיס "כרטיס כניסה" 1200x630 (גם היחס של תצוגת קישור) ----

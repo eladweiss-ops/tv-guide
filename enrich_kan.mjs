@@ -33,7 +33,10 @@ export function parseKan(html) {
     const title = clean((b.match(/class="program-title">([\s\S]*?)<\/h3>/) || [])[1]);
     const desc = clean((b.match(/class="program-description">([\s\S]*?)<\/(?:div|p)>/) || [])[1]);
     const start = localStart(utc);
-    if (start && title) out.push({ start, title, desc: desc.replace(/[^\p{L}\p{N}]/gu, "") === title.replace(/[^\p{L}\p{N}]/gu, "") ? "" : desc }); // תקציר שהוא רק שם התוכנית – לא תקציר
+    // ▶ קישור לדף התוכנית באתר כאן (בערך 60% מהשידורים; "current" מפנה לשידור החי – לא דף תוכנית)
+    const href = (b.match(/class="[^"]*program-link[^"]*" href="([^"]+)"/) || [])[1] || "";
+    const u = /^\/content\/kan\/[\w-]+\/p-\d+\/$/.test(href) ? href : "";
+    if (start && title) out.push({ start, title, desc: desc.replace(/[^\p{L}\p{N}]/gu, "") === title.replace(/[^\p{L}\p{N}]/gu, "") ? "" : desc, ...(u ? { u } : {}) }); // תקציר שהוא רק שם התוכנית – לא תקציר
   }
   return out;
 }
@@ -43,17 +46,18 @@ const key = (x) => String(x).replace(/[^\p{L}\p{N}]/gu, "");
 
 export function enrich(guide, items) {
   const ids = new Set(guide.channels.filter((c) => /^(HD )?כאן( 11)?( HD)?$/.test(String(c.name).trim())).map((c) => String(c.id)));
-  let n = 0;
+  let n = 0, nu = 0;
   for (const p of guide.programs) {
-    if (!ids.has(String(p.ch)) || p.desc) continue;
+    if (!ids.has(String(p.ch))) continue;
     const t = toMin(p.start);
     let best = null, bd = 16;
     for (const it of items) { const d = Math.abs(toMin(it.start) - t); if (d < bd) { bd = d; best = it; } }
-    if (!best || !best.desc || key(best.desc) === key(p.title)) continue;
-    if (!sameShow(p.title, best.title)) continue; // אף פעם לא תקציר לפי קרבת זמן בלבד
+    if (!best || !sameShow(p.title, best.title)) continue; // אף פעם לא לפי קרבת זמן בלבד (גם לא קישור)
+    if (best.u && p.u !== best.u) { p.u = best.u; nu++; } // ▶ דף התוכנית בכאן (guide.json: שדה אופציונלי u, נתיב יחסי ל-kan.org.il)
+    if (p.desc || !best.desc || key(best.desc) === key(p.title)) continue;
     p.desc = best.desc; n++;
   }
-  return { ids: [...ids], n };
+  return { ids: [...ids], n, nu };
 }
 
 async function main() {
@@ -75,8 +79,8 @@ async function main() {
   const filled = fillGaps(guide, kanIds, items);
   const r = enrich(guide, items);
   if (filled) console.log(`כאן 11: הושלמו ${filled} שידורים בימים שחסרו בוואלה`);
-  console.log(`כאן 11: ${ok} ימים נקראו, ${fail} נכשלו, ${items.length} תוכניות באתר, ${r.n} עודכנו (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
-  if (r.n || filled) await writeFile("guide.json", JSON.stringify(guide));
+  console.log(`כאן 11: ${ok} ימים נקראו, ${fail} נכשלו, ${items.length} תוכניות באתר, ${r.n} עודכנו, ${r.nu} קישורים לדף התוכנית (ערוצים: ${r.ids.join(",") || "לא נמצא"})`);
+  if (r.n || r.nu || filled) await writeFile("guide.json", JSON.stringify(guide));
 }
 
 if (process.argv[1] && process.argv[1].endsWith("enrich_kan.mjs")) {

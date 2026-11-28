@@ -109,7 +109,7 @@
       if (i === SHOW) h += '<div class="tnrest"' + (TVG.tnOpen ? "" : " hidden") + ">";
       var v = TVG.remKey(x.c.id, x.p.s), live = x.p.s <= now, on = !!TVG.hasRem(v), byFol = x.fol && folOn;
       if (!live && !on && !byFol) { if (x.rr) rrOpen++; else open++; } // "להזכיר על הכול" – בלי שידורים חוזרים
-      var sub = (live ? "משודר עכשיו · " : x.rr ? '<span class="tagk rr">📼 שידור חוזר</span> ' : "") + bd(x.c.name) + ' <span class="tnwhy">· ' + (x.why === "מועדף" ? "⭐ מועדף" : x.why === "סדרה במעקב" ? "📺 במעקב" : "⭐ " + bd(x.why)) + "</span>";
+      var sub = (live ? "משודר עכשיו · " : x.rr ? '<span class="tagk rr">📼 שידור חוזר</span> ' : "") + bd(x.c.name) + '&nbsp;· <span class="tnwhy">' + (x.why === "מועדף" ? "⭐ מועדף" : x.why === "סדרה במעקב" ? "📺 במעקב" : "⭐ " + bd(x.why)) + "</span>";
       var act = live ? "" : byFol ? '<button type="button" class="rbt on" data-folopen="' + esc(TVG.folKey(x.p.title)) + '" aria-label="סדרה במעקב, יש תזכורת: ' + esc(x.p.title) + '">📺</button>'
         : '<button type="button" class="rbt' + (on ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="' + (on ? "יש תזכורת: " : "תזכורת: ") + esc(x.p.title) + '">' + (on ? "✓" : "⏰") + "</button>";
       h += '<div class="srow tnrow' + (live ? " tnlive" : "") + (x.rr ? " tmrr" : "") + (x.out ? " tnout" : "") + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl"><bdi>' + TVG.ttlHtml(x.p) + '</bdi><br><span class="sub">' + sub + "</span></span></button>" + act + "</div>" +

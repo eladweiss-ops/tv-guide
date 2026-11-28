@@ -54,5 +54,10 @@
     });
     $("#opts").innerHTML = h || '<p class="none" style="padding:12px 0">לא נמצא ערוץ שמתאים.</p>';
   }
-  function saveSel() { TVG.store("tvg.sel", JSON.stringify(Array.from(sel))); }
+  // ערוצים שנבחרו ונעדרים מהלוח של היום (מקור נפל): נשמרים בבחירה, כדי שיחזרו לבד כשהערוץ חוזר ללוח (boot.js)
+  function saveSel() {
+    var a = Array.from(sel);
+    (TVG.selAway || []).forEach(function (id) { if (a.indexOf(id) < 0 && !sel.has(TVG.IDMAP[id] || id)) a.push(id); });
+    TVG.store("tvg.sel", JSON.stringify(a));
+  }
 })(window.TVG);

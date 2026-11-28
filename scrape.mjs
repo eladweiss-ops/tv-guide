@@ -8,17 +8,29 @@
 // דורש Node 18 ומעלה. הפרסור נבדק מול העמוד האמיתי של קשת (3819).
 // אם הוא מדפיס "parse failed", הוא שומר את העמוד לקובץ debug-<id>.html.
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, readFile } from "node:fs/promises";
 
 const BASE = "https://tv-guide.walla.co.il";
 const HEADERS = { "user-agent": "Mozilla/5.0 (personal TV guide)", "accept-language": "he" };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function get(url) {
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error(`${url} → ${res.status}`);
-  return res.text();
+// וואלה מחזיר לפעמים 503 או מנתק. בלי ניסיון חוזר ערוץ שלם נעלם מהלוח ל-24 שעות (ספורט 2/3/4/6 נעלמו כך ב-13.11, 18-19.11, 25-26.11
+// ובגלל זה הוחמץ משחק של מכבי חיפה ב-28.11). 3 ניסיונות עם המתנה הולכת וגדלה, רק על שגיאות זמניות (רשת, 429, 5xx)
+async function get(url, tries = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
+      if (res.ok) return res.text();
+      const err = new Error(`${url} → ${res.status}`);
+      err.temp = res.status === 429 || res.status >= 500;
+      throw err;
+    } catch (e) {
+      const temp = e.temp !== false && (e.temp || e.name === "TimeoutError" || e.name === "AbortError" || e instanceof TypeError);
+      if (!temp || i >= tries) throw e;
+      await sleep(i * 2500);
+    }
+  }
 }
 
 function decode(s) {
@@ -95,6 +107,25 @@ async function discoverChannels() {
   return prov;
 }
 
+// היום בשעון ישראל, YYYY-MM-DD (הלוח בשעון ישראל; GitHub רץ ב-UTC)
+const ilToday = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Jerusalem" }).format(new Date());
+export async function carryOver(ids, channels, programs, prevPath = "guide.json") {
+  let prev;
+  try { prev = JSON.parse(await readFile(prevPath, "utf8")); } catch { return []; }
+  if (!prev || !Array.isArray(prev.channels) || !Array.isArray(prev.programs)) return [];
+  const tried = new Set(ids), have = new Set(channels.map((c) => c.id)), cut = ilToday() + "T00:00", out = [];
+  for (const c of prev.channels) {
+    if (!tried.has(c.id) || have.has(c.id)) continue;
+    const ps = prev.programs.filter((p) => p.ch === c.id && p.start >= cut).map((p) => ({ ch: p.ch, start: p.start, title: p.title }));
+    if (ps.length < 5) continue; // אין מה להציל (גם ערוץ ישן/מת שוואלה כבר לא מגיש)
+    channels.push({ id: c.id, name: c.name, prov: c.prov || "" });
+    programs.push(...ps);
+    out.push(c.id);
+    console.error(`channel ${c.id} ${c.name}: נכשל היום – נשארות ${ps.length} תוכניות מהלוח הקודם`);
+  }
+  return out;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const ri = args.indexOf("--range");
@@ -162,9 +193,13 @@ async function main() {
     console.error("לא נשלף אף ערוץ. guide.json לא עודכן.");
     process.exit(1);
   }
+  // ערוץ שהיה בלוח הקודם ונכשל היום (גם אחרי ניסיונות חוזרים): משאירים את התוכניות שלו מהיום והלאה מהלוח הקודם,
+  // במקום שייעלם. רק ערוצי וואלה שניסינו לשלוף עכשיו (לא ערוצים שמוסיפים שלבי ההעשרה אחר כך). הרשימה נשמרת ב-carried לניטור
+  const carried = await carryOver(ids, channels, programs);
   const out = { updated: new Date().toISOString(), channels, programs };
+  if (carried.length) out.carried = carried;
   await writeFile("guide.json", JSON.stringify(out));
   console.log(`guide.json: ${channels.length} channels, ${programs.length} programs`);
 }
 
-main();
+if ((process.argv[1] || "").replace(/\\/g, "/").endsWith("scrape.mjs")) main();

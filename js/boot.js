@@ -20,7 +20,13 @@
   TVG.setInst();
   TVG.load().then(function (r) {
     TVG.G = r.g; TVG.isSample = r.s; TVG.classify(); TVG.index();
-    try { var saved = JSON.parse(TVG.store("tvg.sel") || "null"); if (Array.isArray(saved)) saved.forEach(function (id) { id = TVG.IDMAP[id] || id; if (TVG.by.has(id)) sel.add(id); }); if (sel.size !== saved.length && !TVG.isSample && TVG.G.channels.length > 50) TVG.saveSel(); } catch (e) {}
+    // ערוץ שנבחר ואינו בלוח היום (וואלה נפל) לא נמחק מהבחירה: נשמר ב-selAway וחוזר לבד כשהערוץ חוזר.
+    // (קודם הוא נמחק לתמיד – כך נעלם ספורט 3 אצל משתמשים, והוחמץ משחק של מכבי חיפה ב-28.11)
+    try {
+      var saved = JSON.parse(TVG.store("tvg.sel") || "null"), remap = false; TVG.selAway = [];
+      if (Array.isArray(saved)) saved.forEach(function (id0) { var id = TVG.IDMAP[id0] || id0; if (TVG.by.has(id)) { sel.add(id); if (id !== id0) remap = true; } else if (!TVG.isSample) TVG.selAway.push(id0); });
+      if (remap && !TVG.isSample && TVG.G.channels.length > 50) TVG.saveSel();
+    } catch (e) {}
     var st0 = TVG.store("tvg.tab"); TVG.tab = (st0 === "grid" || st0 === "now" || st0 === "rems") ? st0 : "dial";
     TVG.scrollNext = TVG.enterGrid = TVG.tab === "grid";
     TVG.render();

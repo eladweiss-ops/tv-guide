@@ -35,6 +35,11 @@ export const KEY_CHANNELS = [
   { label: "כאן חינוכית", test: (n) => /^כאן חינוכית$/.test(n), minDays: 2 },
   { label: "ספורט 1", test: (n) => /^ספורט 1(\s|$)/.test(n), minDays: 4 },
   { label: "ספורט 5", test: (n) => /^ספורט 5/.test(n), minDays: 4 },
+  // ערוצי ספורט 2/3/4/6 נעלמו מהלוח בכמה ימים בלי התרעה (13.11, 18-19.11, 25-26.11) – כך הוחמץ משחק של מכבי חיפה ב-28.11
+  { label: "ספורט 2", test: (n) => /^(ספורט|sport) 2(\s|$)/i.test(n), minDays: 4 },
+  { label: "ספורט 3", test: (n) => /^(ספורט|sport) 3(\s|$)/i.test(n), minDays: 4 },
+  { label: "ספורט 4", test: (n) => /^(ספורט|sport) 4(\s|$)/i.test(n), minDays: 4 },
+  { label: "ספורט 6", test: (n) => /^(ספורט|sport) 6(\s|$)/i.test(n), minDays: 4 },
 ];
 const SITE = "https://eladweiss-ops.github.io/tv-guide/";
 const SERVER = "https://tv-guide-cal.vercel.app";
@@ -91,6 +96,12 @@ export function evaluateGuide(guide, now = new Date()) {
     }
     info.channelsReport[k.label] = { found: true, today: counts[today] || 0, days: counts, missing };
     if (missing.length) problems.push(k.label + ": אין תוכניות ב-" + missing.length + " מתוך " + k.minDays + " הימים הקרובים (" + missing.map(dm).join(", ") + ")");
+  }
+  // scrape.mjs: ערוצים שנכשלו בוואלה ונשארו מהלוח הקודם (עדיין מוצגים, אבל המקור נפל)
+  if (Array.isArray(guide && guide.carried) && guide.carried.length) {
+    const nm = guide.carried.map((id) => (chans.find((c) => c.id === id) || {}).name || id);
+    info.carried = nm;
+    problems.push("וואלה נכשל ב-" + nm.length + " ערוצים, מוצגים מהלוח של אתמול: " + nm.slice(0, 8).join(", ") + (nm.length > 8 ? "…" : ""));
   }
   const hot = chans.filter((c) => /^HOT\s/i.test(c.name)).slice(0, T.HOT_SAMPLE);
   if (hot.length) {

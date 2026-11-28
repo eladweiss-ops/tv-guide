@@ -12,6 +12,7 @@ function fakeGuide({ skip = {}, updated = "2026-10-30T09:00:00Z", fillDesc = tru
     { id: "k11", name: "HD כאן" }, { id: "k12", name: "קשת" }, { id: "k13", name: "רשת SD" }, { id: "x14", name: "ערוץ 14" },
     { id: "xi24", name: "i24NEWS" }, { id: "xk", name: "ערוץ הכנסת" }, { id: "xkids", name: "כאן חינוכית" },
     { id: "s1", name: "ספורט 1 HD" }, { id: "s5", name: "ספורט 5+" },
+    { id: "s2", name: "ספורט 2" }, { id: "s3", name: "SPORT 3 HD" }, { id: "s4", name: "SPORT 4" }, { id: "s6", name: "ספורט 6 HD" },
   ];
   for (let i = 0; i < 125; i++) channels.push({ id: "h" + i, name: "HOT ערוץ " + i });
   channels = channels.filter((c) => !drop.includes(c.id));
@@ -62,6 +63,15 @@ test("רצפת תקצירים", () => {
 
 test("ערוץ חסר בלוח", () => {
   assert.ok(evaluateGuide(fakeGuide({ drop: ["xi24"] }), NOW).problems.some((p) => p.includes("i24NEWS") && p.includes("לא נמצא")));
+});
+
+test("ערוץ ספורט 3 שנעלם מהלוח מתריע (28.11)", () => {
+  assert.ok(evaluateGuide(fakeGuide({ drop: ["s3"] }), NOW).problems.some((p) => p.startsWith("ספורט 3") && p.includes("לא נמצא")));
+});
+
+test("ערוצים שנשארו מהלוח הקודם (carried) מתריעים בשם", () => {
+  const g = fakeGuide(); g.carried = ["s3", "s6"];
+  assert.ok(evaluateGuide(g, NOW).problems.some((p) => p.includes("וואלה נכשל ב-2") && p.includes("SPORT 3 HD")));
 });
 
 test("נטפליקס", () => {

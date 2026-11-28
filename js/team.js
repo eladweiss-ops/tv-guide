@@ -187,7 +187,13 @@
   function niceName(k) { var d = DISP[k] || {}, best = Object.keys(d).sort(function (a, b) { return d[b] - d[a] || b.length - a.length; })[0]; return nice(best || k); }
   function nice(s) { return String(s).replace(/"/g, "״").replace(/'/g, "׳"); }
 
-  TVG.teamLib = { canon: canon, key: key, sidesOf: sidesOf, sportOf: sportOf, generic: generic, scan: scan, games: games, detect: detect, hit: hit, reset: function () { ALL = null; } };
+  // שם שמופיע כצד במשחק כלשהו בלוח (לא כללי) = קבוצה. "🌙 הערב שלך" מחפש נושא כזה בכל הערוצים, רק במשחקים שלו
+  var SIDES = null, SIDESL = null;
+  function isTeam(k) {
+    var l = scan(); if (SIDESL !== l) { SIDES = {}; SIDESL = l; l.forEach(function (x) { SIDES[x.a] = 1; SIDES[x.b] = 1; }); }
+    return !generic(k) && !!SIDES[k];
+  }
+  TVG.teamLib = { canon: canon, key: key, sidesOf: sidesOf, sportOf: sportOf, generic: generic, scan: scan, games: games, detect: detect, hit: hit, isTeam: isTeam, sportCh: sportCh, reset: function () { ALL = null; } };
 
   // ---------- מצב ----------
   function load(k, d) { try { var v = JSON.parse(TVG.store(k) || "null"); return v == null ? d : v; } catch (e) { return d; } }
@@ -273,14 +279,16 @@
       : R.reps.length && !REPOPEN ? '<button type="button" class="linkb tnmore" data-teamreps>📼 ' + (R.reps.length === 1 ? "שידור חוזר אחד" : R.reps.length + " שידורים חוזרים") + " ›</button>" : "";
     h += more;
     var srv = TVG.srv();
-    h += '<button type="button" class="tmauto" role="switch" aria-checked="' + AUTO + '" data-teamauto><span class="tmal"><b>⏰ להזכיר על כל משחק</b><span>' +
-      (AUTO && !srv ? "צריך להפעיל התראות לטלפון. הקשה כאן להפעלה" : "אוטומטית, גם על משחקים חדשים שיופיעו. בלי שידורים חוזרים") + '</span></span><i class="tmsw" aria-hidden="true"></i></button>';
-    h += "</section>";
+    h += autoSw() + "</section>";
     // התראות הופעלו בינתיים (למשל מהחלון "איך להזכיר לך?"): משלימים את התזכורות האוטומטיות
     if (AUTO && srv && fut && !pendSync) { pendSync = true; setTimeout(function () { pendSync = false; if (autoList(new Date()).length) teamSync(false); }, 60); }
     return h;
   }
   TVG.teamHtml = teamHtml;
+  function autoSw() {
+    return '<button type="button" class="tmauto" role="switch" aria-checked="' + AUTO + '" data-teamauto><span class="tmal"><b>⏰ להזכיר על כל משחק</b><span>' +
+      (AUTO && !TVG.srv() ? "צריך להפעיל התראות לטלפון. הקשה כאן להפעלה" : "אוטומטית, גם על משחקים חדשים שיופיעו. בלי שידורים חוזרים") + '</span></span><i class="tmsw" aria-hidden="true"></i></button>';
+  }
 
   // ---------- המועדפים: שורת כניסה לבורר ----------
   function teamFavHtml() {
@@ -289,10 +297,36 @@
       var G = TVG.G ? games(TVG.TEAMS, new Date()).games : [];
       h += '<div class="srow"><button type="button" class="go sg" data-teamedit><span class="ttl">' + TVG.TEAMS.map(function (t) { return icon(t) + " " + bd(t.n); }).join(" · ") +
         '<br><span class="sub">' + (G.length ? (G.length === 1 ? "משחק אחד" : G.length + " משחקים") + " בשבוע הקרוב" : "אין משחקים בשבוע הקרוב") + (AUTO ? " · ⏰ תזכורת אוטומטית" : "") + '</span></span></button></div>';
+      if (T2T_JUST) h += autoSw(); // אחרי "להפוך לקבוצה שלי": המתג של התזכורת האוטומטית, באותו מקום
     } else h += '<p class="none">בוחרים קבוצה, ונציג בלשונית "היום" את כל המשחקים שלה בשבוע הקרוב.</p><button type="button" class="ghost" data-teamedit>⚽ בחירת קבוצה</button>';
     return h;
   }
   TVG.teamFavHtml = teamFavHtml;
+
+  // ---------- נושא ⭐ שהוא בעצם קבוצה: הצעה "⚽ להפוך לקבוצה שלי" (בחלון המועדפים, מתחת לנושא) ----------
+  // הנושא מוחלף בקבוצה (עם ביטול), כדי שאותו משחק לא יופיע פעמיים: ב"הערב שלך" וב"קבוצה שלי". ✕ = לא להציע שוב (tvg.t2tX)
+  var T2TX = load("tvg.t2tX", []) || [], T2T_JUST = false;
+  function teamSug(topic) {
+    if (!TVG.G || TVG.isSample) return null;
+    var k = key(topic); if (generic(k) || hasTeam(k) || T2TX.indexOf(k) >= 0 || !isTeam(k)) return null;
+    var d = detOf(k); return d ? { k: k, n: d.n } : null;
+  }
+  TVG.teamSugHtml = function (topic) {
+    var s = teamSug(topic); if (!s) return "";
+    return '<div class="remall tnhint t2t"><button type="button" class="tnhgo" data-t2t="' + esc(topic) + '">⚽ להפוך את ' + bd(s.n) + ' לקבוצה שלי<br><span class="sub">כל המשחקים שלה בשבוע, ותזכורת אוטומטית אם רוצים</span></button><button type="button" class="tnx" data-t2tx="' + esc(s.k) + '" aria-label="לא להציע שוב">✕</button></div>';
+  };
+  function favRefresh() { if (!$("#favs").hidden && TVG.favHtml) $("#favBody").innerHTML = TVG.favHtml(); }
+  function t2t(topic) {
+    var s = teamSug(topic); if (!s) return;
+    var i0 = TVG.TOPICS.indexOf(topic);
+    addTeam(s.n, s.k, ""); TVG.TOPICS = TVG.TOPICS.filter(function (x) { return x !== topic; }); TVG.saveTopics(); T2T_JUST = true;
+    favRefresh(); TVG.render();
+    TVG.pill("⚽ " + s.n + " עכשיו הקבוצה שלך", 5000, "ביטול", function () {
+      TVG.TEAMS = TVG.TEAMS.filter(function (t) { return tKey(t) !== s.k; }); saveTeams(); TVG.teamLib.reset();
+      if (TVG.TOPICS.indexOf(topic) < 0) TVG.TOPICS.splice(Math.max(0, Math.min(i0, TVG.TOPICS.length)), 0, topic);
+      TVG.saveTopics(); T2T_JUST = false; favRefresh(); TVG.render();
+    });
+  }
 
   // ---------- הבורר (בתוך חלון המועדפים) ----------
   var FROM = "", DET = null, Q = "", ADD_SP = null;
@@ -360,7 +394,9 @@
     var dl = t.closest("[data-teamdel]"); if (dl) { delTeam(+dl.getAttribute("data-teamdel")); return; }
     var sp = t.closest("[data-teamsp]");
     if (sp) { var a = sp.getAttribute("data-teamsp").split("|"), tm = TVG.TEAMS[+a[0]]; if (tm) { tm.sport = a[1]; saveTeams(); refresh(); } return; }
-    if (t.closest("[data-teamauto]")) { toggleAuto(); return; }
+    if (t.closest("[data-teamauto]")) { toggleAuto(); if ($("#favBody [data-teamauto]")) favRefresh(); return; }
+    var tt = t.closest("[data-t2t]"); if (tt) { t2t(tt.getAttribute("data-t2t")); return; }
+    var tx = t.closest("[data-t2tx]"); if (tx) { var xk = tx.getAttribute("data-t2tx"); if (T2TX.indexOf(xk) < 0) T2TX.push(xk); TVG.store("tvg.t2tX", JSON.stringify(T2TX)); favRefresh(); TVG.pill("לא נציע שוב", 3000, "ביטול", function () { T2TX = T2TX.filter(function (x) { return x !== xk; }); TVG.store("tvg.t2tX", JSON.stringify(T2TX)); favRefresh(); }); return; }
   });
   function delTeam(i) {
     var x = TVG.TEAMS[i]; if (!x) return;

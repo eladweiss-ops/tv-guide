@@ -13,6 +13,7 @@
   };
   TVG.allDays = allDays;
   TVG.chans = chans;
+  TVG.myChans = myChans;
   TVG.chipsHtml = chipsHtml;
   TVG.classify = classify;
   TVG.dObj = dObj;
@@ -173,9 +174,10 @@
   // ערוץ בלי שום תוכנית מעכשיו והלאה (למשל ערוץ 24: בוואלה הלוח תקוע על שבוע ישן) לא מוצג. כשהלוח חוזר – חוזר לבד
   // (המערך ממוין, אז מספיק לבדוק את האחרונה; "מהיום" ולא "מעכשיו" – כדי שערוץ לא ייעלם באמצע היום האחרון שבלוח)
   function live(c) { var a = TVG.by.get(c.id), t = new Date(); t.setHours(0, 0, 0, 0); return !!a && a.length > 0 && a[a.length - 1].e > t; }
+  // הערוצים שלי בלי סינון הסוג (הצ׳יפים): "🌙 הערב שלך" מסמן מה "לא בערוצים שלך" לפי זה (השרת: userChans ב-_tonight.js)
+  function myChans() { var l0 = baseChans(), l = l0.filter(live); return l.length ? l : l0; }
   function chans() {
-    var l0 = baseChans(), l = l0.filter(live);
-    if (!l.length) l = l0;
+    var l = myChans();
     if (TVG.gen !== "all") {
       var f = l.filter(function (c) { return c._n === TVG.gen; });
       if (f.length) l = f; else TVG.gen = "all";

@@ -823,6 +823,13 @@
   .tnwhy { white-space: nowrap; }
 
   .tonight .tnmore { display: block; margin: 2px auto 0; }
+  /* שידור חוזר (📼) ושורה מערוץ שלא בערוצים שלך: "לא בערוצים שלך · ＋ להוספה" מתחת לכותרת, באותו טור */
+  .tnrow.tmrr .time { color: var(--muted); }
+  .tnrow .sub .tagk { vertical-align: 1px; }
+  .tnlist .tnadd { display: block; min-height: 40px; margin: -12px 0 2px; padding: 0 4px; margin-inline-start: calc(3.4rem + 14px); font-size: .88rem; font-weight: 600; text-decoration: none; text-align: start; }
+  .tnlist .tnadd + .srow.tnrow { border-top: .5px solid var(--line); }
+  .t2t { margin: -2px 0 6px; }
+  .t2t .tnhgo .sub { font-weight: 400; color: var(--muted); font-size: .85rem; }
 
   /* ⚽ הקבוצה שלי (team.js): כרטיס בלשונית "היום" מתחת ל"🌙 הערב שלך" (אותו משטח ושורות), מתג תזכורת אוטומטית, ובורר בתוך חלון המועדפים */
   .tonight.team .tmhd { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-inline-end: 0; }

@@ -4,6 +4,13 @@
   TVG.files["events"] = 1;
   var $ = TVG.$, dstr = TVG.dstr, sel = TVG.sel, SCR = TVG.SCR, FAV = TVG.FAV, CAL_API = TVG.CAL_API, CX = TVG.CX, RO = TVG.RO;
 
+  // מוסיף ערוץ לערוצים שלי, עם ביטול (מהקפיצה לתוכנית בערוץ שלא נבחר, ומ"לא בערוצים שלך" ב"הערב שלך")
+  function addCh(id) {
+    if (sel.has(id)) return;
+    sel.add(id); TVG.saveSel();
+    var c = TVG.G.channels.filter(function (x) { return x.id === id; })[0];
+    TVG.pill((c ? TVG.bidi(c.name) + " נוסף" : "הערוץ נוסף") + " לערוצים שלך", 4000, "ביטול", function () { sel.delete(id); TVG.saveSel(); TVG.render(); TVG.pill("בוטל", 1200); });
+  }
   document.addEventListener("click", function (e) {
     var t = e.target;
     if (t.closest("#dial")) return; // הקשה על השעון מטופלת ב-pointerup
@@ -73,7 +80,8 @@
     var wh = t.closest("[data-when]"); if (wh) { TVG.sWhen = wh.getAttribute("data-when"); TVG.render(); return; }
     var kd = t.closest("[data-kind]"); if (kd) { TVG.sKind = kd.getAttribute("data-kind"); TVG.render(); return; }
     if (t.closest("[data-remlist]")) { var lst = TVG.LASTHITS.map(function (x) { return { id: x.c.id, p: x.p }; }); if (TVG.srv()) TVG.quickAdd(lst); else { TVG.rem = lst[0] || null; TVG.askCal(); } return; }
-    if (t.closest("[data-tnall]")) { var tn = (TVG.TN || []).filter(function (x) { return !(x.fol && TVG.pushOn); }).map(function (x) { return { id: x.c.id, p: x.p }; }); if (TVG.srv()) TVG.quickAdd(tn); else { TVG.rem = tn.filter(function (r) { return r.p.s > new Date(); })[0] || null; TVG.askCal(); } return; } // 🌙 הערב שלך: תזכורת לכל השורות
+    if (t.closest("[data-tnall]")) { var tn = (TVG.TN || []).filter(function (x) { return !(x.fol && TVG.pushOn) && !x.rr; }).map(function (x) { return { id: x.c.id, p: x.p }; }); if (TVG.srv()) TVG.quickAdd(tn); else { TVG.rem = tn.filter(function (r) { return r.p.s > new Date(); })[0] || null; TVG.askCal(); } return; } // 🌙 הערב שלך: תזכורת לכל השורות
+    var tna = t.closest("[data-tnadd]"); if (tna) { addCh(tna.getAttribute("data-tnadd")); TVG.render(); return; } // 🌙 "לא בערוצים שלך · ＋ להוספה"
     if (t.closest("[data-tnmore]")) { TVG.tnOpen = true; TVG.render(); return; } // 🌙 הערב שלך: שאר השורות
     if (t.closest("[data-tnx]")) { TVG.store("tvg.tnHint", dstr(new Date())); TVG.render(); return; } // הרמז נעלם עד מחר
     if (t.closest("[data-tnfav]")) { TVG.openFavs(); return; }
@@ -98,7 +106,7 @@
     if (jp) {
       if (TVG.q.trim()) TVG.addRecent(TVG.qExact || TVG.q, !!TVG.qExact);
       var jr = TVG.findProg(jp.getAttribute("data-jump"));
-      if (jr) { if (!TVG.chans().some(function (c) { return c.id === jr.id; })) { TVG.gen = "all"; if (!sel.has(jr.id)) { sel.add(jr.id); TVG.saveSel(); TVG.pill("הערוץ נוסף לערוצים שלך", 1600); } } TVG.setSearch(false); TVG.chId = jr.id; TVG.day = dstr(jr.p.s); TVG.scrub = Math.round((jr.p.s - TVG.dObj(TVG.day)) / 60000); TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render(); window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); }
+      if (jr) { if (!TVG.chans().some(function (c) { return c.id === jr.id; })) { TVG.gen = "all"; addCh(jr.id); } TVG.setSearch(false); TVG.chId = jr.id; TVG.day = dstr(jr.p.s); TVG.scrub = Math.round((jr.p.s - TVG.dObj(TVG.day)) / 60000); TVG.tab = "dial"; TVG.store("tvg.tab", "dial"); TVG.render(); window.scrollTo({ top: 0, behavior: TVG.reducedMotion() ? "auto" : "smooth" }); }
       return;
     }
     if (t.closest("[data-install]")) { TVG.install(); return; }

@@ -1,7 +1,7 @@
 // 🌙 הערב שלך ב-19:00: פוש יומי אחד עם מה שמעניין את המשתמש הערב (מועדפים ⭐, נושאים, סדרות במעקב), בערוצים שלו.
 // אותה לוגיקה כמו הכרטיס בלשונית היום (js/render-dial.js tonightList), על הלוח החי ועל הגיבוי של המשתמש (backup/<t>).
-// עותק נאמן של: js/data.js (classify/index/chans/live), js/search.js (canon/topicAlts/topicHit), js/channels.js (chNum),
-// js/reminders.js (tonightEnd/remKey). נבדק מול הקוד של הלקוח עצמו ב-test/tonight-parity.test.mjs – שינוי שם דורש שינוי כאן.
+// עותק נאמן של: js/data.js (classify/index/myChans/live/isLiveP), js/search.js (canon/topicAlts/topicHit), js/channels.js (chNum),
+// js/reminders.js (tonightEnd/remKey), js/team.js (teamLib: canon/key/sidesOf/sportOf/scan/hit/isTeam/sportCh). נבדק מול הקוד של הלקוח עצמו ב-test/tonight-parity.test.mjs – שינוי שם דורש שינוי כאן.
 // תזמון: ה-cron היומי (/api/watch-check, 06:00 UTC) מתזמן ב-QStash הודעה אחת ל-19:00 שעון ישראל של היום (כולל שעון קיץ),
 // וההודעה מגיעה ל-/api/fire עם {tn:1, d}. בלי פונקציה חדשה ובלי cron נוסף.
 import { ilToMs, seriesKey } from "./_series.js";
@@ -164,6 +164,134 @@ export function topicAlts(t) {
 }
 export function topicHit(p, alts) { const h = (p.title + " " + (p.desc || "")).toLowerCase(), hc = pc(p); return alts.some((a) => h.indexOf(a) >= 0 || hc.indexOf(canon(a).trim()) >= 0); }
 
+// ---------- js/data.js isLiveP (כולל ה-s* המקורי, מילולית) ----------
+const RE_LIVE_PRE = /^s*(ישיר|LIVE)s*[!:-–]*s*/i;
+export const isLiveP = (p) => !!p && (p.lv === 1 || RE_LIVE_PRE.test(p.title || "") || /LIVE/.test(p.title || ""));
+
+// ---------- js/team.js teamLib: משחקים, צדדים, שידור חוזר (scan/hit/isTeam/sportCh) ----------
+const CITY = { "תא": "תל אביב", "בש": "באר שבע", "פת": "פתח תקווה", "רג": "רמת גן", "קש": "קריית שמונה", "ראשלצ": "ראשון לציון", "כפס": "כפר סבא", "נצ": "נס ציונה", "ים": "ירושלים" };
+const CLUBW = ["מכבי", "הפועל", "ביתר", "עירוני", "בני", "הכח", "אליצור", "מס", "ריאל", "אתלטיקו", "מנצסטר", "אינטר", "דינמו", "ספורטינג", "סיטי", "יונייטד", "fc", "real", "manchester"];
+const TALIAS = {
+  "real madrid": "ריאל מדריד", "barcelona": "ברצלונה", "fc barcelona": "ברצלונה", "barca": "ברצלונה", "liverpool": "ליברפול", "arsenal": "ארסנל", "chelsea": "צלסי",
+  "manchester united": "מנצסטר יונייטד", "man united": "מנצסטר יונייטד", "man utd": "מנצסטר יונייטד", "manchester city": "מנצסטר סיטי", "man city": "מנצסטר סיטי",
+  "tottenham": "טוטנהאם", "juventus": "יובנטוס", "bayern": "באיירן מינכן", "bayern munich": "באיירן מינכן", "psg": "פסז", "paris saint-germain": "פסז", "פריז סן זרמן": "פסז",
+  "atletico madrid": "אתלטיקו מדריד", "ac milan": "מילאן", "milan": "מילאן", "inter": "אינטר", "napoli": "נאפולי", "maccabi tel aviv": "מכבי תל אביב", "maccabi haifa": "מכבי חיפה",
+  "hapoel tel aviv": "הפועל תל אביב", "hapoel beer sheva": "הפועל באר שבע", "beitar jerusalem": "ביתר ירושלים", "lakers": "לא לייקרס", "la lakers": "לא לייקרס", "ל.א. לייקרס": "לא לייקרס",
+  "golden state": "גולדן סטייט", "boston": "בוסטון", "boston celtics": "בוסטון סלטיקס", "panathinaikos": "פנאתינייקוס", "olympiacos": "אולימפיאקוס", "fenerbahce": "פנרבחצה",
+};
+function tcanon(s) {
+  return (" " + String(s == null ? "" : s).toLowerCase() + " ")
+    .replace(/[״”“]/g, '"').replace(/[׳’`]/g, "'").replace(/־/g, "-")
+    .replace(/([\s.(\-])י\s?-\s?ם(?=[\s\-),.:;'"]|$)/g, "$1ירושלים").replace(/([\s.(\-])י["']ם(?=[\s\-),.:;]|$)/g, "$1ירושלים")
+    .replace(/([\s\-(:;])מ\.(?!ס\.)\s?(?=[א-ת])/g, "$1מכבי ").replace(/([\s\-(:;])ה\.\s?(?=[א-ת])/g, "$1הפועל ")
+    .replace(/([\s\-(:;])ב\.\s?(?=[א-ת])/g, "$1ביתר ").replace(/([\s\-(:;])ע\.\s?(?=[א-ת])/g, "$1עירוני ")
+    .replace(/([\s\-(:;])ר\.\s?(?=מדריד)/g, "$1ריאל ").replace(/([\s\-(:;])את\.\s?(?=מדריד)/g, "$1אתלטיקו ")
+    .replace(/([\s\-(:;])מנ[.']\s?(?=(סיטי|יונייטד|יוניטד))/g, "$1מנצסטר ")
+    .replace(/["']/g, "").replace(/בית"?ר/g, "ביתר")
+    .replace(/(^|[\s\-(:])(מכבי|הפועל|ביתר|עירוני|בני|הכח|אליצור)\s+(תא|בש|פת|רג|קש|ראשלצ|כפס|נצ|ים)(?=[\s\-),.:;]|$)/g, (m, a, c, x) => a + c + " " + CITY[x])
+    .replace(/תל[\-\s]אביב(?:[\-\s]יפו)?/g, "תל אביב").replace(/קרית/g, "קריית").replace(/תקוה/g, "תקווה").replace(/יוניטד/g, "יונייטד").replace(/(^|\s)מ\.ס\.\s?/g, "$1מס ")
+    .replace(/\s+/g, " ");
+}
+const CC = new Map();
+const cc = (x) => { x = x || ""; let v = CC.get(x); if (v == null) { if (CC.size > 50000) CC.clear(); v = tcanon(x); CC.set(x, v); } return v; };
+export function teamKey(n) { let k = tcanon(n).replace(/^[\s.,!;:]+|[\s.,!;:]+$/g, ""); k = k.replace(/\./g, ""); return TALIAS[k] || k; }
+export const generic = (k) => !k || k.length < 2 || CLUBW.indexOf(k) >= 0 || /^(מכבי|הפועל|ביתר|עירוני|בני)( (כדורגל|כדורסל))?$/.test(k);
+const tclean = (x) => { x = String(x).replace(/\./g, "").replace(/^[\s,!;:"]+|[\s,!;:"]+$/g, "").replace(/\s+/g, " "); return TALIAS[x] || x; };
+function sidesOf(title) {
+  let t = cc(title).replace(/\([^)]*\)/g, " ").replace(/\s·.*$/, " ").replace(/(^|\s)(ישיר|live)!?(\s|:|$)/g, " ");
+  const i = t.lastIndexOf(":"); if (i >= 0) t = t.slice(i + 1);
+  let parts = t.split(/\s+(?:-|–|נגד|vs\.?)\s+/);
+  if (parts.length !== 2) parts = t.split(/\s*-\s*/);
+  if (parts.length !== 2) return null;
+  const a = tclean(parts[0]), b = tclean(parts[1]);
+  return a && b && a !== b ? [a, b] : null;
+}
+const RE_BB = /כדורסל|יורוליג|יורוקאפ|(^|\s)nba(\s|:|$)|g-league|ווינר סל|אלופות סל|(^|\s)סל(\s|$)|euroleague|eurocup|ליגת העל לנוער בכדורסל/;
+const RE_FB = /כדורגל|ליגה לאומית|פרמייר|(ליגה|הליגה|ל\.) ?ה?(אנגלית|ספרדית|איטלקית|גרמנית|צרפתית|הולנדית|טורקית \(כדורגל\)|ארגנטינאית|פורטוגלית|אירופית|סקוטית|בלגית|סעודית)|ליגת הכנס|גביע הטוטו|ליגת ווינר(?! סל)|ליגת העל ווינר|מוקדמות (יורו|המונדיאל|מונדיאל)|ליגת האומות|אופא|גביע אנגלי|גביע המדינה בכדורגל|ליגת האלופות(?! בכדורסל)|ל\. אלופות/;
+const RE_BB_T = /כדורסל|יורוליג|יורוקאפ|(^|\s)nba(\s|:|$)|ווינר סל/, RE_FB_T = /ל\. (אנגלית|ספרדית|איטלקית|גרמנית|צרפתית|הולנדית|טורקית|ארגנטינאית|פורטוגלית|אירופית)|כדורגל|ליגת ווינר(?! סל)|פרמייר/;
+function sportOf(p) {
+  const t = cc(p.title), d = cc(p.desc);
+  let bb = 0, fb = 0;
+  if (RE_BB.test(d)) bb += 2; if (RE_FB.test(d)) fb += 2;
+  if (RE_BB_T.test(t)) bb += 1; if (RE_FB_T.test(t)) fb += 1;
+  return bb > fb ? "bb" : fb > bb ? "fb" : "";
+}
+const RE_NOGAME = /תקציר|מגזין|סיכום|שערים|לקראת|אולפן|פודקאסט|podcast|highlights|תכנית|תוכנית|חדשות הספורט|מהדורת|מבזק|(^|\s)פרק(\s|$)|תיקתקנו/;
+const RE_YOUTH = /נוער|נערים|נשים|ילדים|קדטים|(^|\s)u-?\d\d|עד גיל/;
+const RE_RR = /(^|\s)שח(\s|$)|ש\.ח|שידור חוזר|מוקלט|מקוצר|(^|\s)הכנה$/;
+const RE_OLD = /המיטב|מיטב העונה|יש לי יום הולדת|נוסטלגיה|קלאסיקות|(^|\s)אwow|(^|\s)wow(\s|$)/;
+const RE_RRD = /\S-\S[^:·]*\sמח\.\s?\d+|\S-\S[^:·]*\sגמר$/;
+function season(now) { const p = ilParts(now), y = +p.year % 100, m = +p.month - 1; return m >= 6 ? [y, (y + 1) % 100] : [(y + 99) % 100, y]; }
+function oldSeason(txt, cur) {
+  const re = /(?:^|[^\d])(?:19|20)?(\d\d)\/(\d\d)(?!\d)/g;
+  let m, any = false;
+  while ((m = re.exec(txt))) { if ((+m[1] + 1) % 100 !== +m[2]) continue; any = true; if (+m[1] === cur[0]) return false; }
+  return any;
+}
+export const sportCh = (c) => c._n === "sport" || c._g === "sport" || /ספורט|sport|5gold|5max|5 live|5stars|one|eurosport/i.test(c.name || "");
+// כל המשחקים בלוח (teamLib.scan), פעם אחת לכל לוח ועונה
+const SCAN = new WeakMap();
+export function scanGames(G, now) {
+  const cur = season(now), sk0 = cur.join("/"), hit0 = SCAN.get(G);
+  if (hit0 && hit0.sk === sk0) return hit0;
+  const list = [], SD = {};
+  for (const c of G.channels) {
+    const spc = sportCh(c);
+    for (const p of G.by.get(c.id) || []) {
+      if (!/[-–]|נגד|vs/i.test(p.title)) continue;
+      if (!spc && !/כדורגל|כדורסל|יורוליג|nba|ווינר|ליג|ל\.|פרמייר/i.test(p.title)) continue;
+      let sd = SD[p.title];
+      if (sd === undefined) sd = SD[p.title] = sidesOf(p.title);
+      if (!sd) continue;
+      if (!spc) { const tc = cc(p.title); if (!RE_BB_T.test(tc) && !RE_FB_T.test(tc)) continue; }
+      const sp = sportOf(p);
+      const txt = cc(p.title) + " " + cc(p.desc), arch = /5\s?gold/i.test(c.name || "") && p.lv !== 1 && !isLiveP(p);
+      list.push({ c, p, a: sd[0], b: sd[1], sp, sp0: sp, pair: [sd[0], sd[1]].sort().join("~"),
+        ng: arch || RE_NOGAME.test(cc(p.title)) || RE_OLD.test(txt) || oldSeason(txt, cur), yo: RE_YOUTH.test(txt), rr: !!p.rr || RE_RR.test(txt) || (p.lv !== 1 && RE_RRD.test(p.desc || "")) });
+    }
+  }
+  const bySp = {};
+  list.forEach((x) => { if (x.sp) { const o = bySp[x.pair] || (bySp[x.pair] = {}); o[x.sp] = 1; } });
+  list.forEach((x) => { if (!x.sp && bySp[x.pair]) { const k = Object.keys(bySp[x.pair]); if (k.length === 1) x.sp = k[0]; } });
+  const sideSp = {};
+  list.forEach((x) => { if (x.sp0) [x.a, x.b].forEach((k) => { (sideSp[k] || (sideSp[k] = {}))[x.sp0] = 1; }); });
+  list.forEach((x) => {
+    if (x.sp) return;
+    const sa = Object.keys(sideSp[x.a] || {}), sb = Object.keys(sideSp[x.b] || {});
+    const both = sa.filter((v) => sb.indexOf(v) >= 0);
+    if (sa.length && sb.length && both.length === 1) x.sp = both[0];
+  });
+  const grp = {};
+  list.forEach((x) => { (grp[x.pair + "|" + x.sp] || (grp[x.pair + "|" + x.sp] = [])).push(x); });
+  Object.keys(grp).forEach((k) => {
+    const g = grp[k].sort((x, y) => x.p.s - y.p.s);
+    let orig = null;
+    g.forEach((x) => {
+      if (x.ng) return;
+      const live = x.p.lv === 1 || isLiveP(x.p);
+      if (orig && live && x.p.s - orig.p.e > 12 * 3600000) orig = null;
+      if (!orig) { if (x.rr && !live) return; orig = x; x.gid = k + "|" + x.p.s; return; }
+      const olive = orig.p.lv === 1 || isLiveP(orig.p);
+      if (live && olive && x.p.s - orig.p.s < 3 * 3600000) { x.rr = false; x.gid = orig.gid; return; }
+      if (x.p.s >= orig.p.s + 45 * 60000) x.rr = true;
+      else if (!x.rr) x.gid = orig.gid;
+    });
+    g.forEach((x) => { if (!x.gid) x.gid = k + "|r|" + (orig ? orig.p.s : x.p.s); });
+  });
+  const sides = new Set();
+  list.forEach((x) => { sides.add(x.a); sides.add(x.b); });
+  const out = { sk: sk0, list, byP: new Map(list.map((x) => [x.p, x])), sides };
+  SCAN.set(G, out);
+  return out;
+}
+// teamLib.hit בלי ענף נבחר (נושא ⭐ לא בוחר ענף)
+function teamHit(x, t) {
+  const side = x.a === t.k ? 1 : x.b === t.k ? 2 : 0;
+  if (!side) return false;
+  if (x.yo && !RE_YOUTH.test(t.k)) return false;
+  return !x.ng;
+}
+
 // ---------- המשתמש מתוך הגיבוי ----------
 const arr = (s) => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
 export function userOf(data) {
@@ -181,23 +309,41 @@ export function userOf(data) {
 export const hasPicks = (u) => !!u && (u.fav.size > 0 || u.topics.length > 0 || u.fol.size > 0);
 
 // ---------- js/render-dial.js tonightList ----------
-// שורה אחת לכל כותרת (השידור הקרוב בערוצים שלי, לפי סדר הערוצים), מעכשיו ועד 04:00, ממוין לפי שעה
+// שורה אחת לכל תוכנית/משחק, מעכשיו ועד 04:00. הערוצים שלי; נושא שהוא קבוצה – כל ערוץ, רק במשחקים שלה; מועדפים ושאר הנושאים – גם ערוצי ספורט.
+// אותו משחק (צמד+ענף): החי/המקורי קודם, אחר כך המוקדם; שידור חוזר (rr) רק כשאין אחר, ולא בערוץ שאין לי. ערוץ שלי מנצח עד 45 דקות אחרי
+const TN_GAP = 45 * 60000;
 export function tonightList(G, u, now) {
-  const end = tonightEnd(now), seen = {}, out = [], alts = u.topics.map((tp) => ({ t: tp, a: topicAlts(tp) }));
-  for (const c of userChans(G, u.sel, now)) {
+  const end = tonightEnd(now), S = scanGames(G, now), mine = new Set(userChans(G, u.sel, now).map((c) => c.id));
+  const alts = u.topics.map((tp) => { const k = teamKey(tp); return { t: tp, a: topicAlts(tp), tm: !generic(k) && S.sides.has(k) ? { k } : null }; });
+  const teams = alts.some((x) => x.tm), grp = new Map();
+  for (const c of G.channels) {
+    const my = mine.has(c.id), spc = sportCh(c);
+    if (!my && !spc && !teams) continue;
     for (const p of G.by.get(c.id) || []) {
-      if (p.e <= now || p.s >= end || seen[p.title]) continue;
+      if (p.e <= now || p.s >= end) continue;
+      const x = S.byP.get(p), g = x && !x.ng ? x : null;
+      const fol = my && u.fol.size > 0 && u.fol.has(seriesKey(p.title));
       let why = "";
-      const fol = u.fol.size > 0 && u.fol.has(seriesKey(p.title));
-      if (u.fav.has(p.title)) why = "מועדף";
+      if ((my || spc) && u.fav.has(p.title)) why = "מועדף";
       else if (fol) why = "סדרה במעקב";
-      else { for (const x of alts) if (topicHit(p, x.a)) { why = x.t; break; } }
+      else { for (const A of alts) if ((A.tm && g && teamHit(g, A.tm)) || ((my || (spc && !A.tm)) && topicHit(p, A.a))) { why = A.t; break; } }
       if (!why) continue;
-      seen[p.title] = 1;
-      out.push({ c, p, why, fol });
+      const k = g ? "g|" + g.pair + "|" + g.sp : "t|" + p.title;
+      if (!grp.has(k)) grp.set(k, []);
+      grp.get(k).push({ c, p, why, fol, out: !my, rr: g ? !!g.rr || (p.lv === 0 && !isLiveP(p)) : false }); // lv=0: "מוקלט" לפי אתר הערוץ
     }
   }
-  return out.sort((x, y) => x.p.s - y.p.s || x.p.title.localeCompare(y.p.title));
+  const out = [];
+  for (const arr0 of grp.values()) {
+    const a = arr0.sort((x, y) => x.rr - y.rr || x.p.s - y.p.s || x.out - y.out);
+    let b = a[0];
+    if (b.out) {
+      const m = a.find((y) => !y.out && y.rr === b.rr && y.p.s - b.p.s <= TN_GAP);
+      if (m) b = m; else if (b.rr) { b = a.find((y) => !y.out); if (!b) continue; } // שידור חוזר רק בערוץ שלי
+    }
+    out.push(b);
+  }
+  return out.sort((x, y) => x.rr - y.rr || x.p.s - y.p.s || x.p.title.localeCompare(y.p.title));
 }
 
 // ---------- ההתראה ----------
@@ -212,9 +358,10 @@ export function buildTonight(list, rems, now) {
   if (!items.length) return null;
   const mine = new Set((Array.isArray(rems) ? rems : []).map((r) => r && r.k));
   // סדרה במעקב = יש לה תזכורת אוטומטית (למשתמש יש פוש, אחרת לא היינו כאן), כמו "✓" בכרטיס
-  const open = items.filter((x) => !x.fol && !mine.has(x.c.id + "|" + x.p.s));
+  // שידור חוזר (📼) לבד לא שולח התראה, כמו "⏰ להזכיר על הכול" בכרטיס
+  const open = items.filter((x) => !x.fol && !x.rr && !mine.has(x.c.id + "|" + x.p.s));
   if (!open.length) return null; // על כל מה שמעניין הערב כבר תגיע תזכורת: לא מוסיפים עוד התראה
-  const lines = items.slice(0, TN_LINES).map((x) => ilHm(x.p.s) + " · " + bidiText(clip(x.p.title, 60)) + " · " + bidiText(x.c.name));
+  const lines = items.slice(0, TN_LINES).map((x) => ilHm(x.p.s) + " · " + (x.rr ? "📼 " : "") + bidiText(clip(x.p.title, 60)) + " · " + bidiText(x.c.name));
   const more = items.length - TN_LINES;
   if (more > 0) lines.push(more === 1 ? "ועוד אחד" : "ועוד " + more);
   return { title: "🌙 הערב שלך", body: lines.join("\n"), tag: TN_TAG, url: TN_URL };

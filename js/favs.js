@@ -24,7 +24,7 @@
     h += TVG.TOPICS.length ? TVG.TOPICS.map(function (t) {
       var a = TVG.topicAirs(t), live = a.filter(function (x) { return x.p.s <= now; }).length, n = a.filter(function (x) { return x.p.s > now; })[0];
       var sub = (live ? "● משודר עכשיו · " : "") + (n ? "הבא: " + TVG.dayLabel(dstr(n.p.s)) + " " + hhmm(n.p.s) + " · " + n.c.name : "אין שידור בימים הקרובים") + (a.length ? " · " + a.length + " שידורים" : "");
-      return '<div class="srow"><button type="button" class="go sg" data-topic="' + esc(t) + '"><span class="ttl">⭐ ' + esc(t) + '<br><span class="sub">' + esc(sub) + '</span></span></button><button type="button" class="rbt" data-topicdel="' + esc(t) + '" aria-label="הפסקת מעקב: ' + esc(t) + '">✕</button></div>';
+      return '<div class="srow"><button type="button" class="go sg" data-topic="' + esc(t) + '"><span class="ttl">⭐ ' + esc(t) + '<br><span class="sub">' + esc(sub) + '</span></span></button><button type="button" class="rbt" data-topicdel="' + esc(t) + '" aria-label="הפסקת מעקב: ' + esc(t) + '">✕</button></div>' + (TVG.teamSugHtml ? TVG.teamSugHtml(t) : ""); // ⚽ נושא שהוא קבוצה (team.js)
     }).join("") : '<p class="none">אפשר להוסיף גם קבוצה, שחקן או שף: מחפשים למשל "מכבי חיפה" או "חיים כהן" ולוחצים "⭐ להוסיף למועדפים".</p>';
     if (TVG.teamFavHtml) h += TVG.teamFavHtml(); // ⚽ הקבוצה שלי (team.js)
     h += '<button type="button" class="btn" data-favadd>הוספת תוכנית</button><button type="button" class="ghost" data-topicadd>הוספת מילה (קבוצה, שחקן…)</button>';

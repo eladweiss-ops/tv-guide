@@ -342,6 +342,7 @@ export function tonightList(G, u, now) {
       if (m) b = m; else if (b.rr) { b = a.find((y) => !y.out); if (!b) continue; } // שידור חוזר רק בערוץ שלי
     }
     out.push(b);
+    if (b.out && !b.rr) { const r = a.find((y) => !y.out && y.rr); if (r) out.push(r); } // החי בערוץ אחר + השידור החוזר בערוץ שלי
   }
   return out.sort((x, y) => x.rr - y.rr || x.p.s - y.p.s || x.p.title.localeCompare(y.p.title));
 }

@@ -6,12 +6,13 @@ import fs from "node:fs";
 import vm from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { prepGuide, userOf, tonightList, tonightEnd, buildTonight } from "../api/_tonight.js";
+import { prepGuide, userOf, tonightList, tonightEnd, buildTonight, scanGames } from "../api/_tonight.js";
 import { ilToMs } from "../api/_series.js";
 
 process.env.TZ = "Asia/Jerusalem"; // הלקוח עובד בשעון המכשיר (ישראל)
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RAW = fs.readFileSync(path.join(ROOT, "guide.json"), "utf8");
+const FX = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "guide-2026-11-28.json"), "utf8");
 
 function client(nowMs, raw = RAW) {
   const RealDate = Date;
@@ -84,12 +85,22 @@ test("parity: tonightList זהה לכרטיס בלקוח – 240 פרופילי�
     }
   }
   // סף נמוך: הכמות תלויה בלוח של היום, וזו רק בדיקה שההשוואה לא ריקה
+  console.log(`tonight parity: ${nonEmpty} פרופילים עם פריטים, ${total} פריטים`);
   assert.ok(nonEmpty > 40 && total > 120,  `בדיקה אמיתית: ${nonEmpty} פרופילים עם פריטים, ${total} פריטים`);
+});
+
+test("parity: teamLib.scan (team.js) זהה ל-scanGames בשרת – כל המשחקים בלוח האמיתי ובלוח 28.11", () => {
+  for (const [raw, day] of [[RAW, DAY], [FX, "2026-11-28"]]) {
+    const now = ilToMs(day + "T12:00"), { T } = client(now, raw);
+    const want = T.teamLib.scan().map((x) => [x.c.id, x.p.s.getTime(), x.pair, x.sp, x.ng, x.yo, x.rr, x.gid]);
+    const got = scanGames(prepGuide(JSON.parse(raw)), now).list.map((x) => [x.c.id, x.p.s, x.pair, x.sp, x.ng, x.yo, x.rr, x.gid]);
+    assert.ok(got.length > 30, "משחקים בלוח");
+    assert.deepEqual(got, JSON.parse(JSON.stringify(want)), day);
+  }
 });
 
 // תקלת 28.11.2026: "מכבי חיפה" כנושא ⭐, ספורט 3 (3761/3762) לא בערוצים שלי. המשחק החי ב-14:40 הוצג רק כשני שידורים חוזרים בערב.
 // לוח קבוע (fixtures/guide-2026-11-28.json: ערוצי הספורט + הערוצים שלי, מתוך guide.json של 28.11), כדי שהבדיקה לא תלויה בלוח של היום
-const FX = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "guide-2026-11-28.json"), "utf8");
 test("28.11: המשחק החי של מכבי חיפה בספורט 3 ראשון, מסומן 'לא בערוצים שלך', שידורים חוזרים אחריו – בלקוח ובשרת", () => {
   const data = { "tvg.sel": JSON.stringify(["208", "199", "3763", "3540", "3551"]), "tvg.topics": JSON.stringify(["מכבי חיפה"]), "tvg.fav": "[]", "tvg.fol": "[]" };
   const rows = {};
@@ -108,7 +119,10 @@ test("28.11: המשחק החי של מכבי חיפה בספורט 3 ראשון,
     assert.equal(c, "3761", hm); assert.equal(s, live, hm); assert.match(title, /בני סכנין - מכבי חיפה/); assert.equal(why, "מכבי חיפה");
     assert.equal(out, true, hm + ": לא בערוצים שלי"); assert.equal(rr, false, hm + ": חי, לא חוזר");
     assert.ok(!rows[hm].some((r) => r[5] && r[6]), hm + ": אין שידור חוזר מערוץ שאין לי");
-    assert.ok(!rows[hm].some((r, i) => i > 0 && /בני סכנין - מכבי חיפה/.test(r[2])), hm + ": המשחק פעם אחת");
+    // והשידור החוזר בערוץ שלי (ספורט 4, 22:15) כשורת 📼 אחרונה – פעם אחת
+    const reps = rows[hm].filter((r, i) => i > 0 && /בני סכנין - מכבי חיפה/.test(r[2]));
+    assert.deepEqual(reps.map((r) => [r[0], r[1], r[5], r[6]]), [["3763", ilToMs("2026-11-28T22:15"), false, true]], hm);
+    assert.equal(rows[hm][rows[hm].length - 1][6], true, hm + ": החוזר למטה");
   }
   // בערב, אחרי המשחק: רק השידור החוזר בערוץ שלי (ספורט 4, 22:15), מסומן כחוזר
   const eve = rows["19:00"].filter((r) => /בני סכנין - מכבי חיפה/.test(r[2]));

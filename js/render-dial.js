@@ -51,6 +51,7 @@
   // מקורות: מועדפים (כותרת), נושאים, סדרות במעקב. שורה אחת לכל תוכנית/משחק, לפי שעה, עד 5.
   // ערוצים: הערוצים שלך; נושא שהוא קבוצה (teamLib.isTeam) – גם כל ערוץ אחר, אבל רק במשחקים שלה; מועדפים ושאר הנושאים – גם ערוצי ספורט אחרים.
   // אותו משחק בכמה שידורים (teamLib.scan: צמד+ענף): החי/המקורי קודם, ואחריו המוקדם; שידור חוזר (📼) רק כשאין אחר, ולא בערוץ שאין לך.
+  // כשהחי בערוץ שאין לך – גם השידור החוזר הקרוב בערוץ שלך, כשורת 📼 למטה.
   // ערוץ שלך מנצח ערוץ אחר כשהוא משדר את אותו דבר עד 45 דקות אחריו. השרת (calendar-server/api/_tonight.js) מחקה את זה בדיוק
   var TN_MAX = 5, TN_GAP = 45 * 60000;
   function tonightList(now) {
@@ -84,6 +85,7 @@
         if (m) b = m; else if (b.rr) { b = a.filter(function (y) { return !y.out; })[0]; if (!b) return; } // שידור חוזר רק בערוץ שלך
       }
       out.push(b);
+      if (b.out && !b.rr) { var r = a.filter(function (y) { return !y.out && y.rr; })[0]; if (r) out.push(r); } // החי בערוץ אחר + השידור החוזר בערוץ שלך (📼, למטה)
     });
     return out.sort(function (x, y) { return x.rr - y.rr || x.p.s - y.p.s || x.p.title.localeCompare(y.p.title); });
   }
@@ -107,7 +109,7 @@
       if (i === SHOW) h += '<div class="tnrest"' + (TVG.tnOpen ? "" : " hidden") + ">";
       var v = TVG.remKey(x.c.id, x.p.s), live = x.p.s <= now, on = !!TVG.hasRem(v), byFol = x.fol && folOn;
       if (!live && !on && !byFol) { if (x.rr) rrOpen++; else open++; } // "להזכיר על הכול" – בלי שידורים חוזרים
-      var sub = (live ? "משודר עכשיו · " : x.rr ? '<span class="tagk rr">📼 שידור חוזר</span> ' : "") + bd(x.c.name) + ' · <span class="tnwhy">' + (x.why === "מועדף" ? "⭐ מועדף" : x.why === "סדרה במעקב" ? "📺 במעקב" : "⭐ " + bd(x.why)) + "</span>";
+      var sub = (live ? "משודר עכשיו · " : x.rr ? '<span class="tagk rr">📼 שידור חוזר</span> ' : "") + bd(x.c.name) + ' <span class="tnwhy">· ' + (x.why === "מועדף" ? "⭐ מועדף" : x.why === "סדרה במעקב" ? "📺 במעקב" : "⭐ " + bd(x.why)) + "</span>";
       var act = live ? "" : byFol ? '<button type="button" class="rbt on" data-folopen="' + esc(TVG.folKey(x.p.title)) + '" aria-label="סדרה במעקב, יש תזכורת: ' + esc(x.p.title) + '">📺</button>'
         : '<button type="button" class="rbt' + (on ? " on" : "") + '" data-rem="' + esc(v) + '" aria-label="' + (on ? "יש תזכורת: " : "תזכורת: ") + esc(x.p.title) + '">' + (on ? "✓" : "⏰") + "</button>";
       h += '<div class="srow tnrow' + (live ? " tnlive" : "") + (x.rr ? " tmrr" : "") + (x.out ? " tnout" : "") + '"><button type="button" class="go" data-jump="' + esc(v) + '"><span class="time">' + hhmm(x.p.s) + '</span><span class="ttl"><bdi>' + TVG.ttlHtml(x.p) + '</bdi><br><span class="sub">' + sub + "</span></span></button>" + act + "</div>" +

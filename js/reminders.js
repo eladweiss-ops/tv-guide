@@ -12,6 +12,7 @@
   TVG.icsText = icsText;
   TVG.newTok = newTok;
   TVG.pullRems = pullRems;
+  TVG.mergeSrv = mergeSrv;
   TVG.remBtn = remBtn;
   TVG.remCount = remCount;
   TVG.remKey = remKey;
@@ -56,14 +57,19 @@
   TVG.pushOn = TVG.store("tvg.push") === "1";
   if (calNorm && TVG.pushOn) setTimeout(function () { TVG.syncRems(); }, 0);
   function srv() { return TVG.calMode === "sub" || TVG.pushOn; } // התזכורות נשמרות בשרת (יומן מנוי או התראות פוש)
+  // tx = tvg.teamX (⚽ team.js): מפתחות של משחקים שכבר טופלו. כך השרת יודע שתזכורת שהוא הוסיף נראתה כאן (ואם היא לא ברשימה – נמחקה)
   function syncRems() {
     if (!srv() || !TVG.calTok) return Promise.resolve(true);
-    return fetch(CAL_API + "/api/rems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.calTok, rems: TVG.REMS }) })
+    return fetch(CAL_API + "/api/rems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t: TVG.calTok, rems: TVG.REMS, tx: TVG.teamTX ? TVG.teamTX() : undefined }) })
       .then(function (r) {
         if (r.status === 429) { var e = new Error("rate"); e.retry = Math.min(120, Math.max(5, +r.headers.get("retry-after") || 60)); throw e; } // קצב: ניסיון חוזר שקט
         if (r.status === 413) { var e2 = new Error("big"); e2.big = true; throw e2; } // הרשימה גדולה מדי: ניסיון חוזר לא יעזור
         if (!r.ok) throw 0;
-        TVG.syncBad = false; TVG.store("tvg.remDirty", "0"); return true;
+        TVG.syncBad = false; TVG.store("tvg.remDirty", "0");
+        return r.json().catch(function () { return null; }).then(function (j) { // תזכורות שהשרת הוסיף ועוד לא היו כאן: מצטרפות
+          if (j && Array.isArray(j.srv) && j.srv.length && mergeSrv(j.srv).add.length) { if (TVG.G && TVG.render) TVG.render(); setTimeout(syncRems, 1500); }
+          return true;
+        });
       })
       .catch(function (e) {
         TVG.syncBad = true; TVG.store("tvg.remDirty", "1");
@@ -73,11 +79,36 @@
       });
   }
   var syncRetry = 0;
-  function pullRems() { // שחזור הרשימה מהשרת (למשל אחרי התקנה מחדש וקוד גיבוי)
-    if (!srv() || !TVG.calTok || TVG.REMS.length) return;
-    fetch(CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      if (j && Array.isArray(j.rems) && j.rems.length && !TVG.REMS.length) { TVG.REMS = j.rems; saveRems(); if (TVG.G) TVG.render(); }
-    }).catch(function () {});
+  // ⚽ תזכורות שהשרת הוסיף (srv:1, ks = המפתח ומפתחות הערוצים המקבילים), למשל למשחק שהופיע בלוח כשהאפליקציה הייתה סגורה.
+  // מצטרפות לרשימה, אלא אם כבר יש תזכורת למשחק או שכבר טיפלנו בו (tvg.teamX: נוסף כאן, או שהמשתמש מחק). מחזיר {add, ack}:
+  // ack = יש מה לאשר לשרת (syncRems שולח את הרשימה ואת tx, והשרת מוריד אותן מהממתינות)
+  function mergeSrv(list) {
+    var tx = TVG.teamTX ? TVG.teamTX() : [], add = [], ack = false;
+    (list || []).forEach(function (x) {
+      if (!x || !x.srv || typeof x.k !== "string" || !(x.ts > 0) || !(x.end > x.ts)) return;
+      var ks = Array.isArray(x.ks) && x.ks.length ? x.ks : [x.k];
+      if (ks.some(function (k) { return hasRem(k) || tx.indexOf(k) >= 0; }) || add.some(function (a) { return a.k === x.k; })) { ack = true; return; }
+      add.push({ k: x.k, id: x.id, ts: x.ts, end: x.end, title: String(x.title || ""), ch: String(x.ch || ""), desc: String(x.desc || ""), lead: +x.lead || 0, at: x.at || Date.now(), ks: ks });
+    });
+    if (add.length) {
+      var keys = []; add.forEach(function (a) { keys = keys.concat(a.ks); delete a.ks; });
+      TVG.REMS = TVG.REMS.concat(add); saveRems();
+      if (TVG.teamMark) TVG.teamMark(keys);
+    }
+    return { add: add, ack: ack || add.length > 0 };
+  }
+  // בעלייה ובחזרה לאפליקציה: שחזור הרשימה מהשרת (אחרי התקנה מחדש וקוד גיבוי), וצירוף תזכורות שהשרת הוסיף. מחזיר Promise (team.js מחכה לו לפני teamSync)
+  function pullRems() {
+    if (!srv() || !TVG.calTok) return Promise.resolve(0);
+    return fetch(CAL_API + "/api/rems?t=" + TVG.calTok, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || !Array.isArray(j.rems)) return 0;
+      var n = 0;
+      if (j.rems.length && !TVG.REMS.length) { TVG.REMS = j.rems.map(function (x) { var o = {}; Object.keys(x).forEach(function (k) { if (k !== "srv" && k !== "ks") o[k] = x[k]; }); return o; }); saveRems(); n = TVG.REMS.length; }
+      var m = mergeSrv(j.rems); n += m.add.length;
+      if (m.ack) syncRems();
+      if (n && TVG.G && TVG.render) TVG.render();
+      return n;
+    }).catch(function () { return 0; });
   }
   function remBtn(p, cid, small) {
     if (!cid || p.s <= new Date()) return "";

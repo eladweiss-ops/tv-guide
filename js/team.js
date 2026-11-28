@@ -197,6 +197,9 @@
   function saveTeams() { TVG.store("tvg.teams", JSON.stringify(TVG.TEAMS.map(function (t) { return { n: t.n, sport: t.sport || "" }; }))); }
   function saveTX() { var cut = Date.now() - 86400000; TX = TX.filter(function (k) { return +k.slice(k.lastIndexOf("|") + 1) > cut; }); TVG.store("tvg.teamX", JSON.stringify(TX)); }
   function tKey(t) { return t.k || (t.k = key(t.n)); }
+  // לסנכרון עם השרת (reminders.js): tx נשלח עם הרשימה; תזכורות שהשרת הוסיף ונקלטו כאן מסומנות כמטופלות
+  TVG.teamTX = function () { return TX.slice(); };
+  TVG.teamMark = function (keys) { var d = false; (keys || []).forEach(function (k) { if (typeof k === "string" && TX.indexOf(k) < 0) { TX.push(k); d = true; } }); if (d) saveTX(); };
   function hasTeam(k) { return TVG.TEAMS.some(function (t) { return tKey(t) === k; }); }
   function icon(t) { return t && t.sport === "bb" ? "🏀" : "⚽"; }
 
@@ -376,7 +379,13 @@
     var g = games(TVG.TEAMS, new Date()).games.filter(function (x) { return x.p.s > new Date(); })[0];
     TVG.rem = g ? { id: g.c.id, p: g.p } : null; TVG.askCal();
   }
+  // קודם מצרפים תזכורות שהשרת כבר הוסיף (reminders.js pullRems), ורק אז מוסיפים כאן – אחרת אותו משחק יכול להיכנס פעמיים בערוצים שונים.
+  // השרת לא עונה תוך 4 שניות: ממשיכים בלעדיו
+  function afterPull(fn) {
+    var p = TVG.remPull || Promise.resolve(); TVG.remPull = null;
+    Promise.race([p, new Promise(function (ok) { setTimeout(ok, 4000); })]).then(fn, fn);
+  }
   // בעלייה: אחרי שהלוח נטען (boot.js קורא ל-render ראשון) – משחקים חדשים מקבלים תזכורת
-  var bootT = setInterval(function () { if (!TVG.G) return; clearInterval(bootT); setTimeout(function () { teamSync(true); }, 400); }, 300);
-  document.addEventListener("visibilitychange", function () { if (!document.hidden && TVG.G) { TVG.teamLib.reset(); teamSync(false); } });
+  var bootT = setInterval(function () { if (!TVG.G) return; clearInterval(bootT); setTimeout(function () { afterPull(function () { teamSync(true); }); }, 400); }, 300);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && TVG.G) { TVG.teamLib.reset(); TVG.remPull = TVG.pullRems ? TVG.pullRems() : null; afterPull(function () { teamSync(false); }); } });
 })(window.TVG);

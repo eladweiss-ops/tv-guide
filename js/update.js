@@ -23,7 +23,7 @@
     checkUpdate();
   });
   setTimeout(checkUpdate, 1500);
-  TVG.pullRems(); if (TVG.syncBad) TVG.syncRems();
+  TVG.remPull = TVG.pullRems(); if (TVG.syncBad) TVG.syncRems(); // team.js מחכה ל-remPull לפני תזכורות הקבוצה
   if (TVG.pushOn && TVG.canPush) setTimeout(function () { TVG.pushReg().catch(function () {}); }, 3000);
   if (TVG.store("tvg.calJust") === "1") { TVG.store("tvg.calJust", "0"); setTimeout(TVG.calWelcome, 800); }
 })(window.TVG);

@@ -88,3 +88,21 @@ jobs:
             git pull --rebase -X theirs origin main || true
             git push
           fi
+      # ⚽ הקבוצה שלי: תזכורות אוטומטיות בצד השרת על הלוח החדש (גם למי שלא פותח את האפליקציה). אף פעם לא מכשיל את העדכון.
+      # GitHub Pages מתעדכן דקה-שתיים אחרי ה-push: השרת מחזיר stale עד שהוא רואה את הלוח הזה (updated), ואז מנסים שוב.
+      # צריך את אותו CRON_SECRET כמו ב-Vercel (Settings > Secrets and variables > Actions > CRON_SECRET). בלעדיו – מדלגים (ה-cron היומי עדיין מריץ).
+      - name: Server-side team reminders (team-sync)
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET not set, skipping"; exit 0; fi
+          U=$(node -e 'process.stdout.write(String(require("./guide.json").updated||""))')
+          for i in 1 2 3 4 5 6 7 8; do
+            sleep 45
+            R=$(curl -s -m 70 -X POST -H "Authorization: Bearer $CRON_SECRET" "https://tv-guide-cal.vercel.app/api/team-sync?u=$U" || true)
+            echo "try $i: $R"
+            case "$R" in *'"stale":true'*|*'"more":true'*|'') continue;; *) break;; esac
+          done
+          exit 0

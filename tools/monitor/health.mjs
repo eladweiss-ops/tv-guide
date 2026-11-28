@@ -21,6 +21,8 @@ export const T = {
   EXTRA_CACHE_MAX_AGE_H: 48,  // extra-cache.json: x14 .at (המחשב בבית)
   HOT_SAMPLE: 8,              // כמה ערוצי HOT לדגום
   HOT_SAMPLE_MIN_OK: 0.5,     // חלק מהדגימה שחייב להיות עם תוכניות היום
+  CANARY_MAX_AGE_H: 26,       // 🐤 הבדיקה היומית (QStash → /api/fire) רצה כל 24 ש' מה-cron של 06:00 UTC
+  CANARY_LOST_H: 2,           // תוזמנה ולא הגיעה תוך שעתיים = השרשרת שבה תזכורות עוברות שבורה
 };
 // HOT cache: הערך האחרון חייב להיות מהיום (שעון ישראל) ומעלה.
 // ערוצים מרכזיים: התאמה לפי שם (כמו באפליקציה, אחרי ניקוי HD/SD). minDays = כמה ימים קדימה (כולל היום) חייבים להיות עם תוכניות.
@@ -156,6 +158,25 @@ export function evaluateHome(st) {
   return { problems, info };
 }
 
+// 🐤 GET /api/status של השרת: {canaryAt, canaryOk, canaryPlan, canaryLag}. st=null (404, לפני פריסה) או בלי השדות = עוד לא נפרס: לא תקלה
+export function evaluateCanary(st, now = new Date()) {
+  const problems = [], info = {};
+  if (!st || typeof st !== "object" || !("canaryAt" in st)) { info.state = "not-deployed"; return { problems, info }; }
+  const h = (ms) => (now.getTime() - ms) / 3600000;
+  if (!st.canaryAt) {
+    if (st.canaryPlan && h(st.canaryPlan) > T.CANARY_LOST_H) problems.push("הבדיקה היומית תוזמנה ב-QStash ולא הגיעה ל-/api/fire (תזכורות לא נורות?)");
+    info.state = st.canaryPlan ? "pending" : "never-ran";
+    return { problems, info };
+  }
+  const age = h(st.canaryAt);
+  info.state = "ok"; info.ageH = Math.round(age * 10) / 10; if (st.canaryLag != null) info.lagS = Math.round(st.canaryLag / 1000);
+  if (!(age < T.CANARY_MAX_AGE_H)) { info.state = "stale"; problems.push("הבדיקה היומית של התזכורות לא רצה " + fmtAge(age) + " (QStash/‏cron)"); }
+  // תוזמנה אחרי הירי האחרון ועברו שעתיים: הירי של היום לא הגיע
+  else if (st.canaryPlan && st.canaryPlan > st.canaryAt && h(st.canaryPlan) > T.CANARY_LOST_H) { info.state = "lost"; problems.push("הבדיקה היומית תוזמנה ב-QStash ולא הגיעה ל-/api/fire (תזכורות לא נורות?)"); }
+  if (st.canaryOk === false) { info.state = "late"; problems.push("הבדיקה היומית הגיעה באיחור של " + Math.round((st.canaryLag || 0) / 60000) + " דקות (QStash מעכב תזכורות)"); }
+  return { problems, info };
+}
+
 export function parseSiteFiles(indexHtml) {
   const build = (indexHtml.match(/BUILD\s*=\s*"([^"]+)"/) || [])[1] || null;
   const m = indexHtml.match(/TVG\.list\s*=\s*\[([^\]]*)\]/);
@@ -217,6 +238,15 @@ export async function runHealth({ base = SITE, server = SERVER, fetchFn = fetch,
   await check("/api/push", server + "/api/push", async (r) => { const j = await r.json().catch(() => null); if (!j || j.scheduler !== true) { problems.push("/api/push: ה-scheduler אינו פעיל"); return false; } return true; });
   await check("/api/rems", server + "/api/rems?t=" + rnd(30), async (r) => { const j = await r.json().catch(() => null); if (!j || !Array.isArray(j.rems) || j.rems.length) { problems.push("/api/rems: תשובה לא צפויה"); return false; } return true; });
   await check("/cal/*.ics", server + "/cal/" + rnd(30) + ".ics", async (r) => { if (!/text\/calendar/i.test(r.headers.get("content-type") || "")) { problems.push("/cal/*.ics: סוג התוכן אינו text/calendar"); return false; } return true; });
+
+  // 🐤 הבדיקה היומית של שרשרת התזכורות (סטטוס ציבורי, בלי מידע אישי). 404 = עוד לא נפרס
+  try {
+    const r = await get(fetchFn, server + "/api/status");
+    let st = null;
+    if (r.status === 200) st = await r.json().catch(() => null);
+    else if (r.status !== 404) problems.push("/api/status: HTTP " + r.status);
+    const c = evaluateCanary(st, now); problems.push(...c.problems); info.canary = c.info;
+  } catch (e) { problems.push("/api/status: " + (e.name === "AbortError" ? "תם הזמן" : e.message)); }
 
   // cron של התראות המעקב: בלי הרשאה צריך להחזיר 401. 503 = CRON_SECRET לא מוגדר בפרויקט (ההתראות לא ירוצו). GET בלבד, בלי סוד
   try {

@@ -5,13 +5,15 @@ import { QBASE, remPayload, fireDest } from "./_snz.js";
 import { validSub } from "./_val.js";
 import { wantedSchedule, START_SUFFIX } from "./_rems.js";
 import { withDerived, isDerKey, folPath, pruneDerived } from "./_fol.js";
+import { tmPath, normTm, mergePend } from "./_team.js";
+import { logEv, hostOf } from "./_rlog.js";
 export { remPayload };
 
 export { readJson, writeJson }; // נשארים מיוצאים מכאן (snooze.js, בדיקות); המימוש ב-_db.js
 export const getSubs = (t) => readJson(`push/${t}.json`, []);
 export const setSubs = (t, s) => writeJson(`push/${t}.json`, s);
 
-// d (לבדיקות): {getSubs, setSubs, send}
+// d (לבדיקות): {getSubs, setSubs, send}. d.trace (מערך, אופציונלי): לכל מכשיר {h: מארח שירות הפוש, c: קוד HTTP, e?: שגיאה} – ליומן התזכורות
 export async function sendTo(t, payload, d = {}) {
   const send = d.send || ((s, body, o) => webpush.sendNotification(s, body, o));
   if (!d.send) webpush.setVapidDetails("mailto:tv-guide@users.noreply.github.com", process.env.VAPID_PUBLIC, process.env.VAPID_PRIVATE);
@@ -19,8 +21,8 @@ export async function sendTo(t, payload, d = {}) {
   let ok = 0; const keep = [];
   for (const s of subs) {
     if (!validSub(s)) { keep.push(s); continue; } // מנוי שלא עומד באימות לא מקבל בקשת רשת (SSRF), אבל גם לא נמחק
-    try { await send(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); }
-    catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) keep.push(s); else console.log("subscription gone", e.statusCode); }
+    try { const r = await send(s, JSON.stringify(payload), { TTL: 900, urgency: "high" }); ok++; keep.push(s); if (d.trace) d.trace.push({ h: hostOf(s.endpoint), c: (r && r.statusCode) || 201 }); }
+    catch (e) { if (d.trace) d.trace.push({ h: hostOf(s.endpoint), c: e.statusCode || 0, e: String((e && e.message) || "error").slice(0, 120) }); if (e.statusCode !== 404 && e.statusCode !== 410) keep.push(s); else console.log("subscription gone", e.statusCode); }
   }
   if (keep.length !== subs.length) { try { await (d.setSubs || setSubs)(t, keep); } catch (e) { console.error("setSubs failed (push already sent)", e && e.message); } }
   return { ok, total: subs.length };
@@ -49,6 +51,8 @@ export async function reschedule(t, rems, d = {}) {
   // תזכורות שנגזרו ממעקב אחרי סדרות (fol/<t>) מצטרפות לאותו תקציב (60 מתוזמנות, 300 פרסומים ביום); של המשתמש קודמות
   let fol = null; if (subs.length) { try { fol = await rj(folPath(t), null); } catch (e) { console.error("reschedule fol", e && e.message); } }
   if (fol && Array.isArray(fol.derived) && fol.derived.length) rems = withDerived(rems, pruneDerived(fol.derived, fol.follows), now); // רק של מעקבים פעילים
+  // ⚽ תזכורות קבוצה שהשרת הוסיף ועוד לא אושרו בלקוח (tm/<t>). מה שנורה זה עתה (__f) לא חוזר (ירי מאוחר לא יתוזמן שוב)
+  if (subs.length) { try { const pend = normTm(await rj(tmPath(t), null)).pend.filter((p) => !fired[p.k]); if (pend.length) rems = mergePend(rems, pend, now); } catch (e) { console.error("reschedule tm", e && e.message); } }
   let want = subs.length ? wantedSchedule(rems, now) : {}; // כולל הודעות k#s (תחילת שידור)
   const noNew = new Set(rems.filter((r) => r.stOnly).map((r) => r.k + START_SUFFIX)); // stOnly: רק משאירים k#s קיימת, לא מפרסמים
   for (const k of Object.keys(want)) if (fired[k] && Math.abs(fired[k].at - want[k]) < 60000) delete want[k];
@@ -61,16 +65,18 @@ export async function reschedule(t, rems, d = {}) {
     capped = ks.length - MAX_SCHED; want = keep;
   } else { const o = {}; for (const k of ks) o[k] = want[k]; want = o; }
   let added = 0, removed = 0, limited = false;
+  const ev = []; // יומן התזכורות (נכתב פעם אחת בסוף)
   for (const k of Object.keys(sched)) {
     if (want[k] && Math.abs(sched[k].at - want[k]) < 60000) { delete want[k]; continue; }
     try { await fx(`${QBASE()}/v2/messages/${sched[k].id}`, { method: "DELETE", headers: { authorization: "Bearer " + token } }); } catch (e) {}
+    ev.push({ k, e: "unsched", id: sched[k].id, fa: sched[k].at, why: want[k] ? "moved" : "gone" });
     delete sched[k]; removed++;
   }
   for (const [k, at] of Object.entries(want)) {
     if (noNew.has(k)) continue;
-    if (q.n >= MAX_PUBLISH_DAY) { limited = true; break; }
+    if (q.n >= MAX_PUBLISH_DAY) { limited = true; ev.push({ k, e: "sched-skip", why: "daily" }); break; }
     if (isDerKey(k) && q.n >= MAX_PUBLISH_DAY - DER_RESERVE) { limited = true; continue; }
-    if (d.deadline && Date.now() > d.deadline) { limited = "time"; break; } // ההמשך יתוזמן בהרצה/שמירה הבאה
+    if (d.deadline && Date.now() > d.deadline) { limited = "time"; ev.push({ k, e: "sched-skip", why: "time" }); break; } // ההמשך יתוזמן בהרצה/שמירה הבאה
     q.n++;
     const r = await fx(`${QBASE()}/v2/publish/${fireDest()}`, {
       method: "POST", signal: !d.fetch && AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined,
@@ -78,7 +84,8 @@ export async function reschedule(t, rems, d = {}) {
       body: JSON.stringify(k.endsWith(START_SUFFIX) ? { t, k: k.slice(0, -START_SUFFIX.length), at, st: 1 } : { t, k, at }), // st: התראת תחילת שידור
     });
     const j = await r.json().catch(() => ({}));
-    if (r.ok && j.messageId) { sched[k] = { at, id: j.messageId }; added++; } else console.log("qstash publish failed", r.status, JSON.stringify(j).slice(0, 200));
+    if (r.ok && j.messageId) { sched[k] = { at, id: j.messageId }; added++; ev.push({ k, e: "sched", id: j.messageId, fa: at }); }
+    else { console.log("qstash publish failed", r.status, JSON.stringify(j).slice(0, 200)); ev.push({ k, e: "sched-fail", c: r.status, err: String(j && j.error || "").slice(0, 120) }); }
   }
   sched.__q = q;
   if (Object.keys(fired).length) sched.__f = fired;
@@ -86,6 +93,8 @@ export async function reschedule(t, rems, d = {}) {
   const out = { added, removed, total: Object.keys(sched).filter((k) => !k.startsWith("__")).length };
   if (capped) out.capped = capped;
   if (limited) out.limited = limited === "time" ? "time" : "daily";
+  if (capped) ev.push({ k: "*", e: "capped", n: capped });
+  if (ev.length) await (d.log || logEv)(t, ev, d.log ? undefined : {});
   return out;
 }
 const FIRED_MS = 120000;

@@ -21,6 +21,14 @@
     {
       "source": "/n/:k",
       "destination": "/api/nf-search?og=:k"
+    },
+    {
+      "source": "/api/team-sync",
+      "destination": "/api/watch-check?job=team"
+    },
+    {
+      "source": "/api/status",
+      "destination": "/api/push?status=1"
     }
   ],
   "headers": [

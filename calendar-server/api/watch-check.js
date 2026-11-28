@@ -1,4 +1,5 @@
 // GET /api/watch-check  → הבדיקה היומית של רשימות המעקב (Vercel Cron, ראו vercel.json "crons").
+// POST /api/team-sync?u=<updated> (rewrite ל-/api/watch-check?job=team) → ⚽ תזכורות קבוצה בצד השרת, מיד אחרי עדכון הלוח (GitHub Action update.yml).
 // אימות: Vercel שולחת Authorization: Bearer <CRON_SECRET> כש-CRON_SECRET מוגדר בפרויקט. בלי המשתנה, הנקודה סגורה (503).
 import { safeEq } from "./_sig.js";
 import { readJson, writeJson, getSubs, sendTo } from "./_push.js";
@@ -11,6 +12,38 @@ import { SEARCH_TTL } from "./_nfs.js";
 import { fail } from "./_guard.js";
 import { cleanParties } from "./_party.js"; // 🍿 ערב צפייה
 import { scheduleTonight } from "./_tonight.js"; // 🌙 הערב שלך ב-19:00
+import { runTeamSync } from "./_team.js"; // ⚽ הקבוצה שלי: תזכורות אוטומטיות בשרת
+import { loadOwn } from "./_store.js";
+import { GUIDE_URL } from "./_wcheck.js";
+import { logEv, cleanLog } from "./_rlog.js"; // יומן התזכורות (30 יום)
+import { scheduleCanary } from "./_canary.js"; // 🐤 בדיקה יומית של QStash → /api/fire
+import { listJson as listJ } from "./_db.js";
+
+export const TEAM_STATS = "stats/teamsync.json"; // {u: updated של הלוח, at, done, added, users}
+// הלוח הטרי מ-GitHub Pages (עוקף את המטמון של 10 דקות ואת המטמון של ה-CDN): רגע אחרי commit של העדכון הלילי
+export async function freshGuide(fx = fetch, now = Date.now()) {
+  try {
+    const r = await fx(GUIDE_URL + "?ts=" + now, { cache: "no-store", signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined });
+    const g = r.ok ? await r.json() : null;
+    return g && Array.isArray(g.programs) && g.programs.length ? g : null;
+  } catch (e) { console.error("team guide", e && e.message); return null; }
+}
+// d (לבדיקות): {readJson, writeJson, list, loadOwn, reschedule, log, guide, fetch, now}
+export async function teamJob(u, d = {}) {
+  if (process.env.TEAMSYNC_OFF === "1") return { skipped: "off" };
+  const now = d.now ? d.now() : Date.now(), rj = d.readJson || readJson, wj = d.writeJson || writeJson;
+  const guide = d.guide ? await d.guide() : await freshGuide(d.fetch || fetch, now);
+  if (!guide) return { skipped: "no guide" };
+  const have = String(guide.updated || "");
+  if (u && have < u) return { stale: true, have, want: u }; // Pages עוד מגיש את הלוח הקודם: ה-Action ינסה שוב
+  const last = await rj(TEAM_STATS, null);
+  if (u && last && last.u === have && last.done) return { dup: true, u: have }; // כבר רץ על הלוח הזה
+  const r = await runTeamSync({ list: d.list || listJ, readJson: rj, writeJson: wj, loadOwn: d.loadOwn || loadOwn,
+    reschedule: d.reschedule || ((t, rems) => reschedule(t, rems)), log: d.log || logEv, guide: async () => guide, now: () => now, deadline: d.deadline || Date.now() + 45000 });
+  if (!r.skipped) await wj(TEAM_STATS, { u: have, at: now, done: !r.more, added: r.added, users: r.auto });
+  console.log("team-sync", JSON.stringify(r));
+  return r;
+}
 
 // כל המשתמשים עם רשימת מעקב: אוסף wl ב-Firestore (מזהה המסמך = הטוקן). הערכים כבר נקראו: אין קריאה שנייה לכל משתמש
 export async function listUsers(list = listJson) {
@@ -48,6 +81,16 @@ export function cronAuth(req, secret = process.env.CRON_SECRET) {
 
 // d (לבדיקות): תלויות של runCheck
 export default async function handler(req, res, d = {}) {
+  if (req.query && req.query.job === "team") { // ⚽ POST /api/team-sync (או GET), אותו סוד כמו ה-cron
+    if (req.method !== "POST" && req.method !== "GET") return res.status(405).end();
+    const au = cronAuth(req);
+    if (au !== 200) return res.status(au).json({ error: au === 503 ? "not configured" : "unauthorized" });
+    try {
+      const u = String(req.query.u || "").slice(0, 40);
+      res.setHeader("cache-control", "no-store");
+      return res.status(200).json(await (d.teamJob || teamJob)(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z?$/.test(u) ? u : "", d.team || {}));
+    } catch (e) { return fail(res, e, "team-sync"); }
+  }
   if (req.method !== "GET") return res.status(405).end();
   const t0 = Date.now(); // 🍿 ערב צפייה: deadline משותף לניקוי, מתחילת הריצה
   const au = cronAuth(req);
@@ -64,8 +107,15 @@ export default async function handler(req, res, d = {}) {
     try {
       fo = await runFollowCheck({ listFol, readJson, writeJson, getSubs, load, reschedule: (t, rems, o) => reschedule(t, rems, o), deadline: t0 + FOLLOW_BUDGET_MS + 10000, ...d, ...(d.follow || {}), guide: guideOnce });
     } catch (e) { console.error("follow-check", e && e.message); fo = { error: true }; }
+    // ⚽ גיבוי ליומי: תזכורות קבוצה (העיקר רץ מה-Action אחרי עדכון הלוח). עד ~8 שניות, לא מתחיל משתמש חדש אחריהן
+    let tm;
+    try { tm = await (d.teamJob || teamJob)("", { guide: guideOnce, deadline: Date.now() + 8000, ...(d.team || {}) }); } catch (e) { tm = { error: true }; console.error("team-sync cron", e && e.message); }
+    // 🐤 בדיקה יומית: הודעה ל-/api/fire בעוד 5 דקות; ויומן התזכורות: מחיקת ימים מעל 30
+    let cn;
+    try { cn = await (d.scheduleCanary || scheduleCanary)({ readJson: d.readJson || readJson, writeJson: d.writeJson || writeJson, fetch: d.fetch, now: d.now }); } catch (e) { cn = { error: true }; console.error("canary schedule", e && e.message); }
     const r = await runCheck({ listUsers, readJson, writeJson, getSubs, sendTo, cleanCache: (now) => cleanNfCache(now), deadline: t0 + 52000, ...d, guide: guideOnce }); // משאיר זמן לניקוי ערבי הצפייה לפני maxDuration 60
-    r.follow = fo; r.tn = tn;
+    r.follow = fo; r.tn = tn; r.team = tm; r.canary = cn;
+    try { r.rlog = await (d.cleanLog || ((dl) => listJ("push").then((rows) => cleanLog(rows.map((x) => x.id), Date.now(), { deadline: dl }))))(t0 + 55000); } catch (e) { r.rlog = -1; console.error("rlog cleanup", e && e.message); }
     // 🍿 ערב צפייה: ניקוי קטן (עד 100 ערבים שעברו יומיים), מכבד את הזמן שנשאר. כישלון כאן לא פוגע בבדיקה היומית
     try { r.parties = await (d.cleanParties || cleanParties)(Date.now(), { deadline: t0 + 55000 }); } catch (e) { r.parties = -1; console.error("party cleanup failed"); }
     console.log("watch-check", JSON.stringify(r));

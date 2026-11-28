@@ -10,6 +10,8 @@ import { derivedStillAired, rederive } from "./_fcheck.js";
 import { readJson, writeJson, listJson } from "./_db.js";
 import { fireTonight } from "./_tonight.js"; // 🌙 הערב שלך ב-19:00
 import { getGuide } from "./_fcheck.js";
+import { logEv } from "./_rlog.js";
+import { fireCanary } from "./_canary.js"; // 🐤 בדיקה יומית שהשרשרת QStash → /api/fire עובדת
 
 export const config = { api: { bodyParser: false } }; // צריך את הגוף הגולמי לאימות תקציר החתימה
 
@@ -65,8 +67,16 @@ export default async function handler(req, res) {
       const r = await fireTonight(b, { list: listJson, readJson, writeJson, load, sendTo, guide: () => getGuide({}), deadline: Date.now() + 45000 });
       return res.status(r.status).json(r.json);
     }
+    if (b && b.canary === 1) { const r = await fireCanary(b, { readJson, writeJson }); return res.status(r.status).json(r.json); }
     if (!b || !okToken(b.t) || typeof b.k !== "string") return res.status(400).json({ error: "bad request" });
-    const r = await handleFire(b, { load: loadAll, sendTo, dropSched, reschedule, checkDerived });
+    // יומן התזכורות: תשובת שירות הפוש לכל מכשיר. לא זורק (logEv בולע שגיאות): כישלון כאן לא יגרום ל-QStash לנסות שוב ולשלוח פוש כפול
+    const trace = [];
+    let r;
+    try { r = await handleFire(b, { load: loadAll, sendTo: (t, p) => sendTo(t, p, { trace }), dropSched, reschedule, checkDerived }); }
+    catch (e) { await logEv(b.t, [{ k: b.k, e: "fire-err", fa: b.at, st: b.st ? 1 : undefined, sn: b.snooze ? 1 : undefined, err: String((e && e.message) || "error").slice(0, 160) }]); throw e; }
+    const j = r.json || {};
+    await logEv(b.t, [j.skipped ? { k: b.k, e: "fire-skip", why: j.skipped, fa: b.at }
+      : { k: b.k, e: b.snooze ? "snooze-fired" : b.st ? "fired-start" : "fired", fa: b.at, ok: j.ok, total: j.total, w: trace, sch: j.sch && (j.sch.error || j.sch.limited || j.sch.capped) ? j.sch : undefined }]);
     return res.status(r.status).json(r.json);
   } catch (e) {
     return fail(res, e, "fire");

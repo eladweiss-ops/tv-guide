@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateGuide, evaluateNetflix, evaluateDisney, evaluateCaches, parseSiteFiles, runHealth, israelNow, T } from "./health.mjs";
+import { evaluateGuide, evaluateNetflix, evaluateDisney, evaluateCaches, evaluateCanary, parseSiteFiles, runHealth, israelNow, T } from "./health.mjs";
 
 // שישי 2026-10-30 12:00 שעון ישראל (UTC+2 אחרי המעבר לשעון חורף) – מחר שבת
 const NOW = new Date("2026-10-30T10:00:00Z");
@@ -124,6 +124,7 @@ test("runHealth עם fetch מזויף: הכול תקין, ורק GET", async () 
     if (u.endsWith("hot-cache.json")) return res({ "1|2026-11-02T01:57": {} });
     if (u.endsWith("extra-cache.json")) return res({ x14: { at: "2026-10-30T08:00:00Z" } });
     if (u.endsWith("/api/push")) return res({ scheduler: true });
+    if (u.endsWith("/api/status")) return res({ scheduler: true, canaryAt: NOW.getTime() - 4 * 3600000, canaryOk: true, canaryPlan: NOW.getTime() - 4 * 3600000 - 1000, canaryLag: 2000 });
     if (u.endsWith("/api/rems")) { assert.match(url, /t=[a-z0-9]{30}$/); return res({ rems: [] }); }
     if (u.endsWith(".ics")) return res("BEGIN", "text/calendar; charset=utf-8");
     if (u.endsWith("/api/watch-check")) return { status: 401, headers: { get: () => "application/json" }, json: async () => ({}), text: async () => "" }; // בלי הרשאה: 401 = ה-cron מוגן ו-CRON_SECRET מוגדר
@@ -186,4 +187,38 @@ test("תקצירים: רק 72 השעות הקרובות, ואחרי העתקה �
   const r = evaluateGuide({ updated: "2026-10-31T17:00:00Z", channels: [], programs }, now);
   assert.equal(r.info.synopsisPct, Math.round((4 / 6) * 1000) / 10);
   assert.equal(r.info.synopsisAllPct, Math.round((3 / 7) * 1000) / 10);
+});
+
+test("🐤 evaluateCanary: תקין, ישן מ-26 שעות, באיחור, תוזמנה ולא הגיעה, ולפני פריסה (לא תקלה)", () => {
+  const H = 3600000, t = NOW.getTime();
+  assert.deepEqual(evaluateCanary({ canaryAt: t - 5 * H, canaryOk: true, canaryPlan: t - 5 * H - 300000, canaryLag: 3000 }, NOW).problems, []);
+  assert.equal(evaluateCanary({ canaryAt: t - 5 * H, canaryOk: true }, NOW).info.state, "ok");
+  assert.match(evaluateCanary({ canaryAt: t - 27 * H, canaryOk: true }, NOW).problems[0], /לא רצה/);
+  assert.match(evaluateCanary({ canaryAt: t - 1 * H, canaryOk: false, canaryLag: 14 * 60000 }, NOW).problems[0], /באיחור של 14 דקות/);
+  // תוזמנה היום (אחרי הירי של אתמול) ועברו 3 שעות בלי ירי
+  assert.match(evaluateCanary({ canaryAt: t - 20 * H, canaryOk: true, canaryPlan: t - 3 * H }, NOW).problems[0], /לא הגיעה/);
+  assert.deepEqual(evaluateCanary({ canaryAt: t - 20 * H, canaryOk: true, canaryPlan: t - 1 * H }, NOW).problems, []); // עוד בחלון
+  // מעולם לא רצה: רק אם תוזמנה ועברו שעתיים
+  assert.match(evaluateCanary({ canaryAt: null, canaryOk: null, canaryPlan: t - 3 * H }, NOW).problems[0], /לא הגיעה/);
+  assert.deepEqual(evaluateCanary({ canaryAt: null, canaryOk: null, canaryPlan: null }, NOW).problems, []);
+  assert.equal(evaluateCanary({ canaryAt: null, canaryPlan: null }, NOW).info.state, "never-ran");
+  // לפני פריסה: 404 (st=null) או GET ישן בלי השדות
+  assert.deepEqual(evaluateCanary(null, NOW), { problems: [], info: { state: "not-deployed" } });
+  assert.equal(evaluateCanary({ key: "x", scheduler: true }, NOW).info.state, "not-deployed");
+  assert.equal(T.CANARY_MAX_AGE_H, 26);
+});
+
+test("🐤 runHealth: /api/status – 404 לפני פריסה לא תקלה; 500 תקלה; בדיקה ישנה תקלה", async () => {
+  const mk = (st, body) => async (url) => {
+    const u = url.replace(/\?.*/, ""), res = (b, status = 200, ct = "application/json") => ({ status, headers: { get: () => ct }, json: async () => b, text: async () => b });
+    if (u.endsWith("index.html")) return res('BUILD = "B1"; TVG.list = [];', 200, "text/html");
+    if (u.endsWith("/api/status")) return res(body, st);
+    return res({}, 500);
+  };
+  const has = (r, re) => r.problems.some((p) => re.test(p));
+  let r = await runHealth({ fetchFn: mk(404, {}), now: NOW });
+  assert.ok(!has(r, /status|הבדיקה היומית/)); assert.equal(r.info.canary.state, "not-deployed");
+  assert.ok(has(await runHealth({ fetchFn: mk(500, {}), now: NOW }), /\/api\/status: HTTP 500/));
+  r = await runHealth({ fetchFn: mk(200, { canaryAt: NOW.getTime() - 30 * 3600000, canaryOk: true }), now: NOW });
+  assert.ok(has(r, /הבדיקה היומית של התזכורות לא רצה/));
 });

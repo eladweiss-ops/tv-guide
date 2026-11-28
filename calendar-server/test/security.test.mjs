@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, createHash, createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 process.env.FIRE_SECRET = "test-secret-not-real";
 process.env.QSTASH_TOKEN = "qs-test";
@@ -382,7 +382,14 @@ test("vercel.json: Referrer-Policy ו-nosniff על /api ועל /cal, וה-CORS �
     assert.equal(h["X-Content-Type-Options"], "nosniff");
   }
   assert.equal(by("/api/(.*)")["Access-Control-Allow-Origin"], "*");
-  assert.deepEqual(v.rewrites, [{ source: "/cal/:t.ics", destination: "/api/cal?t=:t" }, { source: "/n/:k", destination: "/api/nf-search?og=:k" }]);
+  assert.deepEqual(v.rewrites, [{ source: "/cal/:t.ics", destination: "/api/cal?t=:t" }, { source: "/n/:k", destination: "/api/nf-search?og=:k" },
+    { source: "/api/team-sync", destination: "/api/watch-check?job=team" }, { source: "/api/status", destination: "/api/push?status=1" }]);
+});
+
+// Vercel Hobby: עד 12 פונקציות בפריסה. נקודות קצה חדשות עוברות דרך rewrites לפונקציות קיימות
+test("vercel: לכל היותר 12 פונקציות (קבצי api/ בלי _)", () => {
+  const n = readdirSync(new URL("../api/", import.meta.url)).filter((f) => f.endsWith(".js") && !f.startsWith("_")).length;
+  assert.ok(n <= 12, `${n} פונקציות`);
 });
 
 // ---------- מצב אימות JWT בלוג ----------

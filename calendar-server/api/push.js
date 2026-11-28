@@ -2,15 +2,23 @@
 // POST /api/push {t, test:1}       → התראת בדיקה מיידית
 // POST /api/push {t, off:endpoint} → ביטול מכשיר
 // ה-endpoint חייב להיות שירות פוש מוכר (ראו _val.js), אחרת 400
+// GET /api/push?status=1 (= GET /api/status, rewrite ב-vercel.json) → סטטוס ציבורי בלי מידע אישי: הבדיקה היומית 🐤 (ראו _canary.js)
 import { okToken, load } from "./_store.js";
 import { getSubs, setSubs, sendTo, reschedule } from "./_push.js";
 import { validSub } from "./_val.js";
 import { allow, clientIp, tooMany, readBody, fail } from "./_guard.js";
+import { canaryStatus } from "./_canary.js";
+import { readJson } from "./_db.js";
 
 export const MAX_BODY = 4096;
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method === "GET" && req.query && req.query.status) {
+    if (!allow("status:ip:" + clientIp(req), 30)) return tooMany(res);
+    try { res.setHeader("cache-control", "no-store"); return res.status(200).json({ scheduler: !!process.env.QSTASH_TOKEN, ...(await canaryStatus({ readJson })) }); }
+    catch (e) { return fail(res, e, "status"); }
+  }
   if (req.method === "GET") return res.status(200).json({ key: process.env.VAPID_PUBLIC, scheduler: !!process.env.QSTASH_TOKEN });
   if (req.method !== "POST") return res.status(405).end();
   try {
